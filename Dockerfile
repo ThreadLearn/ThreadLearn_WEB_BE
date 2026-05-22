@@ -16,7 +16,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN npm run build
+RUN DATABASE_URL="mongodb://localhost:27017/dummy" \
+    JWT_ACCESS_SECRET="dummy_access" \
+    JWT_REFRESH_SECRET="dummy_refresh" \
+    npm run build
 
 # ============================================
 # Stage 3: Runner (Production)
