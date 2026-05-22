@@ -29,6 +29,10 @@ jobs:
 
       - name: Type Check & Build Next.js
         run: npm run build
+        env:
+          DATABASE_URL: "mongodb://localhost:27017/dummy"
+          JWT_ACCESS_SECRET: "dummy_access"
+          JWT_REFRESH_SECRET: "dummy_refresh"
 
       - name: Validate Dockerfile Build
         run: docker build -t threadlearn-backend .
