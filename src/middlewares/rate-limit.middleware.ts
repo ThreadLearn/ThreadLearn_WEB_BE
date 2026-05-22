@@ -1,4 +1,4 @@
-import { redis } from '../configs/redis';
+import { getRedisClient } from '../configs/redis';
 import { env } from '../configs/env';
 import { logger } from '../configs/logger';
 import { AppError } from '../common/custom-error';
@@ -16,6 +16,7 @@ export async function rateLimiter(ip: string): Promise<void> {
   const limit = env.RATE_LIMIT_LIMIT;
   const key = `rate-limit:${ip}`;
 
+  const redis = getRedisClient();
   if (redis.isOpen) {
     try {
       const hits = await redis.incr(key);

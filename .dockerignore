@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.github
+coverage
+logs
+.env
+.env.local
+dist
+Dockerfile
