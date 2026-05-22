@@ -43,5 +43,7 @@ export function getRedisClient() {
   return client;
 }
 
-export const redis = getRedisClient();
-export default redis;
+// Lazy getter — avoids connecting during `next build` or CI where
+// Redis is unavailable.  The first runtime call to getRedisClient()
+// will establish the connection.
+export default getRedisClient;

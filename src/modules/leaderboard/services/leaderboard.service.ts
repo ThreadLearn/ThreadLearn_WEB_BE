@@ -1,4 +1,4 @@
-import { redis } from '../../../configs/redis';
+import { getRedisClient } from '../../../configs/redis';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { logger } from '../../../configs/logger';
 
@@ -7,6 +7,7 @@ export class LeaderboardService {
 
   static async syncLeaderboardToRedis() {
     try {
+      const redis = getRedisClient();
       if (!redis.isOpen) return;
 
       const stats = await UserStats.find().populate('userId', 'firstName lastName');
@@ -27,6 +28,7 @@ export class LeaderboardService {
 
   static async getTopRankings(limit = 10) {
     try {
+      const redis = getRedisClient();
       if (redis.isOpen) {
         const range = await redis.zRangeWithScores(this.LEADERBOARD_KEY, 0, limit - 1, {
           REV: true,
