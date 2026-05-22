@@ -27,8 +27,6 @@ COPY . .
 # and CI pipelines. Real production values are injected at runtime
 # via deployment environment variables or Docker secrets.
 
-RUN ls -la && ls -la src && ls -la src/configs
-
 RUN DATABASE_URL="mongodb://localhost:27017/dummy" \
     JWT_ACCESS_SECRET="dummy_access" \
     JWT_REFRESH_SECRET="dummy_refresh" \
