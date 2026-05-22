@@ -1,14 +1,14 @@
 # ============================================
-# Stage 1: Dependencies
+# Stage 1: Install ALL dependencies (including devDeps for build)
 # ============================================
 FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci
 
 # ============================================
-# Stage 2: Builder
+# Stage 2: Builder — compile Next.js + TypeScript
 # ============================================
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -34,7 +34,16 @@ RUN DATABASE_URL="mongodb://localhost:27017/dummy" \
     npm run build
 
 # ============================================
-# Stage 3: Runner (Production)
+# Stage 3: Production dependencies only
+# ============================================
+FROM node:20-alpine AS prod-deps
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# ============================================
+# Stage 4: Runner (Production)
 # ============================================
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -49,6 +58,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/dist ./dist
+COPY --from=prod-deps /app/node_modules ./node_modules
 
 RUN mkdir -p ./logs ./public/uploads/attachments ./public/uploads/avatars
 RUN chown -R nextjs:nodejs ./logs ./public/uploads
