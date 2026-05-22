@@ -1,0 +1,30 @@
+name: Refactor Request
+description: Propose an improvement to code quality, architecture, or tech debt
+title: "[REFACTOR] "
+labels: ["refactor"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement!
+  - type: input
+    id: module
+    attributes:
+      label: Module or File affected
+      description: E.g., src/modules/auth/services/auth.service.ts
+    validations:
+      required: true
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Current State (Why does it need refactoring?)
+      description: Describe the current implementation and its drawbacks (e.g. performance issues, unreadable code).
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_state
+    attributes:
+      label: Proposed Improvement
+      description: How would you improve this? Describe your architectural or code changes.
+    validations:
+      required: true
