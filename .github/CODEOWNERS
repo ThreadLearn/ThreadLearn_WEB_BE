@@ -1,0 +1,21 @@
+# Default fallback owner
+* @dat-21
+
+# Feature module ownership
+/src/modules/auth/            @hoanghuync
+/src/modules/ai/              @hoanganh306
+/src/modules/quiz/            @trung2605
+/src/modules/quiz-attempts/   @trung2605
+/src/modules/leaderboard/     @hoanghuync
+/src/modules/admin/           @dat-21
+/src/modules/notifications/   @VanAnWebdev
+
+# GitHub workflows & CI
+/.github/                     @dat-21
+
+# Environment & infrastructure
+/docker-compose.yml           @dat-21
+/Dockerfile                   @dat-21
+
+# Documentation
+/README.md                    @dat-21
