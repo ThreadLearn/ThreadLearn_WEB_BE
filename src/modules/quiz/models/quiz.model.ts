@@ -1,0 +1,36 @@
+import mongoose, { Schema, Document, Model } from 'mongoose';
+
+export interface IQuestion {
+  questionText: string;
+  options: string[];
+  correctAnswerIndex: number;
+}
+
+export interface IQuiz extends Document {
+  lessonId: mongoose.Types.ObjectId;
+  title: string;
+  xpReward: number;
+  questions: IQuestion[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const QuizSchema: Schema<IQuiz> = new Schema(
+  {
+    lessonId: { type: Schema.Types.ObjectId, ref: 'Lesson', required: true, index: true },
+    title: { type: String, required: true, trim: true },
+    xpReward: { type: Number, default: 100 },
+    questions: [
+      {
+        questionText: { type: String, required: true },
+        options: [{ type: String, required: true }],
+        correctAnswerIndex: { type: Number, required: true },
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+export const Quiz: Model<IQuiz> =
+  mongoose.models.Quiz || mongoose.model<IQuiz>('Quiz', QuizSchema);
+export default Quiz;
