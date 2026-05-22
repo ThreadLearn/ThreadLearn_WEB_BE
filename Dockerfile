@@ -16,9 +16,21 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# ============================================
+# Build-time environment variables
+# ============================================
+# Next.js App Router evaluates API routes during `next build`.
+# Some routes import env validation (Zod) and require mandatory
+# environment variables at build time.
+#
+# These dummy values are ONLY used for compilation inside Docker
+# and CI pipelines. Real production values are injected at runtime
+# via deployment environment variables or Docker secrets.
+
 RUN DATABASE_URL="mongodb://localhost:27017/dummy" \
     JWT_ACCESS_SECRET="dummy_access" \
     JWT_REFRESH_SECRET="dummy_refresh" \
+    NEXTAUTH_SECRET="dummy_nextauth_secret" \
     npm run build
 
 # ============================================
