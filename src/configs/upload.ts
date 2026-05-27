@@ -4,9 +4,11 @@ import { env } from './env';
 import { logger } from './logger';
 import { BadRequestError } from '../common/custom-error';
 
-export async function saveUploadedFile(file: File, folder = 'attachments'): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
+type UploadFile = File | Express.Multer.File;
+
+export async function saveUploadedFile(file: UploadFile, folder = 'attachments'): Promise<string> {
+  const isMulterFile = 'buffer' in file;
+  const buffer = isMulterFile ? file.buffer : Buffer.from(await file.arrayBuffer());
 
   // Validate size
   const maxBytes = env.MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -21,8 +23,9 @@ export async function saveUploadedFile(file: File, folder = 'attachments'): Prom
   }
 
   // Generate safe name
-  const originalExtension = path.extname(file.name);
-  const baseName = path.basename(file.name, originalExtension).replace(/[^a-zA-Z0-9]/g, '_');
+  const originalName = isMulterFile ? file.originalname : file.name;
+  const originalExtension = path.extname(originalName);
+  const baseName = path.basename(originalName, originalExtension).replace(/[^a-zA-Z0-9]/g, '_');
   const uniqueName = `${Date.now()}-${baseName}${originalExtension}`;
   const filePath = path.join(targetDir, uniqueName);
 

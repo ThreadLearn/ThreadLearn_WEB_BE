@@ -2,69 +2,69 @@
 
 Base URL:
 
-- <http://localhost:5000>
+- `http://localhost:3000`
 
 Conventions:
 
-- All API routes below are under /api/v1 unless stated otherwise.
-- Protected routes require header: Authorization: Bearer <access_token>
-- Admin-only routes require role ADMIN.
+- All API routes below are under `/api/v1` unless stated otherwise.
+- Protected routes require `Authorization: Bearer <access_token>`.
+- Admin-only routes require authenticated user role `ADMIN`.
+- Swagger UI is served at `/api/docs`.
 
-Authentication (custom)
+## Authentication
 
-- POST /api/v1/auth/register
-- POST /api/v1/auth/login
-- POST /api/v1/auth/logout
-- POST /api/v1/auth/refresh
-- GET  /api/v1/auth/session (protected)
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/session` protected
 
-Authentication (NextAuth)
+OAuth endpoints are not currently implemented. The previous framework-specific OAuth route was removed during the NestJS migration.
 
-- GET  /api/auth/[...nextauth]
-- POST /api/auth/[...nextauth]
+## Users
 
-Users
+- `GET /api/v1/users/profile` protected
+- `POST /api/v1/users/avatar` protected, multipart field: `avatar`
 
-- GET  /api/v1/users/profile (protected)
-- POST /api/v1/users/avatar (protected)
+## Courses
 
-Courses
+- `GET /api/v1/courses`
+  - Query: `page=1`, `limit=10`, `search=keyword`
+- `POST /api/v1/courses` protected, ADMIN
+- `GET /api/v1/courses/:id`
 
-- GET  /api/v1/courses
-- POST /api/v1/courses (protected, ADMIN)
-- GET  /api/v1/courses/:id
+## Lessons
 
-Lessons
+- `GET /api/v1/lessons/:id`
+- `POST /api/v1/lessons/:id/attachment` protected, ADMIN, multipart field: `attachment`
 
-- GET  /api/v1/lessons/:id
-- POST /api/v1/lessons/:id/attachment (protected, ADMIN)
+## Quiz
 
-Quiz
+- `POST /api/v1/quiz/submit` protected
 
-- POST /api/v1/quiz/submit (protected)
+## Notifications
 
-Notifications
+- `GET /api/v1/notifications` protected
+  - Query: `unread=true`
+- `PATCH /api/v1/notifications/:id` protected
 
-- GET   /api/v1/notifications (protected)
-  - Query: unread=true
-- PATCH /api/v1/notifications/:id (protected)
+## Leaderboard
 
-Leaderboard
+- `GET /api/v1/leaderboard`
+  - Query: `limit=10`
 
-- GET /api/v1/leaderboard
-  - Query: limit=10
+## AI
 
-AI
+- `POST /api/v1/ai/recommendation` protected
+- `GET /api/v1/ai/recommendation` protected
 
-- POST /api/v1/ai/recommendation (protected)
-- GET  /api/v1/ai/recommendation (protected)
+## Admin
 
-Admin
+- `GET /api/v1/admin/stats` protected, ADMIN
+- `POST /api/v1/admin/execute` protected, ADMIN
 
-- GET  /api/v1/admin/stats (protected, ADMIN)
-- POST /api/v1/admin/execute (protected)
+## System
 
-System
-
-- GET /api/v1/health
-- GET /api/v1/docs
+- `GET /api/v1/health`
+- `GET /api/docs`
+- `GET /api/v1/docs` redirects to `/api/docs`
