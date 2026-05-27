@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs'; 
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
@@ -29,7 +29,7 @@ export class AuthService {
 
     const user = await User.create({
       email: data.email,
-      passwordHash,
+      passwordHash, 
       firstName: data.firstName,
       lastName: data.lastName,
       role: 'STUDENT',

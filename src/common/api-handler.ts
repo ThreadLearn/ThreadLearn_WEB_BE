@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../configs/env';
 
 export interface AuthenticatedNextRequest extends NextRequest {
-  user?: {
+  user?: { 
     id: string;
     email: string;
     role: 'STUDENT' | 'ADMIN';
