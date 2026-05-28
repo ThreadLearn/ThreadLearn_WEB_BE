@@ -9,6 +9,7 @@ export interface IUser extends Document {
   avatarUrl?: string;
   googleId?: string;
   githubId?: string;
+  isPremium: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +24,7 @@ const UserSchema: Schema<IUser> = new Schema(
     avatarUrl: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     githubId: { type: String, unique: true, sparse: true },
+    isPremium: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

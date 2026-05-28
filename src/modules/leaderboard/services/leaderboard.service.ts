@@ -35,7 +35,7 @@ export class LeaderboardService {
         });
 
         if (range.length > 0) {
-          return range.map((item, index) => {
+          return range.map((item: { value: string; score: number }, index: number) => {
             const parsed = JSON.parse(item.value);
             return {
               rank: index + 1,

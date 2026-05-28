@@ -1,17 +1,6 @@
-import { apiHandler, AuthenticatedNextRequest } from '@/common/api-handler';
-import { ApiResponse } from '@/common/api-response';
-import { NotificationsService } from '@/modules/notifications/services/notifications.service';
+import { apiHandler } from '@/common/api-handler';
+import { NotificationsController } from '@/modules/notifications/controllers/notifications.controller';
 
-export const GET = apiHandler(
-  async (req: AuthenticatedNextRequest) => {
-    const { id: userId } = req.user!;
-    const unreadOnly = req.nextUrl.searchParams.get('unread') === 'true';
-    const notifications = await NotificationsService.getNotificationsForUser(userId, unreadOnly);
-
-    return ApiResponse.success({
-      message: 'Notifications fetched successfully.',
-      data: notifications,
-    });
-  },
-  { requireAuth: true }
-);
+export const GET = apiHandler(NotificationsController.getMyNotifications, {
+  requireAuth: true,
+});

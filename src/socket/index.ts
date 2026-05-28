@@ -1,13 +1,14 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import { logger } from '../configs/logger';
+import { env } from '../configs/env';
 
 let ioInstance: SocketIOServer | null = null;
 
 export function initializeSocketServer(server: HTTPServer) {
   ioInstance = new SocketIOServer(server, {
     cors: {
-      origin: '*',
+      origin: env.CORS_ORIGIN,
       methods: ['GET', 'POST'],
     },
   });

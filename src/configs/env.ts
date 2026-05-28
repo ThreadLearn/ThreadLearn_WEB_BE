@@ -6,6 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   RATE_LIMIT_LIMIT: z.coerce.number().default(100),
@@ -20,8 +21,11 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
-  JUDGE0_API_KEY: z.string().optional(),
+  JUDGE0_API_URL: z.string().default('https://judge0-ce.p.rapidapi.com'),
+  JUDGE0_RAPIDAPI_KEY: z.string().optional(),
+  JUDGE0_RAPIDAPI_HOST: z.string().default('judge0-ce.p.rapidapi.com'),
+  JUDGE0_TIMEOUT_MS: z.coerce.number().default(10000),
+  OPENAI_API_KEY: z.string().optional(),
   UPLOAD_DIR: z.string().default('./public/uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().default(10),
 });

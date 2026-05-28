@@ -1,10 +1,12 @@
-import bcrypt from 'bcryptjs'; 
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { env } from '../../../configs/env';
 import { BadRequestError, UnauthorizedError } from '../../../common/custom-error';
+import { logger } from '../../../configs/logger';
 
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
@@ -56,6 +58,14 @@ export class AuthService {
       userId: user._id,
       expiresAt,
     });
+
+    // Notify all admins about the new registration (fire-and-forget)
+    NotificationsService.notifyAdmin(
+      'NEW_USER_REGISTERED',
+      'Học viên mới đăng ký',
+      `${user.firstName} ${user.lastName} (${user.email}) vừa tạo tài khoản.`,
+      { userId: user._id, email: user.email }
+    ).catch((err) => logger.warn('New user admin notification failed (non-critical).', err));
 
     return {
       user: {

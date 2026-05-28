@@ -26,7 +26,7 @@ export function getRedisClient() {
     url: env.REDIS_URL,
   });
 
-  client.on('error', (err) => {
+  client.on('error', (err: Error) => {
     logger.error('❌ Redis client error:', err);
   });
 
@@ -35,7 +35,7 @@ export function getRedisClient() {
   });
 
   // Attempt async connection
-  client.connect().catch((err) => {
+  client.connect().catch((err: Error) => {
     logger.warn('⚠️ Redis failed to connect. Rate limiting and leaderboard will fall back to local in-memory mock modes.', err);
   });
 
