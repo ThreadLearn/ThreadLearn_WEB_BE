@@ -1,5 +1,6 @@
 import { User } from '../../modules/auth/models/user.model';
 import { RefreshToken } from '../../modules/auth/models/refresh-token.model';
+import { EmailVerificationToken } from '../../modules/auth/models/email-verification-token.model';
 import { Course } from '../../modules/courses/models/course.model';
 import { Lesson } from '../../modules/lessons/models/lesson.model';
 import { Enrollment } from '../../modules/enrollments/models/enrollment.model';
@@ -12,6 +13,7 @@ import { Notification } from '../../modules/notifications/models/notification.mo
 export {
   User,
   RefreshToken,
+  EmailVerificationToken,
   Course,
   Lesson,
   Enrollment,

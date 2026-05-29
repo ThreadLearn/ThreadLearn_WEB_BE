@@ -1,11 +1,18 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs'; 
 import jwt from 'jsonwebtoken';
-import { User } from '../models/user.model';
+import { EmailVerificationToken } from '../models/email-verification-token.model';
+import { User, IUser } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { env } from '../../../configs/env';
 import { AuthenticatedUser } from '../../../common/api-handler';
-import { BadRequestError, ForbiddenError, UnauthorizedError } from '../../../common/custom-error';
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../../common/custom-error';
+import { EmailService } from './email.service';
+
+const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const EMAIL_VERIFICATION_URL =
+  process.env.EMAIL_VERIFICATION_URL || 'http://localhost:3000/api/v1/auth/verify-email';
 
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
@@ -59,6 +66,8 @@ export class AuthService {
       userId: user._id,
       expiresAt,
     });
+
+    await this.createAndSendVerificationToken(user);
 
     return {
       user: {
@@ -156,6 +165,76 @@ export class AuthService {
     return true;
   }
 
+  static async verifyEmail(token: string) {
+    const tokenHash = this.hashVerificationToken(token);
+    const verificationToken = await EmailVerificationToken.findOne({ tokenHash });
+
+    if (!verificationToken) {
+      throw new BadRequestError('Verification token is invalid.');
+    }
+
+    if (verificationToken.usedAt) {
+      throw new BadRequestError('Verification token has already been used.');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      throw new BadRequestError('Verification token has expired.');
+    }
+
+    const user = await User.findById(verificationToken.userId);
+    if (!user) {
+      throw new NotFoundError('User for verification token was not found.');
+    }
+
+    if (user.isVerified) {
+      verificationToken.usedAt = new Date();
+      await verificationToken.save();
+      throw new BadRequestError('Email address is already verified.');
+    }
+
+    const verifiedAt = new Date();
+    verificationToken.usedAt = verifiedAt;
+    user.isVerified = true;
+    user.emailVerifiedAt = verifiedAt;
+
+    await Promise.all([verificationToken.save(), user.save()]);
+
+    return {
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isVerified: user.isVerified,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+    };
+  }
+
+  static async resendVerification(email: string) {
+    const user = await User.findOne({ email });
+    if (!user) {
+      throw new NotFoundError('User not found.');
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestError('Email address is already verified.');
+    }
+
+    await EmailVerificationToken.updateMany(
+      {
+        userId: user._id,
+        $or: [{ usedAt: { $exists: false } }, { usedAt: null }],
+      },
+      { usedAt: new Date() }
+    );
+
+    await this.createAndSendVerificationToken(user);
+
+    return true;
+  }
+
   static async getSessionUser(userId: string): Promise<AuthenticatedUser> {
     const user = await User.findById(userId);
     if (!user) {
@@ -179,6 +258,33 @@ export class AuthService {
     if (user.lockedAt) {
       throw new ForbiddenError('User account is locked.');
     }
+  }
+
+  private static async createAndSendVerificationToken(user: IUser) {
+    const rawToken = this.generateRawVerificationToken();
+    const tokenHash = this.hashVerificationToken(rawToken);
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+
+    await EmailVerificationToken.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt,
+    });
+
+    const verificationUrl = `${EMAIL_VERIFICATION_URL}?token=${encodeURIComponent(rawToken)}`;
+    await EmailService.sendVerificationEmail({
+      email: user.email,
+      firstName: user.firstName,
+      verificationUrl,
+    });
+  }
+
+  private static generateRawVerificationToken() {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  private static hashVerificationToken(token: string) {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }
 export default AuthService;

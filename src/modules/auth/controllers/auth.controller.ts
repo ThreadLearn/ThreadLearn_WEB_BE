@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../../common/api-handler';
@@ -7,7 +7,13 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
 import { AuthService } from '../services/auth.service';
-import { loginSchema, refreshTokenSchema, registerSchema } from '../validators/auth.validator';
+import {
+  loginSchema,
+  refreshTokenSchema,
+  registerSchema,
+  resendVerificationSchema,
+  verifyEmailSchema,
+} from '../validators/auth.validator';
 
 @ApiTags('Auth')
 @Controller('v1/auth')
@@ -19,6 +25,27 @@ export class AuthController {
       message: 'User registered successfully.',
       data: result,
       statusCode: 201,
+    });
+  }
+
+  @Post('verify-email')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify an email address with a verification token.' })
+  async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { token: string }) {
+    const result = await AuthService.verifyEmail(body.token);
+    return ApiResponse.success({
+      message: 'Email verified successfully.',
+      data: result,
+    });
+  }
+
+  @Post('resend-verification')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Resend the email verification link.' })
+  async resendVerification(@Body(new ZodValidationPipe(resendVerificationSchema)) body: { email: string }) {
+    await AuthService.resendVerification(body.email);
+    return ApiResponse.success({
+      message: 'Verification email sent successfully.',
     });
   }
 
