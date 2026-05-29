@@ -9,6 +9,12 @@ export interface IUser extends Document {
   avatarUrl?: string;
   googleId?: string;
   githubId?: string;
+  isVerified: boolean;
+  emailVerifiedAt?: Date;
+  isActive: boolean;
+  lockedAt?: Date;
+  lockedReason?: string;
+  lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +29,12 @@ const UserSchema: Schema<IUser> = new Schema(
     avatarUrl: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     githubId: { type: String, unique: true, sparse: true },
+    isVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date },
+    isActive: { type: Boolean, default: true },
+    lockedAt: { type: Date },
+    lockedReason: { type: String, trim: true },
+    lastLoginAt: { type: Date },
   },
   { timestamps: true }
 );

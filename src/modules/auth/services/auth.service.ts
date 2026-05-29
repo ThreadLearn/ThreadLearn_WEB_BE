@@ -4,7 +4,8 @@ import { User } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { env } from '../../../configs/env';
-import { BadRequestError, UnauthorizedError } from '../../../common/custom-error';
+import { AuthenticatedUser } from '../../../common/api-handler';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../../../common/custom-error';
 
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
@@ -33,6 +34,8 @@ export class AuthService {
       firstName: data.firstName,
       lastName: data.lastName,
       role: 'STUDENT',
+      isVerified: false,
+      isActive: true,
     });
 
     // Initialize user stats for gamification
@@ -79,6 +82,10 @@ export class AuthService {
     if (!matches) {
       throw new BadRequestError('Invalid email or password credentials.');
     }
+
+    this.assertUserCanAuthenticate(user);
+    user.lastLoginAt = new Date();
+    await user.save();
 
     const tokens = this.generateTokens({
       id: user._id.toString(),
@@ -147,6 +154,31 @@ export class AuthService {
   static async logout(token: string) {
     await RefreshToken.deleteOne({ token });
     return true;
+  }
+
+  static async getSessionUser(userId: string): Promise<AuthenticatedUser> {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new UnauthorizedError('Authenticated user no longer exists.');
+    }
+
+    this.assertUserCanAuthenticate(user);
+
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+    };
+  }
+
+  private static assertUserCanAuthenticate(user: { isActive?: boolean; lockedAt?: Date | null }) {
+    if (user.isActive === false) {
+      throw new ForbiddenError('User account is inactive.');
+    }
+
+    if (user.lockedAt) {
+      throw new ForbiddenError('User account is locked.');
+    }
   }
 }
 export default AuthService;

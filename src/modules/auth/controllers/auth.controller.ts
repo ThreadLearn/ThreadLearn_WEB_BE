@@ -58,9 +58,10 @@ export class AuthController {
     if (!user) {
       throw new BadRequestError('User context missing from request.');
     }
+    const sessionUser = await AuthService.getSessionUser(user.id);
     return ApiResponse.success({
       message: 'User context retrieved successfully.',
-      data: { user },
+      data: { user: sessionUser },
     });
   }
 }
