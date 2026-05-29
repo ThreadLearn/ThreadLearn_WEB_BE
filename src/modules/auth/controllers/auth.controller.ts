@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -9,6 +9,7 @@ import { BadRequestError } from '../../../common/custom-error';
 import { AuthService } from '../services/auth.service';
 import {
   forgotPasswordSchema,
+  googleOAuthCallbackSchema,
   loginSchema,
   refreshTokenSchema,
   registerSchema,
@@ -71,6 +72,33 @@ export class AuthController {
     await AuthService.resetPassword(body.token, body.newPassword);
     return ApiResponse.success({
       message: 'Password reset successfully.',
+    });
+  }
+
+  @Get('google')
+  @ApiOperation({ summary: 'Start Google OAuth authentication.' })
+  async googleAuth(@Res() response: any) {
+    return response.redirect(AuthService.getGoogleAuthorizationUrl());
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback.' })
+  async googleCallback(
+    @Query(new ZodValidationPipe(googleOAuthCallbackSchema))
+    query: { code?: string; error?: string }
+  ) {
+    if (query.error) {
+      throw new BadRequestError(`Google OAuth failed: ${query.error}`);
+    }
+
+    if (!query.code) {
+      throw new BadRequestError('Google OAuth authorization code is required.');
+    }
+
+    const result = await AuthService.loginWithGoogleCode(query.code);
+    return ApiResponse.success({
+      message: 'Google login successful.',
+      data: result,
     });
   }
 
