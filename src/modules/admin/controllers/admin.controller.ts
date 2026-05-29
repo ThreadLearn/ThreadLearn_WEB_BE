@@ -117,7 +117,8 @@ export class AdminController {
   }
 
   @Get('stats')
-  async getStats() {
+  async getStats(@CurrentUser() admin: AuthenticatedUser) {
+    await this.ensureAdminCanManageStudents(admin);
     const [totalUsers, totalCourses, totalEnrollments, totalAttempts] = await Promise.all([
       User.countDocuments(),
       Course.countDocuments(),

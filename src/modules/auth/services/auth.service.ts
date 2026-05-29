@@ -5,9 +5,9 @@ import { EmailVerificationToken } from '../models/email-verification-token.model
 import { PasswordResetToken } from '../models/password-reset-token.model';
 import { User, IUser } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
+import { assertUserCanAuthenticate, sanitizeUser, SafeUser } from '../utils/user-sanitizer';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { env } from '../../../configs/env';
-import { AuthenticatedUser } from '../../../common/api-handler';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../../common/custom-error';
 import { EmailService } from './email.service';
 
@@ -90,13 +90,7 @@ export class AuthService {
     await this.createAndSendVerificationToken(user);
 
     return {
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: sanitizeUser(user),
       ...tokens,
     };
   }
@@ -112,7 +106,11 @@ export class AuthService {
       throw new BadRequestError('Invalid email or password credentials.');
     }
 
-    this.assertUserCanAuthenticate(user);
+    assertUserCanAuthenticate(user);
+    if (!user.isVerified) {
+      throw new ForbiddenError('Please verify your email before logging in.');
+    }
+
     user.lastLoginAt = new Date();
     await user.save();
 
@@ -186,7 +184,7 @@ export class AuthService {
     const user = existingUser || (await this.createGoogleUser({ ...profile, email }, verifiedAt));
 
     if (existingUser) {
-      this.assertUserCanAuthenticate(existingUser);
+      assertUserCanAuthenticate(existingUser);
 
       if (existingUser.googleId && existingUser.googleId !== profile.sub) {
         throw new BadRequestError('Email address is linked to a different Google account.');
@@ -222,34 +220,42 @@ export class AuthService {
       throw new UnauthorizedError('Refresh token is invalid or has expired.');
     }
 
+    let decoded: { id: string; email: string; role: string };
     try {
-      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as {
+      decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as {
         id: string;
         email: string;
         role: string;
       };
-
-      await RefreshToken.deleteOne({ _id: storedToken._id });
-
-      const tokens = this.generateTokens({
-        id: decoded.id,
-        email: decoded.email,
-        role: decoded.role,
-      });
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      await RefreshToken.create({
-        token: tokens.refreshToken,
-        userId: decoded.id as any,
-        expiresAt,
-      });
-
-      return tokens;
     } catch (err) {
       throw new UnauthorizedError('Refresh token verification failed.');
     }
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      await RefreshToken.deleteOne({ _id: storedToken._id });
+      throw new UnauthorizedError('Refresh token user no longer exists.');
+    }
+
+    assertUserCanAuthenticate(user);
+    await RefreshToken.deleteOne({ _id: storedToken._id });
+
+    const tokens = this.generateTokens({
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+    });
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await RefreshToken.create({
+      token: tokens.refreshToken,
+      userId: decoded.id as any,
+      expiresAt,
+    });
+
+    return tokens;
   }
 
   static async logout(token: string) {
@@ -292,15 +298,7 @@ export class AuthService {
     await Promise.all([verificationToken.save(), user.save()]);
 
     return {
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isVerified: user.isVerified,
-        emailVerifiedAt: user.emailVerifiedAt,
-      },
+      user: sanitizeUser(user),
     };
   }
 
@@ -380,29 +378,15 @@ export class AuthService {
     return true;
   }
 
-  static async getSessionUser(userId: string): Promise<AuthenticatedUser> {
+  static async getSessionUser(userId: string): Promise<SafeUser> {
     const user = await User.findById(userId);
     if (!user) {
       throw new UnauthorizedError('Authenticated user no longer exists.');
     }
 
-    this.assertUserCanAuthenticate(user);
+    assertUserCanAuthenticate(user);
 
-    return {
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    };
-  }
-
-  private static assertUserCanAuthenticate(user: { isActive?: boolean; lockedAt?: Date | null }) {
-    if (user.isActive === false) {
-      throw new ForbiddenError('User account is inactive.');
-    }
-
-    if (user.lockedAt) {
-      throw new ForbiddenError('User account is locked.');
-    }
+    return sanitizeUser(user);
   }
 
   private static async createAndSendVerificationToken(user: IUser) {
@@ -537,13 +521,7 @@ export class AuthService {
     });
 
     return {
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: sanitizeUser(user),
       ...tokens,
     };
   }

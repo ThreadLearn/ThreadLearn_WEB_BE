@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { User } from '../../auth/models/user.model';
 import { EmailService } from '../../auth/services/email.service';
+import { assertUserCanAuthenticate, sanitizeUser } from '../../auth/utils/user-sanitizer';
 import { Course } from '../../courses/models/course.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
@@ -52,9 +53,7 @@ export class AdminService {
       throw new ForbiddenError('You do not have permission to manage students.');
     }
 
-    if (admin.isActive === false || admin.lockedAt) {
-      throw new ForbiddenError('Admin account is inactive or locked.');
-    }
+    assertUserCanAuthenticate(admin);
   }
 
   static async createStudent(data: CreateStudentData) {
@@ -216,22 +215,7 @@ export class AdminService {
   }
 
   private static toSafeStudent(user: any) {
-    return {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-      isActive: user.isActive,
-      isVerified: user.isVerified,
-      emailVerifiedAt: user.emailVerifiedAt,
-      lockedAt: user.lockedAt,
-      lockedReason: user.lockedReason,
-      lastLoginAt: user.lastLoginAt,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+    return sanitizeUser(user);
   }
 }
 export default AdminService;
