@@ -12,6 +12,12 @@ type PasswordResetEmailPayload = {
   resetUrl: string;
 };
 
+type StudentInvitationEmailPayload = {
+  email: string;
+  firstName: string;
+  temporaryPassword: string;
+};
+
 export class EmailService {
   static async sendVerificationEmail(payload: VerificationEmailPayload) {
     logger.info(
@@ -21,6 +27,12 @@ export class EmailService {
 
   static async sendPasswordResetEmail(payload: PasswordResetEmailPayload) {
     logger.info(`Mock password reset email sent to ${payload.email} for ${payload.firstName}: ${payload.resetUrl}`);
+  }
+
+  static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
+    logger.info(
+      `Mock student invitation email sent to ${payload.email} for ${payload.firstName}. Temporary password: ${payload.temporaryPassword}`
+    );
   }
 }
 
