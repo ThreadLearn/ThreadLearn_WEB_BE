@@ -8,10 +8,12 @@ import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
 import { AuthService } from '../services/auth.service';
 import {
+  forgotPasswordSchema,
   loginSchema,
   refreshTokenSchema,
   registerSchema,
   resendVerificationSchema,
+  resetPasswordSchema,
   verifyEmailSchema,
 } from '../validators/auth.validator';
 
@@ -46,6 +48,29 @@ export class AuthController {
     await AuthService.resendVerification(body.email);
     return ApiResponse.success({
       message: 'Verification email sent successfully.',
+    });
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Request a password reset link.' })
+  async forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) body: { email: string }) {
+    await AuthService.forgotPassword(body.email);
+    return ApiResponse.success({
+      message: 'If the email exists, a password reset link has been sent.',
+    });
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Reset password with a password reset token.' })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordSchema))
+    body: { token: string; newPassword: string }
+  ) {
+    await AuthService.resetPassword(body.token, body.newPassword);
+    return ApiResponse.success({
+      message: 'Password reset successfully.',
     });
   }
 

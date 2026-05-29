@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs'; 
 import jwt from 'jsonwebtoken';
 import { EmailVerificationToken } from '../models/email-verification-token.model';
+import { PasswordResetToken } from '../models/password-reset-token.model';
 import { User, IUser } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
@@ -11,8 +12,10 @@ import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } fro
 import { EmailService } from './email.service';
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const EMAIL_VERIFICATION_URL =
   process.env.EMAIL_VERIFICATION_URL || 'http://localhost:3000/api/v1/auth/verify-email';
+const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3000/reset-password';
 
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
@@ -166,7 +169,7 @@ export class AuthService {
   }
 
   static async verifyEmail(token: string) {
-    const tokenHash = this.hashVerificationToken(token);
+    const tokenHash = this.hashToken(token);
     const verificationToken = await EmailVerificationToken.findOne({ tokenHash });
 
     if (!verificationToken) {
@@ -235,6 +238,59 @@ export class AuthService {
     return true;
   }
 
+  static async forgotPassword(email: string) {
+    const user = await User.findOne({ email });
+    if (!user || user.isActive === false) {
+      return true;
+    }
+
+    await PasswordResetToken.updateMany(
+      {
+        userId: user._id,
+        $or: [{ usedAt: { $exists: false } }, { usedAt: null }],
+      },
+      { usedAt: new Date() }
+    );
+
+    await this.createAndSendPasswordResetToken(user);
+
+    return true;
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    const tokenHash = this.hashToken(token);
+    const resetToken = await PasswordResetToken.findOne({ tokenHash });
+
+    if (!resetToken) {
+      throw new BadRequestError('Password reset token is invalid.');
+    }
+
+    if (resetToken.usedAt) {
+      throw new BadRequestError('Password reset token has already been used.');
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      throw new BadRequestError('Password reset token has expired.');
+    }
+
+    const user = await User.findById(resetToken.userId);
+    if (!user) {
+      throw new NotFoundError('User for password reset token was not found.');
+    }
+
+    const usedAt = new Date();
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    resetToken.usedAt = usedAt;
+
+    await Promise.all([
+      user.save(),
+      resetToken.save(),
+      RefreshToken.deleteMany({ userId: user._id }),
+    ]);
+
+    return true;
+  }
+
   static async getSessionUser(userId: string): Promise<AuthenticatedUser> {
     const user = await User.findById(userId);
     if (!user) {
@@ -261,8 +317,8 @@ export class AuthService {
   }
 
   private static async createAndSendVerificationToken(user: IUser) {
-    const rawToken = this.generateRawVerificationToken();
-    const tokenHash = this.hashVerificationToken(rawToken);
+    const rawToken = this.generateRawToken();
+    const tokenHash = this.hashToken(rawToken);
     const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
 
     await EmailVerificationToken.create({
@@ -279,11 +335,30 @@ export class AuthService {
     });
   }
 
-  private static generateRawVerificationToken() {
+  private static async createAndSendPasswordResetToken(user: IUser) {
+    const rawToken = this.generateRawToken();
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+    await PasswordResetToken.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt,
+    });
+
+    const resetUrl = `${PASSWORD_RESET_URL}?token=${encodeURIComponent(rawToken)}`;
+    await EmailService.sendPasswordResetEmail({
+      email: user.email,
+      firstName: user.firstName,
+      resetUrl,
+    });
+  }
+
+  private static generateRawToken() {
     return crypto.randomBytes(32).toString('hex');
   }
 
-  private static hashVerificationToken(token: string) {
+  private static hashToken(token: string) {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 }
