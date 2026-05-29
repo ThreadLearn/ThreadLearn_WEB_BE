@@ -10,12 +10,14 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { User } from '../../auth/models/user.model';
 import { CodeExecutionService } from '../../code-execution/services/code-execution.service';
+import { AnalyticsService } from '../../analytics/services/analytics.service';
 import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
 import { QuizAttempt } from '../../quiz-attempts/models/quiz-attempt.model';
 import { AdminService } from '../services/admin.service';
 import {
   createStudentSchema,
+  dashboardStatisticsQuerySchema,
   listStudentsQuerySchema,
   lockStudentSchema,
   objectIdParamSchema,
@@ -131,6 +133,21 @@ export class AdminController {
         totalEnrollments,
         totalQuizAttempts: totalAttempts,
       },
+    });
+  }
+
+  @Get('dashboard/statistics')
+  @ApiOperation({ summary: 'Get admin dashboard statistics and chart data.' })
+  async getDashboardStatistics(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Query(new ZodValidationPipe(dashboardStatisticsQuerySchema))
+    query: { from?: string; to?: string; months: number }
+  ) {
+    await this.ensureAdminCanManageStudents(admin);
+    const statistics = await AnalyticsService.getAdminDashboardStatistics(query);
+    return ApiResponse.success({
+      message: 'Admin dashboard statistics retrieved.',
+      data: statistics,
     });
   }
 
