@@ -13,8 +13,6 @@ import { EmailService } from './email.service';
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
-const EMAIL_VERIFICATION_URL =
-  process.env.EMAIL_VERIFICATION_URL || 'http://localhost:3000/api/v1/auth/verify-email';
 const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3000/reset-password';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -72,26 +70,12 @@ export class AuthService {
       level: 1,
     });
 
-    const tokens = this.generateTokens({
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    });
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    await RefreshToken.create({
-      token: tokens.refreshToken,
-      userId: user._id,
-      expiresAt,
-    });
-
     await this.createAndSendVerificationToken(user);
 
     return {
       user: sanitizeUser(user),
-      ...tokens,
+      verificationRequired: true,
+      message: 'Please verify your email before logging in.',
     };
   }
 
@@ -400,7 +384,7 @@ export class AuthService {
       expiresAt,
     });
 
-    const verificationUrl = `${EMAIL_VERIFICATION_URL}?token=${encodeURIComponent(rawToken)}`;
+    const verificationUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(rawToken)}`;
     await EmailService.sendVerificationEmail({
       email: user.email,
       firstName: user.firstName,
