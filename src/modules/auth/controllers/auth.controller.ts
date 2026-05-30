@@ -6,6 +6,7 @@ import { AuthenticatedUser } from '../../../common/api-handler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
+import { env } from '../../../configs/env';
 import { AuthService } from '../services/auth.service';
 import {
   forgotPasswordSchema,
@@ -85,21 +86,31 @@ export class AuthController {
   @ApiOperation({ summary: 'Handle Google OAuth callback.' })
   async googleCallback(
     @Query(new ZodValidationPipe(googleOAuthCallbackSchema))
-    query: { code?: string; error?: string }
+    query: { code?: string; error?: string },
+    @Res() response: any
   ) {
     if (query.error) {
-      throw new BadRequestError(`Google OAuth failed: ${query.error}`);
+      return this.redirectGoogleFailure(response, `Google OAuth failed: ${query.error}`);
     }
 
     if (!query.code) {
-      throw new BadRequestError('Google OAuth authorization code is required.');
+      return this.redirectGoogleFailure(response, 'Google OAuth authorization code is required.');
     }
 
-    const result = await AuthService.loginWithGoogleCode(query.code);
-    return ApiResponse.success({
-      message: 'Google login successful.',
-      data: result,
-    });
+    try {
+      const result = await AuthService.loginWithGoogleCode(query.code);
+      const redirectUrl = new URL(
+        env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'
+      );
+      redirectUrl.searchParams.set('accessToken', result.accessToken);
+      redirectUrl.searchParams.set('refreshToken', result.refreshToken);
+      redirectUrl.searchParams.set('user', JSON.stringify(result.user));
+
+      return response.redirect(redirectUrl.toString());
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : 'Google OAuth failed.';
+      return this.redirectGoogleFailure(response, message);
+    }
   }
 
   @Post('login')
@@ -143,6 +154,12 @@ export class AuthController {
       message: 'User context retrieved successfully.',
       data: { user: sessionUser },
     });
+  }
+
+  private redirectGoogleFailure(response: any, message: string) {
+    const redirectUrl = new URL(env.FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3000/login');
+    redirectUrl.searchParams.set('error', message);
+    return response.redirect(redirectUrl.toString());
   }
 }
 
