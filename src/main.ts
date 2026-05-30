@@ -21,11 +21,20 @@ async function bootstrap() {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const frontendOrigin = new URL(env.FRONTEND_URL).origin;
 
   app.setGlobalPrefix('api');
-  app.use(helmet());
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(compression());
-  app.use('/uploads', express.static(join(process.cwd(), env.UPLOAD_DIR)));
+  app.use(
+    '/uploads',
+    express.static(join(process.cwd(), env.UPLOAD_DIR), {
+      setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+      },
+    })
+  );
   app.enableCors({
     origin: corsOrigins.includes('*') ? true : corsOrigins,
     credentials: !corsOrigins.includes('*'),
