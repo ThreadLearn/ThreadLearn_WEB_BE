@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IEnrollment extends Document {
   userId: mongoose.Types.ObjectId;
@@ -25,3 +25,5 @@ EnrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true });
 export const Enrollment: Model<IEnrollment> =
   mongoose.models.Enrollment || mongoose.model<IEnrollment>('Enrollment', EnrollmentSchema);
 export default Enrollment;
+export { EnrollmentSchema };
+

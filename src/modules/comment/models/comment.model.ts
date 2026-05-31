@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IComment extends Document {
   targetType: 'COURSE' | 'LESSON';
@@ -28,3 +28,5 @@ CommentSchema.index({ targetType: 1, targetId: 1 });
 export const Comment: Model<IComment> =
   mongoose.models.Comment || mongoose.model<IComment>('Comment', CommentSchema);
 export default Comment;
+export { CommentSchema };
+

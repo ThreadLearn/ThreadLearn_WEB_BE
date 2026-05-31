@@ -1,138 +1,92 @@
-import { Notification, NotificationType } from '../models/notification.model';
-import { User } from '../../auth/models/user.model';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { INotification, NotificationType } from '../models/notification.model';
+import { IUser } from '../../auth/models/user.model';
 import { NotFoundError } from '../../../common/custom-error';
-import { getSocketServer } from '../../../socket';
+import { NotificationsGateway } from '../gateways/notifications.gateway';
 
+@Injectable()
 export class NotificationsService {
-  // ─── Read ───────────────────────────────────────────────────────────────────
+  constructor(
+    @InjectModel('Notification') private notificationModel: Model<INotification>,
+    @InjectModel('User')         private userModel:         Model<IUser>,
+    private readonly gateway: NotificationsGateway,
+  ) {}
 
-  static async getMyNotifications(
-    userId: string,
-    page = 1,
-    limit = 20,
-    onlyUnread = false
-  ) {
-    const skip = (page - 1) * limit;
+  // ── Read ──────────────────────────────────────────────────────────────────
+
+  async getMyNotifications(userId: string, page = 1, limit = 20, onlyUnread = false) {
+    const skip  = (page - 1) * limit;
     const query: any = { userId };
     if (onlyUnread) query.isRead = false;
 
     const [notifications, total, unreadCount] = await Promise.all([
-      Notification.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Notification.countDocuments(query),
-      Notification.countDocuments({ userId, isRead: false }),
+      this.notificationModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.notificationModel.countDocuments(query),
+      this.notificationModel.countDocuments({ userId, isRead: false }),
     ]);
 
-    return {
-      data: notifications,
-      total,
-      page,
-      limit,
-      hasMore: skip + notifications.length < total,
-      unreadCount,
-    };
+    return { data: notifications, total, page, limit, hasMore: skip + notifications.length < total, unreadCount };
   }
 
-  static async getUnreadCount(userId: string): Promise<number> {
-    return Notification.countDocuments({ userId, isRead: false });
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.notificationModel.countDocuments({ userId, isRead: false });
   }
 
-  // ─── Write ──────────────────────────────────────────────────────────────────
+  // ── Write ─────────────────────────────────────────────────────────────────
 
-  static async markAsRead(notificationId: string, userId: string) {
-    const notification = await Notification.findOneAndUpdate(
+  async markAsRead(notificationId: string, userId: string) {
+    const notification = await this.notificationModel.findOneAndUpdate(
       { _id: notificationId, userId },
       { isRead: true },
-      { new: true }
+      { new: true },
     );
-    if (!notification) {
-      throw new NotFoundError('Notification not found or access denied.');
-    }
+    if (!notification) throw new NotFoundError('Notification not found or access denied.');
     return notification;
   }
 
-  static async markAllAsRead(userId: string) {
-    const result = await Notification.updateMany(
-      { userId, isRead: false },
-      { isRead: true }
-    );
+  async markAllAsRead(userId: string) {
+    const result = await this.notificationModel.updateMany({ userId, isRead: false }, { isRead: true });
     return { updated: result.modifiedCount };
   }
 
-  // ─── Notify helpers (called by other modules) ────────────────────────────────
+  // ── Notify helpers (called by other modules) ──────────────────────────────
 
-  /** Send a notification to a single user and emit via Socket.IO. */
-  static async notify(
+  async notify(
     userId: string,
     type: NotificationType,
     title: string,
     message: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ) {
-    const notification = await Notification.create({
-      userId,
-      title,
-      message,
-      type,
-      metadata,
-      isRead: false,
+    const notification = await this.notificationModel.create({
+      userId, type, title, message, metadata, isRead: false,
     });
 
     try {
-      const io = getSocketServer();
-      if (io) {
-        io.to(`user:${userId}`).emit('notification', {
-          id: notification._id,
-          title: notification.title,
-          message: notification.message,
-          type: notification.type,
-          metadata: notification.metadata,
-          createdAt: notification.createdAt,
-        });
-      }
-    } catch {
-      // Socket server may not be running — persist-only fallback is acceptable
-    }
+      this.gateway.emitToUser(userId, {
+        id:        notification._id,
+        title:     notification.title,
+        message:   notification.message,
+        type:      notification.type,
+        metadata:  notification.metadata,
+        createdAt: notification.createdAt,
+      });
+    } catch { /* socket down — DB record persisted */ }
 
     return notification;
   }
 
-  /** Broadcast a notification to every user with role ADMIN. */
-  static async notifyAdmin(
+  async notifyAdmin(
     type: NotificationType,
     title: string,
     message: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ) {
-    const admins = await User.find({ role: 'ADMIN' }).select('_id').lean();
+    const admins = await this.userModel.find({ role: 'ADMIN' }).select('_id').lean();
     await Promise.all(
-      admins.map((admin) =>
-        NotificationsService.notify(admin._id.toString(), type, title, message, metadata)
-      )
-    );
-  }
-
-  // ─── Backward-compat alias ───────────────────────────────────────────────────
-
-  /** @deprecated Use notify() instead. */
-  static async sendNotification(data: {
-    userId: string;
-    title: string;
-    message: string;
-    type: NotificationType;
-    metadata?: Record<string, any>;
-  }) {
-    return NotificationsService.notify(
-      data.userId,
-      data.type,
-      data.title,
-      data.message,
-      data.metadata
+      admins.map((a) => this.notify(a._id.toString(), type, title, message, metadata)),
     );
   }
 }
-
-export default NotificationsService;

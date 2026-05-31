@@ -1,31 +1,34 @@
-import { Lesson } from '../models/lesson.model';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { ILesson } from '../models/lesson.model';
 import { NotFoundError } from '../../../common/custom-error';
 
+@Injectable()
 export class LessonsService {
-  static async getLesson(lessonId: string) {
-    const lesson = await Lesson.findById(lessonId);
-    if (!lesson) {
-      throw new NotFoundError('Lesson not found.');
-    }
+  constructor(@InjectModel('Lesson') private lessonModel: Model<ILesson>) {}
+
+  async getLesson(lessonId: string) {
+    const lesson = await this.lessonModel.findById(lessonId);
+    if (!lesson) throw new NotFoundError('Lesson not found.');
     return lesson;
   }
 
-  static async createLesson(data: any) {
-    return await Lesson.create({
-      courseId: data.courseId,
-      title: data.title,
-      content: data.content,
+  async createLesson(data: any) {
+    return this.lessonModel.create({
+      courseId:      data.courseId,
+      title:         data.title,
+      content:       data.content,
       attachmentUrl: data.attachmentUrl,
-      order: data.order || 0,
+      order:         data.order ?? 0,
     });
   }
 
-  static async updateAttachment(lessonId: string, attachmentUrl: string) {
-    const lesson = await Lesson.findByIdAndUpdate(lessonId, { attachmentUrl }, { new: true });
-    if (!lesson) {
-      throw new NotFoundError('Lesson not found.');
-    }
+  async updateAttachment(lessonId: string, attachmentUrl: string) {
+    const lesson = await this.lessonModel.findByIdAndUpdate(
+      lessonId, { attachmentUrl }, { new: true },
+    );
+    if (!lesson) throw new NotFoundError('Lesson not found.');
     return lesson;
   }
 }
-export default LessonsService;

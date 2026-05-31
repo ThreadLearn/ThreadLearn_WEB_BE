@@ -1,91 +1,76 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, Query, UseGuards, HttpCode,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentService } from '../services/comment.service';
+import { CreateCommentDto, UpdateCommentDto } from '../dto/comment.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('comments')
+@Controller('comments')
 export class CommentController {
-  static async getComments(req: AuthenticatedNextRequest) {
-    const { searchParams } = req.nextUrl;
-    const targetType = searchParams.get('targetType') as 'COURSE' | 'LESSON';
-    const targetId = searchParams.get('targetId') || '';
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 50);
+  constructor(private readonly commentService: CommentService) {}
 
-    const result = await CommentService.getComments(targetType, targetId, page, limit);
-
-    return ApiResponse.success({
-      message: 'Comments fetched successfully.',
-      data: result.data,
-      meta: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        hasMore: result.hasMore,
-      },
-    });
-  }
-
-  static async getReplies(
-    req: AuthenticatedNextRequest,
-    { params }: { params: { commentId: string } }
+  @Get()
+  async getComments(
+    @Query('targetType') targetType: 'COURSE' | 'LESSON',
+    @Query('targetId')   targetId: string,
+    @Query('page')       page  = '1',
+    @Query('limit')      limit = '10',
   ) {
-    const replies = await CommentService.getReplies(params.commentId);
-
-    return ApiResponse.success({
-      message: 'Replies fetched successfully.',
-      data: replies,
-    });
-  }
-
-  static async createComment(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const body = await req.json();
-
-    const comment = await CommentService.createComment(userId, {
-      targetType: body.targetType,
-      targetId: body.targetId,
-      content: body.content,
-      parentId: body.parentId,
-    });
-
-    return ApiResponse.success({
-      message: 'Comment created successfully.',
-      data: comment,
-      statusCode: 201,
-    });
-  }
-
-  static async updateComment(
-    req: AuthenticatedNextRequest,
-    { params }: { params: { commentId: string } }
-  ) {
-    const { id: userId, role: userRole } = req.user!;
-    const { content } = await req.json();
-
-    const comment = await CommentService.updateComment(
-      params.commentId,
-      userId,
-      content,
-      userRole
+    const result = await this.commentService.getComments(
+      targetType, targetId,
+      parseInt(page, 10), Math.min(parseInt(limit, 10), 50),
     );
-
-    return ApiResponse.success({
-      message: 'Comment updated successfully.',
-      data: comment,
-    });
+    return {
+      message: 'Comments fetched.',
+      data:    result.data,
+      meta:    { total: result.total, page: result.page, limit: result.limit, hasMore: result.hasMore },
+    };
   }
 
-  static async deleteComment(
-    req: AuthenticatedNextRequest,
-    { params }: { params: { commentId: string } }
+  @Get(':commentId/replies')
+  async getReplies(@Param('commentId') commentId: string) {
+    const data = await this.commentService.getReplies(commentId);
+    return { message: 'Replies fetched.', data };
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STUDENT', 'ADMIN')
+  @ApiBearerAuth()
+  async createComment(@CurrentUser() user: JwtPayload, @Body() dto: CreateCommentDto) {
+    const data = await this.commentService.createComment(user.id, dto);
+    return { message: 'Comment created.', data, statusCode: 201 };
+  }
+
+  @Patch(':commentId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STUDENT', 'ADMIN')
+  @ApiBearerAuth()
+  async updateComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('commentId') commentId: string,
+    @Body() dto: UpdateCommentDto,
   ) {
-    const { id: userId, role: userRole } = req.user!;
+    const data = await this.commentService.updateComment(commentId, user.id, dto.content, user.role);
+    return { message: 'Comment updated.', data };
+  }
 
-    await CommentService.deleteComment(params.commentId, userId, userRole);
-
-    return ApiResponse.success({
-      message: 'Comment deleted successfully.',
-    });
+  @Delete(':commentId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('STUDENT', 'ADMIN')
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async deleteComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('commentId') commentId: string,
+  ) {
+    await this.commentService.deleteComment(commentId, user.id, user.role);
+    return { message: 'Comment deleted.' };
   }
 }
-
-export default CommentController;

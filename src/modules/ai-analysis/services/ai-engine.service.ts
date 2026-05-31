@@ -1,153 +1,117 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
-import { env } from '../../../configs/env';
-import { logger } from '../../../configs/logger';
-import { getRedisClient } from '../../../configs/redis';
+import { RedisService } from '../../../config/redis.service';
 
-const AI_CACHE_TTL = 3600; // 1 hour
+const AI_CACHE_TTL   = 3600;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export interface AIAnalysisResult {
-  suggestions: string[];
+  suggestions:    string[];
   raceConditions: string[];
   optimizedCode?: string;
-  explanation: string;
-  tokensUsed: number;
+  explanation:    string;
+  tokensUsed:     number;
 }
 
-// Lightweight code-context extraction (replaces @babel/parser AST — no extra dep)
 function extractCodeContext(code: string, language: string): string {
   const patterns: string[] = [];
-
-  if (/async\s+function|async\s*\(|async\s+\w+\s*=/.test(code)) patterns.push('async functions');
-  if (/await\s+/.test(code)) patterns.push('await expressions');
+  if (/async\s+function|async\s*\(/.test(code))               patterns.push('async functions');
+  if (/await\s+/.test(code))                                   patterns.push('await expressions');
   if (/new\s+Promise|Promise\.(all|race|allSettled)/.test(code)) patterns.push('Promise usage');
-  if (/setTimeout|setInterval|clearTimeout|clearInterval/.test(code)) patterns.push('timer functions');
-  if (/for\s*\(|while\s*\(|for\s+\w+\s+of|for\s+\w+\s+in/.test(code)) patterns.push('loop constructs');
-  if (/\.map\(|\.filter\(|\.reduce\(|\.forEach\(/.test(code)) patterns.push('array iteration');
-  if (/global\.|window\.|module\.exports|exports\./.test(code)) patterns.push('global/module state');
-  if (/try\s*\{|catch\s*\(/.test(code)) patterns.push('error handling');
-  if (/Thread|synchronized|volatile|mutex|semaphore/i.test(code)) patterns.push('concurrency primitives');
-  if (/import\s|require\(/.test(code)) patterns.push('module imports');
+  if (/setTimeout|setInterval/.test(code))                     patterns.push('timer functions');
+  if (/for\s*\(|while\s*\(/.test(code))                        patterns.push('loop constructs');
+  if (/\.map\(|\.filter\(|\.reduce\(/.test(code))              patterns.push('array iteration');
+  if (/global\.|window\./.test(code))                          patterns.push('global state');
+  if (/try\s*\{|catch\s*\(/.test(code))                        patterns.push('error handling');
+  if (/Thread|synchronized|mutex|semaphore/i.test(code))        patterns.push('concurrency primitives');
 
   const varNames = [...code.matchAll(/(?:let|const|var)\s+(\w+)/g)]
-    .map((m) => m[1])
-    .slice(0, 12)
-    .join(', ');
-
-  const lineCount = code.split('\n').length;
+    .map((m) => m[1]).slice(0, 12).join(', ');
 
   return [
     `Language: ${language}`,
-    `Lines: ${lineCount}`,
+    `Lines: ${code.split('\n').length}`,
     `Detected patterns: ${patterns.length ? patterns.join(', ') : 'none'}`,
     `Declared variables: ${varNames || 'none'}`,
   ].join('\n');
 }
 
 const SYSTEM_PROMPT =
-  'You are a concurrent programming expert. Analyze the provided code and return JSON with this exact structure: ' +
+  'You are a concurrent programming expert. Analyze the provided code and return JSON: ' +
   '{ "suggestions": string[], "raceConditions": string[], "optimizedCode": string | null, "explanation": string }. ' +
   'Focus on race conditions, shared state issues, async pitfalls, and performance. Return ONLY valid JSON.';
 
+@Injectable()
 export class AIEngineService {
-  static async analyze(inputCode: string, language: string): Promise<AIAnalysisResult> {
+  private readonly logger = new Logger(AIEngineService.name);
+
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly config: ConfigService,
+  ) {}
+
+  async analyze(inputCode: string, language: string): Promise<AIAnalysisResult> {
     const cacheKey = `ai:cache:${createHash('sha256').update(inputCode + language).digest('hex')}`;
 
-    // Try Redis cache first
-    const redis = getRedisClient();
-    if (redis.isOpen) {
+    if (this.redisService.isOpen) {
       try {
-        const cached = await redis.get(cacheKey);
+        const cached = await this.redisService.get(cacheKey);
         if (cached) {
-          logger.info('AI analysis served from Redis cache.');
+          this.logger.debug('AI analysis served from cache.');
           return JSON.parse(cached);
         }
-      } catch (err) {
-        logger.warn('Redis cache read failed for AI analysis.', err);
-      }
+      } catch { /* cache miss — proceed */ }
     }
 
-    const result = await AIEngineService.callOpenAI(inputCode, language);
+    const result = await this.callOpenAI(inputCode, language);
 
-    // Persist in cache
-    if (redis.isOpen) {
-      try {
-        await redis.setEx(cacheKey, AI_CACHE_TTL, JSON.stringify(result));
-      } catch (err) {
-        logger.warn('Redis cache write failed for AI analysis.', err);
-      }
+    if (this.redisService.isOpen) {
+      try { await this.redisService.setEx(cacheKey, AI_CACHE_TTL, JSON.stringify(result)); } catch {}
     }
-
     return result;
   }
 
-  private static async callOpenAI(inputCode: string, language: string): Promise<AIAnalysisResult> {
-    if (!env.OPENAI_API_KEY) {
-      logger.info('OPENAI_API_KEY not configured — returning mock AI analysis.');
+  private async callOpenAI(inputCode: string, language: string): Promise<AIAnalysisResult> {
+    const apiKey = this.config.get<string>('openai.apiKey');
+
+    if (!apiKey) {
+      this.logger.warn('OPENAI_API_KEY not set — returning mock analysis.');
       return {
-        suggestions: [
-          'Use proper synchronization when accessing shared state across async operations.',
-          'Avoid mutating variables defined in an outer scope inside callbacks.',
-          'Prefer Promise.all with error boundaries to avoid silent failures.',
-        ],
+        suggestions:    ['Use proper synchronization when accessing shared state.', 'Avoid mutating outer-scope variables in callbacks.'],
         raceConditions: [],
-        optimizedCode: undefined,
-        explanation:
-          'Mock analysis — configure OPENAI_API_KEY in your environment for real AI-powered code review.',
-        tokensUsed: 0,
+        explanation:    'Mock analysis — configure OPENAI_API_KEY for real AI review.',
+        tokensUsed:     0,
       };
     }
 
-    const codeContext = extractCodeContext(inputCode, language);
-    const userMessage =
-      `Code context:\n${codeContext}\n\n` +
-      `Code to analyze:\n\`\`\`${language}\n${inputCode}\n\`\`\`\n\n` +
-      `Return JSON analysis only.`;
+    const context = extractCodeContext(inputCode, language);
+    const userMsg = `Code context:\n${context}\n\nCode to analyze:\n\`\`\`${language}\n${inputCode}\n\`\`\`\n\nReturn JSON analysis only.`;
 
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        max_tokens: 1500,
+        model:           'gpt-4o-mini',
+        messages:        [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
+        max_tokens:      1500,
         response_format: { type: 'json_object' },
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('OpenAI API error', { status: response.status, body: errorText });
-      throw new Error('AI analysis service temporarily unavailable.');
-    }
+    if (!response.ok) throw new Error('AI analysis service temporarily unavailable.');
 
-    const data = await response.json();
-    const content: string = data.choices?.[0]?.message?.content ?? '';
-    const tokensUsed: number = data.usage?.total_tokens ?? 0;
+    const data    = await response.json();
+    const content = data.choices?.[0]?.message?.content ?? '';
+    if (!content) throw new Error('AI returned empty response.');
 
-    if (!content) throw new Error('AI analysis returned an empty response.');
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new Error('AI analysis response could not be parsed as JSON.');
-    }
-
+    const parsed = JSON.parse(content);
     return {
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+      suggestions:    Array.isArray(parsed.suggestions)    ? parsed.suggestions    : [],
       raceConditions: Array.isArray(parsed.raceConditions) ? parsed.raceConditions : [],
-      optimizedCode: typeof parsed.optimizedCode === 'string' ? parsed.optimizedCode : undefined,
-      explanation: typeof parsed.explanation === 'string' ? parsed.explanation : '',
-      tokensUsed,
+      optimizedCode:  typeof parsed.optimizedCode === 'string' ? parsed.optimizedCode : undefined,
+      explanation:    typeof parsed.explanation   === 'string' ? parsed.explanation   : '',
+      tokensUsed:     data.usage?.total_tokens ?? 0,
     };
   }
 }
-
-export default AIEngineService;

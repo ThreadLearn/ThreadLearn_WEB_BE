@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ITestCase {
   input: string;
@@ -47,3 +47,5 @@ const ExerciseSchema: Schema<IExercise> = new Schema(
 export const Exercise: Model<IExercise> =
   mongoose.models.Exercise || mongoose.model<IExercise>('Exercise', ExerciseSchema);
 export default Exercise;
+export { ExerciseSchema };
+

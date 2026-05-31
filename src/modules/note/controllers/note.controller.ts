@@ -1,71 +1,55 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, Query, UseGuards, HttpCode,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { NoteService } from '../services/note.service';
-import { BadRequestError } from '../../../common/custom-error';
+import { CreateNoteDto, UpdateNoteDto } from '../dto/note.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('notes')
+@Controller('notes')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('STUDENT')
+@ApiBearerAuth()
 export class NoteController {
-  static async getNotes(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const lessonId = req.nextUrl.searchParams.get('lessonId') || '';
+  constructor(private readonly noteService: NoteService) {}
 
-    if (!lessonId) {
-      throw new BadRequestError('lessonId query parameter is required.');
-    }
-
-    const notes = await NoteService.getMyNotesInLesson(userId, lessonId);
-
-    return ApiResponse.success({
-      message: 'Notes fetched successfully.',
-      data: notes,
-    });
-  }
-
-  static async createNote(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const body = await req.json();
-
-    const note = await NoteService.createNote(userId, {
-      lessonId: body.lessonId,
-      anchorText: body.anchorText,
-      anchorStart: body.anchorStart,
-      anchorEnd: body.anchorEnd,
-      noteContent: body.noteContent,
-    });
-
-    return ApiResponse.success({
-      message: 'Note created successfully.',
-      data: note,
-      statusCode: 201,
-    });
-  }
-
-  static async updateNote(
-    req: AuthenticatedNextRequest,
-    { params }: { params: { noteId: string } }
+  @Get()
+  async getMyNotes(
+    @CurrentUser() user: JwtPayload,
+    @Query('lessonId') lessonId: string,
   ) {
-    const { id: userId } = req.user!;
-    const { noteContent } = await req.json();
-
-    const note = await NoteService.updateNote(userId, params.noteId, noteContent);
-
-    return ApiResponse.success({
-      message: 'Note updated successfully.',
-      data: note,
-    });
+    const data = await this.noteService.getMyNotesInLesson(user.id, lessonId);
+    return { message: 'Notes fetched.', data };
   }
 
-  static async deleteNote(
-    req: AuthenticatedNextRequest,
-    { params }: { params: { noteId: string } }
+  @Post()
+  async createNote(@CurrentUser() user: JwtPayload, @Body() dto: CreateNoteDto) {
+    const data = await this.noteService.createNote(user.id, dto);
+    return { message: 'Note created.', data, statusCode: 201 };
+  }
+
+  @Patch(':noteId')
+  async updateNote(
+    @CurrentUser() user: JwtPayload,
+    @Param('noteId') noteId: string,
+    @Body() dto: UpdateNoteDto,
   ) {
-    const { id: userId } = req.user!;
+    const data = await this.noteService.updateNote(user.id, noteId, dto.noteContent);
+    return { message: 'Note updated.', data };
+  }
 
-    await NoteService.deleteNote(userId, params.noteId);
-
-    return ApiResponse.success({
-      message: 'Note deleted successfully.',
-    });
+  @Delete(':noteId')
+  @HttpCode(200)
+  async deleteNote(
+    @CurrentUser() user: JwtPayload,
+    @Param('noteId') noteId: string,
+  ) {
+    await this.noteService.deleteNote(user.id, noteId);
+    return { message: 'Note deleted.' };
   }
 }
-
-export default NoteController;

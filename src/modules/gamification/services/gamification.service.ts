@@ -1,64 +1,49 @@
-import { UserStats } from '../models/user-stats.model';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { IUserStats } from '../models/user-stats.model';
 import { NotFoundError } from '../../../common/custom-error';
 
+@Injectable()
 export class GamificationService {
-  /**
-   * Awards XP to a user and recalculates their level.
-   * Level formula: level = floor(xp / 1000) + 1
-   */
-  static async awardXP(userId: string, xpAmount: number) {
-    const stats = await UserStats.findOne({ userId });
-    if (!stats) {
-      throw new NotFoundError('User stats profile not found.');
-    }
+  constructor(@InjectModel('UserStats') private userStatsModel: Model<IUserStats>) {}
+
+  /** Level formula: floor(xp / 1000) + 1 */
+  async awardXP(userId: string, xpAmount: number) {
+    const stats = await this.userStatsModel.findOne({ userId });
+    if (!stats) throw new NotFoundError('User stats profile not found.');
 
     stats.xp += xpAmount;
     stats.level = Math.floor(stats.xp / 1000) + 1;
     stats.lastActiveDate = new Date();
     await stats.save();
-
     return stats;
   }
 
-  /**
-   * Updates daily login streak tracking.
-   * Called when a user performs any qualifying activity (quiz pass, lesson view, etc.)
-   */
-  static async updateStreak(userId: string) {
-    const stats = await UserStats.findOne({ userId });
-    if (!stats) return;
+  /** Called on qualifying activity to track daily streak. */
+  async updateStreak(userId: string) {
+    const stats = await this.userStatsModel.findOne({ userId });
+    if (!stats) return null;
 
-    const now = new Date();
-    const lastActive = new Date(stats.lastActiveDate);
-    const diffDays = Math.floor(
-      (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const now      = new Date();
+    const diffDays = Math.floor((now.getTime() - new Date(stats.lastActiveDate).getTime()) / 86_400_000);
 
     if (diffDays === 1) {
       stats.currentStreak += 1;
-      if (stats.currentStreak > stats.highestStreak) {
-        stats.highestStreak = stats.currentStreak;
-      }
+      if (stats.currentStreak > stats.highestStreak) stats.highestStreak = stats.currentStreak;
     } else if (diffDays > 1) {
       stats.currentStreak = 1;
     }
-    // diffDays === 0 means same day, no streak change
+    // diffDays === 0 → same day, no change
 
     stats.lastActiveDate = now;
     await stats.save();
-
     return stats;
   }
 
-  /**
-   * Returns the full gamification profile for a user.
-   */
-  static async getStats(userId: string) {
-    const stats = await UserStats.findOne({ userId });
-    if (!stats) {
-      throw new NotFoundError('User stats profile not found.');
-    }
+  async getStats(userId: string) {
+    const stats = await this.userStatsModel.findOne({ userId });
+    if (!stats) throw new NotFoundError('User stats profile not found.');
     return stats;
   }
 }
-export default GamificationService;

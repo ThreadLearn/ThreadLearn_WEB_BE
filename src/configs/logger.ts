@@ -1,37 +1,14 @@
-import winston from 'winston';
-import 'winston-daily-rotate-file';
+// Compatibility shim for old `import { logger } from '../configs/logger'`
+// Old modules can keep their imports during migration.
+import { Logger } from '@nestjs/common';
 
-const logFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.errors({ stack: true }),
-  winston.format.splat(),
-  winston.format.json()
-);
+const _logger = new Logger('App');
 
-const consoleFormat = winston.format.combine(
-  winston.format.colorize(),
-  winston.format.printf(({ timestamp, level, message, stack }) => {
-    return `[${timestamp}] ${level}: ${message}${stack ? `\n${stack}` : ''}`;
-  })
-);
+export const logger = {
+  info:  (msg: string, ...args: any[]) => _logger.log(msg, ...args),
+  warn:  (msg: string, ...args: any[]) => _logger.warn(msg, ...args),
+  error: (msg: string, ...args: any[]) => _logger.error(msg, ...args),
+  debug: (msg: string, ...args: any[]) => _logger.debug(msg, ...args),
+};
 
-export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: logFormat,
-  transports: [
-    new winston.transports.Console({
-      format: consoleFormat,
-    }),
-    new winston.transports.DailyRotateFile({
-      filename: 'logs/error-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      level: 'error',
-      maxFiles: '14d',
-    }),
-    new winston.transports.DailyRotateFile({
-      filename: 'logs/combined-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      maxFiles: '14d',
-    }),
-  ],
-});
+export default logger;

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ICodeExecution extends Document {
   userId: mongoose.Types.ObjectId;
@@ -42,3 +42,5 @@ export const CodeExecution: Model<ICodeExecution> =
   mongoose.models.CodeExecution ||
   mongoose.model<ICodeExecution>('CodeExecution', CodeExecutionSchema);
 export default CodeExecution;
+export { CodeExecutionSchema };
+

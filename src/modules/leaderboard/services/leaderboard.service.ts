@@ -1,71 +1,38 @@
-import { getRedisClient } from '../../../configs/redis';
-import { UserStats } from '../../gamification/models/user-stats.model';
-import { logger } from '../../../configs/logger';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { RedisService } from '../../../config/redis.service';
 
+@Injectable()
 export class LeaderboardService {
-  private static LEADERBOARD_KEY = 'leaderboard:xp';
+  private readonly logger = new Logger(LeaderboardService.name);
+  private readonly LEADERBOARD_KEY = 'leaderboard:xp';
 
-  static async syncLeaderboardToRedis() {
-    try {
-      const redis = getRedisClient();
-      if (!redis.isOpen) return;
+  constructor(
+    @InjectModel('UserStats') private userStatsModel: Model<any>,
+    private readonly redis: RedisService,
+  ) {}
 
-      const stats = await UserStats.find().populate('userId', 'firstName lastName');
-      for (const stat of stats) {
-        if (stat.userId) {
-          const displayName = `${(stat.userId as any).firstName} ${(stat.userId as any).lastName}`;
-          await redis.zAdd(this.LEADERBOARD_KEY, {
-            score: stat.xp,
-            value: JSON.stringify({ userId: stat.userId._id, displayName }),
-          });
-        }
-      }
-      logger.info('📊 Leaderboard synchronized successfully with Redis.');
-    } catch (err) {
-      logger.warn('⚠️ Redis sync failed. Leaderboard will query DB directly.', err);
-    }
-  }
-
-  static async getTopRankings(limit = 10) {
-    try {
-      const redis = getRedisClient();
-      if (redis.isOpen) {
-        const range = await redis.zRangeWithScores(this.LEADERBOARD_KEY, 0, limit - 1, {
-          REV: true,
-        });
-
-        if (range.length > 0) {
-          return range.map((item: { value: string; score: number }, index: number) => {
-            const parsed = JSON.parse(item.value);
-            return {
-              rank: index + 1,
-              userId: parsed.userId,
-              displayName: parsed.displayName,
-              xp: item.score,
-            };
-          });
-        }
-      }
-    } catch (err) {
-      logger.warn('⚠️ Redis lookup error. Falling back to DB aggregation.', err);
-    }
-
-    const stats = await UserStats.find()
-      .populate('userId', 'firstName lastName')
+  async getTopRankings(limit = 10) {
+    // Always query DB — Redis ZSET path adds complexity without strong upside at this scale.
+    const stats = await this.userStatsModel
+      .find()
+      .populate('userId', 'firstName lastName avatarUrl')
       .sort({ xp: -1 })
       .limit(limit);
 
-    return stats.map((stat, index) => {
+    return stats.map((stat: any, index: number) => {
       const displayName = stat.userId
-        ? `${(stat.userId as any).firstName} ${(stat.userId as any).lastName}`
+        ? `${stat.userId.firstName ?? ''} ${stat.userId.lastName ?? ''}`.trim() || 'Anonymous'
         : 'Unknown User';
       return {
-        rank: index + 1,
-        userId: stat.userId ? stat.userId._id : stat._id,
+        rank:        index + 1,
+        userId:      stat.userId ? stat.userId._id : stat._id,
         displayName,
-        xp: stat.xp,
+        avatarUrl:   stat.userId?.avatarUrl,
+        xp:          stat.xp,
+        level:       stat.level,
       };
     });
   }
 }
-export default LeaderboardService;

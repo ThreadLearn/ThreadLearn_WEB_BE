@@ -1,44 +1,41 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CoursesService } from '../services/courses.service';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('courses')
+@Controller('courses')
 export class CoursesController {
-  static async getCourses(req: AuthenticatedNextRequest) {
-    const { searchParams } = req.nextUrl;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
-    const search = searchParams.get('search') || '';
+  constructor(private readonly coursesService: CoursesService) {}
 
-    const result = await CoursesService.listCourses(page, limit, search);
-
-    return ApiResponse.success({
-      message: 'Courses fetched successfully.',
-      data: result.courses,
-      meta: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: result.totalPages,
-      },
-    });
+  @Get()
+  async getCourses(
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('search') search = '',
+  ) {
+    const result = await this.coursesService.listCourses(
+      parseInt(page, 10), parseInt(limit, 10), search,
+    );
+    return { message: 'Courses fetched.', data: result.courses,
+             meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages } };
   }
 
-  static async getCourseById(req: AuthenticatedNextRequest, { params }: { params: { id: string } }) {
-    const courseDetail = await CoursesService.getCourseDetail(params.id);
-    return ApiResponse.success({
-      message: 'Course details fetched successfully.',
-      data: courseDetail,
-    });
+  @Get(':id')
+  async getCourseById(@Param('id') id: string) {
+    const data = await this.coursesService.getCourseDetail(id);
+    return { message: 'Course fetched.', data };
   }
 
-  static async createCourse(req: AuthenticatedNextRequest) {
-    const body = await req.json();
-    const course = await CoursesService.createCourse(body);
-    return ApiResponse.success({
-      message: 'Course created successfully.',
-      data: course,
-      statusCode: 201,
-    });
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  async createCourse(@Body() body: any) {
+    const data = await this.coursesService.createCourse(body);
+    return { message: 'Course created.', data, statusCode: 201 };
   }
 }
-export default CoursesController;

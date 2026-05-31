@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IBookmark extends Document {
   userId: mongoose.Types.ObjectId;
@@ -26,3 +26,5 @@ BookmarkSchema.index({ userId: 1, targetType: 1, targetId: 1 }, { unique: true }
 export const Bookmark: Model<IBookmark> =
   mongoose.models.Bookmark || mongoose.model<IBookmark>('Bookmark', BookmarkSchema);
 export default Bookmark;
+export { BookmarkSchema };
+

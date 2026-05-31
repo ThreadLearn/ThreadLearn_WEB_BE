@@ -1,162 +1,173 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User } from '../models/user.model';
-import { RefreshToken } from '../models/refresh-token.model';
-import { UserStats } from '../../gamification/models/user-stats.model';
-import { NotificationsService } from '../../notifications/services/notifications.service';
-import { env } from '../../../configs/env';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { Model } from 'mongoose';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import { IUser } from '../models/user.model';
+import { IRefreshToken } from '../models/refresh-token.model';
 import { BadRequestError, UnauthorizedError } from '../../../common/custom-error';
-import { logger } from '../../../configs/logger';
 
+@Injectable()
 export class AuthService {
-  static generateTokens(payload: { id: string; email: string; role: string }) {
-    const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-      expiresIn: env.JWT_ACCESS_EXPIRES_IN as any,
-    });
+  private readonly logger = new Logger(AuthService.name);
 
-    const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, {
-      expiresIn: env.JWT_REFRESH_EXPIRES_IN as any,
-    });
+  constructor(
+    @InjectModel('User')         private userModel:         Model<IUser>,
+    @InjectModel('RefreshToken') private refreshTokenModel: Model<IRefreshToken>,
+    @InjectModel('UserStats')    private userStatsModel:    Model<any>,
+    private readonly jwtService:    JwtService,
+    private readonly config:        ConfigService,
+  ) {}
 
+  // ── Token helpers ──────────────────────────────────────────────────────────
+
+  private generateTokens(payload: { id: string; email: string; role: string }) {
+    const accessSecret  = this.config.get<string>('jwt.accessSecret')!;
+    const refreshSecret = this.config.get<string>('jwt.refreshSecret')!;
+    const accessExp     = this.config.get<string>('jwt.accessExpiresIn')  ?? '15m';
+    const refreshExp    = this.config.get<string>('jwt.refreshExpiresIn') ?? '7d';
+
+    const accessToken  = jwt.sign(payload, accessSecret,  { expiresIn: accessExp  as any });
+    const refreshToken = jwt.sign(payload, refreshSecret, { expiresIn: refreshExp as any });
     return { accessToken, refreshToken };
   }
 
-  static async register(data: any) {
-    const existing = await User.findOne({ email: data.email });
-    if (existing) {
-      throw new BadRequestError('Email address is already in use.');
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-
-    const user = await User.create({
-      email: data.email,
-      passwordHash, 
-      firstName: data.firstName,
-      lastName: data.lastName,
-      role: 'STUDENT',
-    });
-
-    // Initialize user stats for gamification
-    await UserStats.create({
-      userId: user._id,
-      xp: 0,
-      level: 1,
-    });
-
-    const tokens = this.generateTokens({
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    });
-
+  private async saveRefreshToken(userId: any, token: string) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
+    await this.refreshTokenModel.create({ token, userId, expiresAt });
+  }
 
-    await RefreshToken.create({
-      token: tokens.refreshToken,
-      userId: user._id,
-      expiresAt,
+  // ── Endpoints ─────────────────────────────────────────────────────────────
+
+  async register(data: { email: string; password: string; firstName: string; lastName: string }) {
+    const existing = await this.userModel.findOne({ email: data.email });
+    if (existing) throw new BadRequestError('Email address is already in use.');
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const user = await this.userModel.create({
+      email: data.email,
+      passwordHash,
+      firstName: data.firstName,
+      lastName:  data.lastName,
+      role:      'STUDENT',
     });
 
-    // Notify all admins about the new registration (fire-and-forget)
-    NotificationsService.notifyAdmin(
-      'NEW_USER_REGISTERED',
-      'Học viên mới đăng ký',
-      `${user.firstName} ${user.lastName} (${user.email}) vừa tạo tài khoản.`,
-      { userId: user._id, email: user.email }
-    ).catch((err) => logger.warn('New user admin notification failed (non-critical).', err));
+    await this.userStatsModel.create({ userId: user._id, xp: 0, level: 1 });
+
+    const tokens = this.generateTokens({
+      id:    user._id.toString(),
+      email: user.email,
+      role:  user.role,
+    });
+    await this.saveRefreshToken(user._id, tokens.refreshToken);
 
     return {
       user: {
-        id: user._id,
-        email: user.email,
+        _id:       user._id,
+        id:        user._id,
+        email:     user.email,
         firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
+        lastName:  user.lastName,
+        name:      `${user.firstName} ${user.lastName}`.trim(),
+        role:      user.role,
+        avatarUrl: user.avatarUrl,
+        isPremium: user.isPremium,
+        planType:  user.isPremium ? 'PREMIUM' : 'FREE',
       },
       ...tokens,
     };
   }
 
-  static async login(data: any) {
-    const user = await User.findOne({ email: data.email });
+  async login(data: { email: string; password: string }) {
+    const user = await this.userModel.findOne({ email: data.email });
     if (!user || !user.passwordHash) {
       throw new BadRequestError('Invalid email or password credentials.');
     }
 
     const matches = await bcrypt.compare(data.password, user.passwordHash);
-    if (!matches) {
-      throw new BadRequestError('Invalid email or password credentials.');
-    }
+    if (!matches) throw new BadRequestError('Invalid email or password credentials.');
 
     const tokens = this.generateTokens({
-      id: user._id.toString(),
+      id:    user._id.toString(),
       email: user.email,
-      role: user.role,
+      role:  user.role,
     });
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    await RefreshToken.create({
-      token: tokens.refreshToken,
-      userId: user._id,
-      expiresAt,
-    });
+    await this.saveRefreshToken(user._id, tokens.refreshToken);
 
     return {
       user: {
-        id: user._id,
-        email: user.email,
+        _id:       user._id,
+        id:        user._id,
+        email:     user.email,
         firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
+        lastName:  user.lastName,
+        name:      `${user.firstName} ${user.lastName}`.trim(),
+        role:      user.role,
+        avatarUrl: user.avatarUrl,
+        isPremium: user.isPremium,
+        planType:  user.isPremium ? 'PREMIUM' : 'FREE',
       },
       ...tokens,
     };
   }
 
-  static async refresh(token: string) {
-    const storedToken = await RefreshToken.findOne({ token });
-    if (!storedToken || storedToken.expiresAt < new Date()) {
-      if (storedToken) await RefreshToken.deleteOne({ _id: storedToken._id });
+  async refresh(token: string) {
+    const stored = await this.refreshTokenModel.findOne({ token });
+    if (!stored || stored.expiresAt < new Date()) {
+      if (stored) await this.refreshTokenModel.deleteOne({ _id: stored._id });
       throw new UnauthorizedError('Refresh token is invalid or has expired.');
     }
 
     try {
-      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as {
-        id: string;
-        email: string;
-        role: string;
-      };
+      const refreshSecret = this.config.get<string>('jwt.refreshSecret')!;
+      const decoded = jwt.verify(token, refreshSecret) as { id: string; email: string; role: string };
+      await this.refreshTokenModel.deleteOne({ _id: stored._id });
 
-      await RefreshToken.deleteOne({ _id: storedToken._id });
-
-      const tokens = this.generateTokens({
-        id: decoded.id,
-        email: decoded.email,
-        role: decoded.role,
-      });
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      await RefreshToken.create({
-        token: tokens.refreshToken,
-        userId: decoded.id as any,
-        expiresAt,
-      });
-
+      const tokens = this.generateTokens({ id: decoded.id, email: decoded.email, role: decoded.role });
+      await this.saveRefreshToken(decoded.id, tokens.refreshToken);
       return tokens;
-    } catch (err) {
+    } catch {
       throw new UnauthorizedError('Refresh token verification failed.');
     }
   }
 
-  static async logout(token: string) {
-    await RefreshToken.deleteOne({ token });
+  async logout(token?: string) {
+    if (token) await this.refreshTokenModel.deleteOne({ token });
     return true;
   }
+
+  /** Issue a single-use password-reset token. Email delivery is left to ops. */
+  async forgotPassword(email: string) {
+    const user = await this.userModel.findOne({ email });
+    // Always return success to avoid leaking which emails are registered.
+    if (!user) return { sent: true };
+
+    const token = (await import('crypto')).randomBytes(32).toString('hex');
+    user.resetPasswordToken     = token;
+    user.resetPasswordExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
+    await user.save();
+
+    this.logger.log(`[forgotPassword] token for ${email}: ${token}`); // TODO: send via email
+    return { sent: true };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.userModel.findOne({
+      resetPasswordToken:     token,
+      resetPasswordExpiresAt: { $gt: new Date() },
+    });
+    if (!user) throw new BadRequestError('Reset token is invalid or has expired.');
+
+    user.passwordHash           = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken     = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    await user.save();
+
+    // Invalidate all existing refresh tokens for this user
+    await this.refreshTokenModel.deleteMany({ userId: user._id });
+    return { reset: true };
+  }
 }
-export default AuthService;

@@ -1,8 +1,8 @@
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import mongoose from 'mongoose';
-import { Comment } from '../models/comment.model';
-import { Course } from '../../courses/models/course.model';
-import { Lesson } from '../../lessons/models/lesson.model';
-import { Enrollment } from '../../enrollments/models/enrollment.model';
+import { IComment } from '../models/comment.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 
 function formatComment(comment: any) {
@@ -10,57 +10,62 @@ function formatComment(comment: any) {
   const user = comment.userId;
   return {
     ...comment,
-    userId: user && typeof user === 'object' && user.firstName !== undefined
-      ? {
-          _id: user._id,
-          fullName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
-          avatarUrl: user.avatarUrl ?? null,
-        }
-      : user,
+    userId:
+      user && typeof user === 'object' && user.firstName !== undefined
+        ? {
+            _id:       user._id,
+            fullName:  `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+            avatarUrl: user.avatarUrl ?? null,
+          }
+        : user,
   };
 }
 
+@Injectable()
 export class CommentService {
-  static async getComments(
+  constructor(
+    @InjectModel('Comment')    private commentModel:    Model<IComment>,
+    @InjectModel('Course')     private courseModel:     Model<any>,
+    @InjectModel('Lesson')     private lessonModel:     Model<any>,
+    @InjectModel('Enrollment') private enrollmentModel: Model<any>,
+  ) {}
+
+  async getComments(
     targetType: 'COURSE' | 'LESSON',
     targetId: string,
     page = 1,
-    limit = 10
+    limit = 10,
   ) {
-    const skip = (page - 1) * limit;
+    if (!['COURSE', 'LESSON'].includes(targetType)) {
+      throw new BadRequestError('targetType must be COURSE or LESSON.');
+    }
+    const skip  = (page - 1) * limit;
     const query = { targetType, targetId, parentId: null };
 
     const [comments, total] = await Promise.all([
-      Comment.find(query)
+      this.commentModel
+        .find(query)
         .populate('userId', 'firstName lastName avatarUrl')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Comment.countDocuments(query),
+      this.commentModel.countDocuments(query),
     ]);
 
     const data = comments.map(formatComment);
-    return {
-      data,
-      total,
-      page,
-      limit,
-      hasMore: skip + data.length < total,
-    };
+    return { data, total, page, limit, hasMore: skip + data.length < total };
   }
 
-  static async getReplies(commentId: string) {
+  async getReplies(commentId: string) {
     if (!mongoose.isValidObjectId(commentId)) {
       throw new NotFoundError('Comment not found.');
     }
+    const parent = await this.commentModel.findById(commentId);
+    if (!parent) throw new NotFoundError('Comment not found.');
 
-    const parent = await Comment.findById(commentId);
-    if (!parent) {
-      throw new NotFoundError('Comment not found.');
-    }
-
-    const replies = await Comment.find({ parentId: commentId })
+    const replies = await this.commentModel
+      .find({ parentId: commentId })
       .populate('userId', 'firstName lastName avatarUrl')
       .sort({ createdAt: 1 })
       .lean();
@@ -68,24 +73,17 @@ export class CommentService {
     return replies.map(formatComment);
   }
 
-  static async createComment(
+  async createComment(
     userId: string,
-    data: {
-      targetType: 'COURSE' | 'LESSON';
-      targetId: string;
-      content: string;
-      parentId?: string;
-    }
+    data: { targetType: 'COURSE' | 'LESSON'; targetId: string; content: string; parentId?: string },
   ) {
-    // BR-26: Verify target exists and student is enrolled
-    await CommentService.checkTargetAccess(userId, data.targetType, data.targetId);
+    await this.checkTargetAccess(userId, data.targetType, data.targetId);
 
-    // BR-28: Validate parentId if provided
     if (data.parentId) {
       if (!mongoose.isValidObjectId(data.parentId)) {
         throw new BadRequestError('Invalid parentId format.');
       }
-      const parent = await Comment.findById(data.parentId);
+      const parent = await this.commentModel.findById(data.parentId);
       if (!parent || parent.isDeleted) {
         throw new BadRequestError('Parent comment not found or has been deleted.');
       }
@@ -94,37 +92,32 @@ export class CommentService {
       }
     }
 
-    const comment = await Comment.create({
+    const comment = await this.commentModel.create({
       userId,
       targetType: data.targetType,
-      targetId: data.targetId,
-      content: data.content,
-      parentId: data.parentId ? new mongoose.Types.ObjectId(data.parentId) : null,
+      targetId:   data.targetId,
+      content:    data.content,
+      parentId:   data.parentId ? new mongoose.Types.ObjectId(data.parentId) : null,
     });
 
-    const populated = await Comment.findById(comment._id)
+    const populated = await this.commentModel
+      .findById(comment._id)
       .populate('userId', 'firstName lastName avatarUrl')
       .lean();
 
     return formatComment(populated);
   }
 
-  static async updateComment(
+  async updateComment(
     commentId: string,
     userId: string,
     content: string,
-    userRole: 'STUDENT' | 'ADMIN'
+    userRole: 'STUDENT' | 'ADMIN',
   ) {
-    if (!mongoose.isValidObjectId(commentId)) {
-      throw new NotFoundError('Comment not found.');
-    }
+    if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
+    const comment = await this.commentModel.findById(commentId);
+    if (!comment || comment.isDeleted) throw new NotFoundError('Comment not found.');
 
-    const comment = await Comment.findById(commentId);
-    if (!comment || comment.isDeleted) {
-      throw new NotFoundError('Comment not found.');
-    }
-
-    // BR-27: Student can only edit their own; Admin can edit any
     if (userRole !== 'ADMIN' && comment.userId.toString() !== userId) {
       throw new ForbiddenError('You can only edit your own comments.');
     }
@@ -132,60 +125,48 @@ export class CommentService {
     comment.content = content;
     await comment.save();
 
-    const populated = await Comment.findById(commentId)
+    const populated = await this.commentModel
+      .findById(commentId)
       .populate('userId', 'firstName lastName avatarUrl')
       .lean();
 
     return formatComment(populated);
   }
 
-  static async deleteComment(commentId: string, userId: string, userRole: 'STUDENT' | 'ADMIN') {
-    if (!mongoose.isValidObjectId(commentId)) {
-      throw new NotFoundError('Comment not found.');
-    }
+  async deleteComment(commentId: string, userId: string, userRole: 'STUDENT' | 'ADMIN') {
+    if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
+    const comment = await this.commentModel.findById(commentId);
+    if (!comment || comment.isDeleted) throw new NotFoundError('Comment not found.');
 
-    const comment = await Comment.findById(commentId);
-    if (!comment || comment.isDeleted) {
-      throw new NotFoundError('Comment not found.');
-    }
-
-    // BR-27: Admin can delete any; Student can only delete their own
     if (userRole !== 'ADMIN' && comment.userId.toString() !== userId) {
       throw new ForbiddenError('You can only delete your own comments.');
     }
 
-    // Soft delete — keep document to preserve thread structure
     comment.isDeleted = true;
-    comment.content = '[Comment đã bị xóa]';
+    comment.content   = '[Comment đã bị xóa]';
     await comment.save();
-
     return { success: true };
   }
 
-  private static async checkTargetAccess(
+  private async checkTargetAccess(
     userId: string,
     targetType: 'COURSE' | 'LESSON',
-    targetId: string
+    targetId: string,
   ) {
     if (!mongoose.isValidObjectId(targetId)) {
       throw new NotFoundError(targetType === 'COURSE' ? 'Course not found.' : 'Lesson not found.');
     }
 
     if (targetType === 'COURSE') {
-      const course = await Course.findById(targetId);
+      const course = await this.courseModel.findById(targetId);
       if (!course) throw new NotFoundError('Course not found.');
-
-      const enrolled = await Enrollment.findOne({ userId, courseId: targetId });
-      if (!enrolled) throw new ForbiddenError('You must be enrolled in this course to comment.');
+      const enrolled = await this.enrollmentModel.findOne({ userId, courseId: targetId });
+      if (!enrolled) throw new ForbiddenError('You must be enrolled to comment on this course.');
     } else {
-      const lesson = await Lesson.findById(targetId);
+      const lesson = await this.lessonModel.findById(targetId);
       if (!lesson) throw new NotFoundError('Lesson not found.');
-
-      const enrolled = await Enrollment.findOne({ userId, courseId: lesson.courseId });
-      if (!enrolled)
-        throw new ForbiddenError('You must be enrolled in this course to comment on its lessons.');
+      const enrolled = await this.enrollmentModel.findOne({ userId, courseId: lesson.courseId });
+      if (!enrolled) throw new ForbiddenError('You must be enrolled to comment on this lesson.');
     }
   }
 }
-
-export default CommentService;

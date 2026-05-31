@@ -1,54 +1,50 @@
-import { Course } from '../models/course.model';
-import { Lesson } from '../../lessons/models/lesson.model';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { ICourse } from '../models/course.model';
+import { ILesson } from '../../lessons/models/lesson.model';
 import { NotFoundError } from '../../../common/custom-error';
 
+@Injectable()
 export class CoursesService {
-  static async listCourses(page = 1, limit = 10, search = '') {
-    const skip = (page - 1) * limit;
-    
+  constructor(
+    @InjectModel('Course') private courseModel: Model<ICourse>,
+    @InjectModel('Lesson') private lessonModel: Model<ILesson>,
+  ) {}
+
+  async listCourses(page = 1, limit = 10, search = '') {
+    const skip  = (page - 1) * limit;
     const query: any = { isPublished: true };
-    if (search) {
-      query.$text = { $search: search };
-    }
+    if (search) query.$text = { $search: search };
 
     const [courses, total] = await Promise.all([
-      Course.find(query)
+      this.courseModel
+        .find(query)
         .skip(skip)
         .limit(limit)
         .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 }),
-      Course.countDocuments(query),
+      this.courseModel.countDocuments(query),
     ]);
 
-    return {
-      courses,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return { courses, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  static async getCourseDetail(courseId: string) {
-    const course = await Course.findById(courseId);
-    if (!course) {
-      throw new NotFoundError('Course not found.');
-    }
+  async getCourseDetail(courseId: string) {
+    const course = await this.courseModel.findById(courseId);
+    if (!course) throw new NotFoundError('Course not found.');
 
-    const lessons = await Lesson.find({ courseId }).sort({ order: 1 }).select('-content');
+    const lessons = await this.lessonModel
+      .find({ courseId }).sort({ order: 1 }).select('-content');
 
-    return {
-      course,
-      lessons,
-    };
+    return { course, lessons };
   }
 
-  static async createCourse(data: any) {
-    return await Course.create({
-      title: data.title,
+  async createCourse(data: any) {
+    return this.courseModel.create({
+      title:       data.title,
       description: data.description,
-      coverImage: data.coverImage,
-      isPublished: data.isPublished || false,
+      coverImage:  data.coverImage,
+      isPublished: data.isPublished ?? false,
     });
   }
 }
-export default CoursesService;

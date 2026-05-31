@@ -1,53 +1,77 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import { Controller, Post, Get, Body, HttpCode, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { BadRequestError } from '../../../common/custom-error';
+import {
+  RegisterDto, LoginDto, RefreshDto, LogoutDto,
+  ForgotPasswordDto, ResetPasswordDto,
+} from '../dto/auth.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('auth')
+@Controller('auth')
 export class AuthController {
-  static async register(req: AuthenticatedNextRequest) {
-    const body = await req.json();
-    const result = await AuthService.register(body);
-    return ApiResponse.success({
-      message: 'User registered successfully.',
-      data: result,
-      statusCode: 201,
-    });
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() dto: RegisterDto) {
+    const data = await this.authService.register(dto);
+    return { message: 'User registered successfully.', data, statusCode: 201 };
   }
 
-  static async login(req: AuthenticatedNextRequest) {
-    const body = await req.json();
-    const result = await AuthService.login(body);
-    return ApiResponse.success({
-      message: 'Login successful.',
-      data: result,
-    });
+  @Post('login')
+  @HttpCode(200)
+  async login(@Body() dto: LoginDto) {
+    const data = await this.authService.login(dto);
+    return { message: 'Login successful.', data };
   }
 
-  static async refresh(req: AuthenticatedNextRequest) {
-    const body = await req.json();
-    const result = await AuthService.refresh(body.refreshToken);
-    return ApiResponse.success({
-      message: 'Tokens refreshed successfully.',
-      data: result,
-    });
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(@Body() dto: RefreshDto) {
+    const data = await this.authService.refresh(dto.refreshToken);
+    return { message: 'Tokens refreshed successfully.', data };
   }
 
-  static async logout(req: AuthenticatedNextRequest) {
-    const body = await req.json();
-    await AuthService.logout(body.refreshToken);
-    return ApiResponse.success({
-      message: 'Logged out successfully.',
-    });
+  @Post('logout')
+  @HttpCode(200)
+  async logout(@Body() dto: LogoutDto) {
+    await this.authService.logout(dto.refreshToken);
+    return { message: 'Logged out successfully.' };
   }
 
-  static async getSessionUser(req: AuthenticatedNextRequest) {
-    if (!req.user) {
-      throw new BadRequestError('User context missing from request.');
-    }
-    return ApiResponse.success({
-      message: 'User context retrieved successfully.',
-      data: { user: req.user },
-    });
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  me(@CurrentUser() user: JwtPayload) {
+    return { message: 'Session user retrieved.', data: { user } };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'If the email exists, a reset link has been sent.' };
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Password has been reset successfully.' };
+  }
+
+  /**
+   * Google OAuth placeholder. Full implementation requires `passport-google-oauth20`
+   * and Google Cloud credentials — out of DEV3 scope. Returns 501 to make the
+   * FE behavior explicit instead of a misleading 404.
+   */
+  @Get('google')
+  @HttpCode(501)
+  google() {
+    return {
+      message: 'Google OAuth is not configured yet. Please use email/password login.',
+      statusCode: 501,
+    };
   }
 }
-export default AuthController;

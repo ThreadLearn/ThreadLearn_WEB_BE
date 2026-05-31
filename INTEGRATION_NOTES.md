@@ -1,106 +1,70 @@
-# DEV 3 Integration Notes
+# DEV3 — Cross-DEV Integration Contract
 
-## 1. Pending DEV 2 / DEV 4 Dependencies
+## What DEV3 *consumes* from other devs
 
-| Caller | Expects | Status |
-|--------|---------|--------|
-| `CommentService.checkTargetAccess` | `Enrollment.findOne({ userId, courseId })` | ✅ Uses existing Enrollment model directly |
-| `NoteService.checkLessonAccess` | `Enrollment.findOne({ userId, courseId: lesson.courseId })` | ✅ Uses existing Enrollment model directly |
-| `BookmarkService` | No enrollment check required (by spec) | ✅ No dependency |
-| `NotificationsService.notifyAdmin` | Admin users exist in DB (`role: 'ADMIN'`) | Requires at least one ADMIN seeded |
-| `LESSON_COMPLETED` notification | `EnrollmentsService.markLessonComplete` → `NotificationsService.notify` | ✅ Done — `PATCH /api/v1/lessons/:id/complete` |
-| DEV 4 — `PAYMENT_SUCCESS` notification | Payment service calling `NotificationsService.notify(userId, 'PAYMENT_SUCCESS', ...)` | ⏳ DEV 4 must wire this — no payment service exists yet |
-| DEV 4 — `BOOKMARK_COURSE_UPDATED` notification | Lesson-add event triggering notify for bookmarked-course users | ⏳ DEV 4 must wire this — needs lesson-add hook in course admin flow |
+| From | Model / Service           | Used in                          | Notes |
+|------|---------------------------|----------------------------------|-------|
+| DEV1 | `User.isPremium: boolean` | `AIAnalysisService`              | Drives quota tier (Free=10 / Premium=40) |
+| DEV2 | `Enrollment` model        | `CommentService`, `NoteService`  | `findOne({ userId, courseId })` for access guard |
+| DEV2 | `Lesson` model + `courseId` | `CommentService`, `NoteService`, `EnrollmentsService` | Used to resolve lesson→course for access checks |
+| DEV2 | `Course.title`            | `EnrollmentsService` notifications | Snapshot in notification message |
+| DEV4 | `Quiz.title`, `xpReward`  | `QuizAttemptsService` notifications | Snapshot in notification message |
+| DEV4 | `UserStats.{xp, level, …}` | `EnrollmentsService`, `QuizAttemptsService` | Read+write on completion |
 
-## 2. Environment Variables Required
+## What DEV3 *exposes* for other devs
 
-All variables are in `.env.example`. Copy to `.env` and fill in values:
+| Symbol | Where | Use |
+|--------|-------|-----|
+| `NotificationsService.notify(userId, type, title, message, metadata?)` | `notifications/services/notifications.service.ts` | Any module emits a notification |
+| `NotificationsService.notifyAdmin(type, title, message, metadata?)`    | same | Broadcast to all `role: 'ADMIN'` users |
+| WS namespace `/notifications` with `auth: { token }` | `notifications/gateways/notifications.gateway.ts` | Real-time delivery |
 
-```env
-# Required (no defaults)
-DATABASE_URL=mongodb://localhost:27017/threadlearn
-JWT_ACCESS_SECRET=<strong-random-secret>
-JWT_REFRESH_SECRET=<strong-random-secret>
+## Event types contract (UC53)
 
-# Optional — features degrade gracefully if absent
-REDIS_URL=redis://localhost:6379        # Rate limiting falls back to in-memory
-JUDGE0_API_URL=http://localhost:2358    # Code execution falls back to mock mode
-JUDGE0_API_KEY=                         # Only required for api.judge0.com (paid)
-OPENAI_API_KEY=sk-...                   # AI analysis falls back to mock suggestions
-```
+### Student events (DEV2 / DEV4 may emit)
+- `LESSON_COMPLETED`        — DEV2 emits in `EnrollmentsService.markLessonComplete`
+- `COURSE_ENROLLED`         — DEV2 emits in `EnrollmentsService.enrollInCourse`
+- `COURSE_COMPLETED`        — DEV2 emits in `EnrollmentsService.updateLessonProgress`
+- `QUIZ_PASSED` / `QUIZ_FAILED` — DEV4 emits in `QuizAttemptsService.submitAttempt`
+- `LEVEL_UP`                — DEV4 (XP engine) and DEV2 (course completion) both emit
+- `BOOKMARK_COURSE_UPDATED` — DEV2 should emit when bookmarked course has new lessons
+- `PAYMENT_SUCCESS`         — DEV4 emits after payment gateway callback
 
-## 3. npm install Required
+### Admin events
+- `NEW_USER_REGISTERED`     — DEV1 emits via `notifyAdmin` in `AuthService.register`
+- `STUDENT_COMMENT_REPORT`  — Future: DEV3 emits if report feature added
+- `SYSTEM_ERROR`            — Anyone can emit on unrecoverable errors
 
-`node_modules` is not present. Run before starting:
+## Module wiring already done
+
+- `EnrollmentsModule` imports `NotificationsModule` ✓
+- `QuizAttemptsModule` imports `NotificationsModule` ✓
+- DEV1 `AuthModule` and DEV4 `XPModule` should also add `imports: [NotificationsModule]` to inject `NotificationsService`.
+
+## Mocking when DEV1/2/4 not ready
+
+- **Judge0**: `JUDGE0_RAPIDAPI_KEY` unset → `Judge0Service` returns echo mock
+- **OpenAI**: `OPENAI_API_KEY` unset → `AIEngineService` returns canned suggestions
+- **Redis**: any Redis op falls back to in-memory `Map` automatically
+- **Enrollment data**: seed a fake `Enrollment` doc to test gates
+
+## How to verify
 
 ```bash
-npm install
+npx ts-node -P tsconfig.json src/scripts/mock-integration-check.ts
 ```
 
-No new packages were added by DEV 3 — all dependencies (socket.io, redis, zod, mongoose, jsonwebtoken) were already in `package.json`.
+Should print contract OK summary.
 
-## 4. Cross-Module Notification Wiring — What Was Done
-
-| Service | Notification Type | Triggered When |
-|---------|------------------|----------------|
-| `AuthService.register` | `NEW_USER_REGISTERED` → all ADMINs | Student creates account |
-| `EnrollmentsService.enrollInCourse` | `COURSE_ENROLLED` → student | Student enrolls |
-| `EnrollmentsService.markLessonComplete` | `LESSON_COMPLETED` → student | Student marks a lesson complete |
-| `EnrollmentsService.updateLessonProgress` | `COURSE_COMPLETED` → student | Progress reaches 100% |
-| `EnrollmentsService.updateLessonProgress` | `LEVEL_UP` → student | Level increases after course XP |
-| `QuizAttemptsService.submitAttempt` | `QUIZ_PASSED` → student | Score ≥ 80% |
-| `QuizAttemptsService.submitAttempt` | `QUIZ_FAILED` → student | Score < 80% |
-| `QuizAttemptsService.submitAttempt` | `LEVEL_UP` → student | Level increases after quiz XP |
-
-All notification calls are **fire-and-forget** (`.catch()` logs warning) — a failed notification never breaks the primary business operation.
-
-## 5. Socket.IO Room Convention
-
-- Room name: `user:{userId}` (colon separator, not underscore)
-- Client connects with: `io('/notifications', { auth: { userId } })`
-- Backend emits: `io.to('user:{userId}').emit('notification', payload)`
-- Room join happens automatically on connect in `src/socket/index.ts`
-
-## 6. Known Issues / Limitations
-
-| Issue | Notes |
-|-------|-------|
-| `LESSON_COMPLETED` type now triggered | `PATCH /api/v1/lessons/:id/complete` calls `EnrollmentsService.markLessonComplete` — fire-and-forget notification included |
-| AI analysis `@babel/parser` not used | Replaced with regex-based code context extraction. Real AST can be wired by installing `@babel/parser` and replacing `extractCodeContext()` in `ai-engine.service.ts` |
-| `openai` SDK not installed | AI engine uses `fetch` directly to `api.openai.com`. Drop-in replacement: `new OpenAI().chat.completions.create(...)` in `callOpenAI()` |
-| Judge0 mock returns `passed: true` always | Intentional for local dev. Deploy self-hosted Judge0 and set `JUDGE0_API_URL=http://your-judge0:2358` |
-| `User.isPremium` not in JWT | `AIAnalysisService` does a DB lookup per request. If needed for performance, add `isPremium` to JWT payload and regenerate tokens on plan change |
-| TypeScript check blocked | `node_modules` absent — run `npm install` then `npx tsc --noEmit` |
-
-## 7. New API Routes Added in DEV 3
+## Env vars DEV3 needs
 
 ```
-POST   /api/v1/comments
-GET    /api/v1/comments?targetType=&targetId=
-GET    /api/v1/comments/:commentId/replies
-PATCH  /api/v1/comments/:commentId
-DELETE /api/v1/comments/:commentId
-
-POST   /api/v1/bookmarks/toggle
-GET    /api/v1/bookmarks/me
-GET    /api/v1/bookmarks/check
-
-GET    /api/v1/notes?lessonId=
-POST   /api/v1/notes
-PATCH  /api/v1/notes/:noteId
-DELETE /api/v1/notes/:noteId
-
-GET    /api/v1/exercises/:lessonId
-POST   /api/v1/code-execution/run
-GET    /api/v1/code-execution/history
-
-POST   /api/v1/ai-analysis/recommend
-GET    /api/v1/ai-analysis/history
-
-PATCH  /api/v1/lessons/:id/complete
-
-GET    /api/v1/notifications            (updated — now paginated)
-GET    /api/v1/notifications/unread-count
-PATCH  /api/v1/notifications/:id/read
-PATCH  /api/v1/notifications/read-all
+JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
+JUDGE0_RAPIDAPI_KEY=<optional — mock mode if absent>
+JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
+JUDGE0_TIMEOUT_MS=10000
+OPENAI_API_KEY=<optional — mock mode if absent>
+REDIS_URL=<optional — in-memory fallback if absent>
+JWT_ACCESS_SECRET=<shared with DEV1>
+CORS_ORIGIN=http://localhost:3000
 ```

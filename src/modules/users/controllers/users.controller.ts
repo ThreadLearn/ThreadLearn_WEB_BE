@@ -1,45 +1,19 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
-import { BadRequestError } from '../../../common/custom-error';
-import { saveUploadedFile } from '../../../configs/upload';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('users')
+@Controller('users')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class UsersController {
-  static async getMyProfile(req: AuthenticatedNextRequest) {
-    if (!req.user) {
-      throw new BadRequestError('User context not found.');
-    }
-    const profile = await UsersService.getProfile(req.user.id);
-    return ApiResponse.success({
-      message: 'Profile retrieved successfully.',
-      data: profile,
-    });
-  }
+  constructor(private readonly usersService: UsersService) {}
 
-  static async uploadAvatar(req: AuthenticatedNextRequest) {
-    if (!req.user) {
-      throw new BadRequestError('User context not found.');
-    }
-
-    try {
-      const formData = await req.formData();
-      const file = formData.get('avatar') as File;
-
-      if (!file) {
-        throw new BadRequestError('No avatar file provided in FormData.');
-      }
-
-      const fileUrl = await saveUploadedFile(file, 'avatars');
-      const updatedUser = await UsersService.updateAvatar(req.user.id, fileUrl);
-
-      return ApiResponse.success({
-        message: 'Avatar uploaded successfully.',
-        data: updatedUser,
-      });
-    } catch (err: any) {
-      if (err instanceof BadRequestError) throw err;
-      throw new BadRequestError('Failed to parse multipart/form-data for avatar upload.');
-    }
+  @Get('me')
+  async getMyProfile(@CurrentUser() user: JwtPayload) {
+    const data = await this.usersService.getProfile(user.id);
+    return { message: 'Profile retrieved.', data };
   }
 }
-export default UsersController;

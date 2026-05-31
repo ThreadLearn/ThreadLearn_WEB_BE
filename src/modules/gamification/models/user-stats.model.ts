@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IUserStats extends Document {
   userId: mongoose.Types.ObjectId;
@@ -29,3 +29,5 @@ const UserStatsSchema: Schema<IUserStats> = new Schema(
 export const UserStats: Model<IUserStats> =
   mongoose.models.UserStats || mongoose.model<IUserStats>('UserStats', UserStatsSchema);
 export default UserStats;
+export { UserStatsSchema };
+

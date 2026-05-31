@@ -1,52 +1,39 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AIAnalysisService } from '../services/ai-analysis.service';
-import { User } from '../../auth/models/user.model';
+import { RequestAnalysisDto } from '../dto/ai-analysis.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
-async function resolveIsPremium(userId: string, role: 'STUDENT' | 'ADMIN'): Promise<boolean> {
-  if (role === 'ADMIN') return true; // Admins always get premium quota
-  const user = await User.findById(userId).select('isPremium').lean();
-  return (user as any)?.isPremium ?? false;
-}
-
+@ApiTags('ai-analysis')
+@Controller('ai-analysis')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('STUDENT', 'ADMIN')
+@ApiBearerAuth()
 export class AIAnalysisController {
-  static async recommend(req: AuthenticatedNextRequest) {
-    const { id: userId, role } = req.user!;
-    const body = await req.json();
+  constructor(private readonly aiAnalysisService: AIAnalysisService) {}
 
-    const result = await AIAnalysisService.requestAnalysis(userId, {
-      inputCode: body.inputCode,
-      language: body.language,
-      codeExecutionId: body.codeExecutionId,
-    });
-
-    return ApiResponse.success({
-      message: 'Code analysis completed successfully.',
-      data: result,
-    });
+  @Post('recommend')
+  async recommend(@CurrentUser() user: JwtPayload, @Body() dto: RequestAnalysisDto) {
+    const data = await this.aiAnalysisService.requestAnalysis(user.id, dto);
+    return { message: 'Analysis complete.', data };
   }
 
-  static async getHistory(req: AuthenticatedNextRequest) {
-    const { id: userId, role } = req.user!;
-    const isPremium = await resolveIsPremium(userId, role);
-
-    const { searchParams } = req.nextUrl;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 50);
-
-    const result = await AIAnalysisService.getHistory(userId, isPremium, page, limit);
-
-    return ApiResponse.success({
-      message: 'Analysis history fetched successfully.',
-      data: result.data,
-      meta: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        hasMore: result.hasMore,
-      },
-    });
+  @Get('history')
+  async history(
+    @CurrentUser() user: JwtPayload,
+    @Query('page')  page  = '1',
+    @Query('limit') limit = '10',
+  ) {
+    const result = await this.aiAnalysisService.getHistory(
+      user.id, parseInt(page, 10), parseInt(limit, 10),
+    );
+    return {
+      message: 'History fetched.',
+      data:    result.data,
+      meta:    { total: result.total, page: result.page, limit: result.limit, hasMore: result.hasMore },
+    };
   }
 }
-
-export default AIAnalysisController;

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+﻿import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ILesson extends Document {
   courseId: mongoose.Types.ObjectId;
@@ -26,3 +26,5 @@ LessonSchema.index({ courseId: 1, order: 1 });
 export const Lesson: Model<ILesson> =
   mongoose.models.Lesson || mongoose.model<ILesson>('Lesson', LessonSchema);
 export default Lesson;
+export { LessonSchema };
+

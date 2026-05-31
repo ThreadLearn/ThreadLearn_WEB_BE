@@ -1,71 +1,53 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
-import { ApiResponse } from '../../../common/api-response';
+import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BookmarkService } from '../services/bookmark.service';
-import { BadRequestError } from '../../../common/custom-error';
+import { ToggleBookmarkDto } from '../dto/bookmark.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser, JwtPayload } from '../../../common/decorators/current-user.decorator';
 
+@ApiTags('bookmarks')
+@Controller('bookmarks')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('STUDENT', 'ADMIN')
+@ApiBearerAuth()
 export class BookmarkController {
-  static async toggle(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const body = await req.json();
+  constructor(private readonly bookmarkService: BookmarkService) {}
 
-    const result = await BookmarkService.toggleBookmark(userId, {
-      targetType: body.targetType,
-      targetId: body.targetId,
-      title: body.title,
-      thumbnailUrl: body.thumbnailUrl,
-    });
-
-    return ApiResponse.success({
-      message: result.bookmarked ? 'Bookmark saved.' : 'Bookmark removed.',
-      data: result,
-    });
+  @Post('toggle')
+  async toggle(@CurrentUser() user: JwtPayload, @Body() dto: ToggleBookmarkDto) {
+    const data = await this.bookmarkService.toggleBookmark(user.id, dto);
+    return { message: 'Bookmark toggled.', data };
   }
 
-  static async getMyBookmarks(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const { searchParams } = req.nextUrl;
-
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 50);
-    const rawType = searchParams.get('targetType');
-    const targetType =
-      rawType === 'COURSE' || rawType === 'LESSON' ? rawType : undefined;
-
-    const result = await BookmarkService.getMyBookmarks(userId, page, limit, targetType);
-
-    return ApiResponse.success({
-      message: 'Bookmarks fetched successfully.',
-      data: result.data,
-      meta: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        hasMore: result.hasMore,
-      },
-    });
+  @Get('me')
+  async getMyBookmarks(
+    @CurrentUser() user: JwtPayload,
+    @Query('page')       page       = '1',
+    @Query('limit')      limit      = '10',
+    @Query('targetType') targetType?: 'COURSE' | 'LESSON',
+  ) {
+    const result = await this.bookmarkService.getMyBookmarks(
+      user.id,
+      parseInt(page, 10),
+      Math.min(parseInt(limit, 10), 50),
+      targetType,
+    );
+    return {
+      message: 'Bookmarks fetched.',
+      data:    result.data,
+      meta:    { total: result.total, page: result.page, limit: result.limit, hasMore: result.hasMore },
+    };
   }
 
-  static async check(req: AuthenticatedNextRequest) {
-    const { id: userId } = req.user!;
-    const { searchParams } = req.nextUrl;
-
-    const rawType = searchParams.get('targetType');
-    const targetId = searchParams.get('targetId') || '';
-
-    if (rawType !== 'COURSE' && rawType !== 'LESSON') {
-      throw new BadRequestError('targetType must be COURSE or LESSON.');
-    }
-    if (!targetId) {
-      throw new BadRequestError('targetId is required.');
-    }
-
-    const bookmarked = await BookmarkService.isBookmarked(userId, rawType, targetId);
-
-    return ApiResponse.success({
-      message: 'Bookmark status checked.',
-      data: { bookmarked },
-    });
+  @Get('check')
+  async check(
+    @CurrentUser() user: JwtPayload,
+    @Query('targetType') targetType: 'COURSE' | 'LESSON',
+    @Query('targetId')   targetId: string,
+  ) {
+    const bookmarked = await this.bookmarkService.isBookmarked(user.id, targetType, targetId);
+    return { message: 'Bookmark status checked.', data: { bookmarked } };
   }
 }
-
-export default BookmarkController;

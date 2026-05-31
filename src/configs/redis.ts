@@ -1,49 +1,16 @@
-import { createClient } from 'redis';
-import { env } from './env';
-import { logger } from './logger';
-
-interface GlobalRedis {
-  client: ReturnType<typeof createClient> | null;
-}
-
-declare global {
-  var redis: GlobalRedis | undefined;
-}
-
-let cached = global.redis;
-
-if (!cached) {
-  cached = global.redis = { client: null };
-}
-
+// Compatibility shim — RedisService is injected via DI in NestJS modules.
+// Old services that still use getRedisClient() fall back to no-op.
 export function getRedisClient() {
-  if (cached!.client) {
-    return cached!.client;
-  }
-
-  logger.info('🔌 Connecting to Redis...');
-  const client = createClient({
-    url: env.REDIS_URL,
-  });
-
-  client.on('error', (err: Error) => {
-    logger.error('❌ Redis client error:', err);
-  });
-
-  client.on('connect', () => {
-    logger.info('✅ Successfully connected to Redis.');
-  });
-
-  // Attempt async connection
-  client.connect().catch((err: Error) => {
-    logger.warn('⚠️ Redis failed to connect. Rate limiting and leaderboard will fall back to local in-memory mock modes.', err);
-  });
-
-  cached!.client = client;
-  return client;
+  return {
+    isOpen:          false,
+    get:             async (_: string) => null as string | null,
+    set:             async () => {},
+    setEx:           async () => {},
+    incr:            async () => 0,
+    expire:          async () => {},
+    zAdd:            async () => 0,
+    zRangeWithScores: async () => [] as any[],
+    zRange:          async () => [] as any[],
+  };
 }
-
-// Lazy getter — avoids connecting during `next build` or CI where
-// Redis is unavailable.  The first runtime call to getRedisClient()
-// will establish the connection.
 export default getRedisClient;
