@@ -6,11 +6,11 @@ Tài liệu này được biên soạn chi tiết dành riêng cho đội ngũ p
 
 ## 🛠️ Quy Ước Thiết Kế Hệ Thống & Path Aliases
 
-Dự án sử dụng **Next.js 14 App Router** làm nền tảng API, kết hợp với Custom HTTP Server ở [server.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/server.ts) để chạy Socket.IO realtime.
+Dự án sử dụng **NestJS** làm nền tảng API. Entry point là `src/main.ts`, root module là `src/app/app.module.ts`, realtime được triển khai bằng `@WebSocketGateway()` trong `src/socket/index.ts`.
 
 Các lập trình viên lưu ý các quy ước sau:
 1. **Path Aliases**: Sử dụng `@/` để import các tài nguyên thuộc thư mục `src/` (Ví dụ: `import { User } from '@/modules/auth/models/user.model'`). Tránh sử dụng relative import sâu (`../../../../`).
-2. **Khung xử lý API (`apiHandler`)**: Toàn bộ Route Handlers bắt buộc được bọc qua wrapper [apiHandler.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/common/api-handler.ts) để tự động hóa kết nối DB, kiểm tra Token xác thực, phân quyền vai trò (Role), validate định dạng bằng Zod và bắt lỗi tập trung qua [custom-error.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/common/custom-error.ts).
+2. **Khung xử lý API NestJS**: Endpoint được khai báo trong controller bằng decorator như `@Controller()`, `@Get()`, `@Post()`. Xác thực dùng `JwtAuthGuard`, phân quyền dùng `@Roles()`, validate Zod dùng `ZodValidationPipe`, lỗi được gom qua `GlobalExceptionFilter`.
 3. **Chuẩn Phản Hồi (`ApiResponse`)**: Mọi dữ liệu trả về client phải tuân theo format chuẩn quy định tại [api-response.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/common/api-response.ts).
 
 ---
@@ -25,7 +25,7 @@ Mã nguồn cốt lõi nằm tại thư mục `src/modules/auth/`.
 
 #### UC01: Đăng ký tài khoản (Guest)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: Client gửi request `POST` kèm body tới endpoint [register/route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/auth/register/route.ts). Trình tự xử lý:
+* **Mô tả kỹ thuật**: Client gửi request `POST /api/v1/auth/register` kèm body tới `AuthController.register()`. Trình tự xử lý:
   1. Zod schema [auth.validator.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/validators/auth.validator.ts) xác thực tính hợp lệ của dữ liệu đầu vào.
   2. [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`register()`) kiểm tra trùng lặp email trên DB.
   3. Băm mật khẩu bằng `bcryptjs` với độ muối là 10.
@@ -34,8 +34,8 @@ Mã nguồn cốt lõi nằm tại thư mục `src/modules/auth/`.
   6. Sinh mã cặp Access Token & Refresh Token lưu vào [refresh-token.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/models/refresh-token.model.ts) và trả về client.
 
 #### UC02: Đăng ký bằng Google (Guest)
-* **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: Tận dụng cơ chế OAuth 2.0 của NextAuth thông qua file cấu hình [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/auth/%5B...nextauth%5D/route.ts). Khi một Guest bấm Đăng nhập/Đăng ký bằng Google lần đầu, NextAuth tự động tạo bản ghi User mới trong MongoDB thông qua `signIn` callback, lưu lại `googleId` và gán mặc định `role: 'STUDENT'`.
+* **Trạng thái**: ❌ **Chưa có (Missing)**
+* **Mô tả kỹ thuật**: OAuth framework cũ đã được loại bỏ trong quá trình migrate sang NestJS. Nếu vẫn cần use case này, triển khai lại bằng `@nestjs/passport` với Google strategy, callback controller, và service tạo user khi provider trả profile hợp lệ.
 
 #### UC03: Đăng ký bằng nhập thông tin + xác thực email (Guest, Email Verification System)
 * **Trạng thái**: 🔶 **Một phần (Partial)**
@@ -50,15 +50,15 @@ Mã nguồn cốt lõi nằm tại thư mục `src/modules/auth/`.
 
 #### UC04: Đăng nhập (Student, Admin)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: Route POST tại [login/route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/auth/login/route.ts) nhận email/password. [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`login()`) thực hiện truy vấn User, so khớp Hash bằng `bcrypt.compare()`, sinh JWT Token và tạo mới RefreshToken lưu xuống database để quản lý phiên làm việc lâu dài.
+* **Mô tả kỹ thuật**: `POST /api/v1/auth/login` nhận email/password tại `AuthController.login()`. [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`login()`) thực hiện truy vấn User, so khớp Hash bằng `bcrypt.compare()`, sinh JWT Token và tạo mới RefreshToken lưu xuống database để quản lý phiên làm việc lâu dài.
 
 #### UC05: Đăng nhập bằng Google (Student, Admin, Google OAuth System)
-* **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: Setup đầy đủ tích hợp NextAuth Google Provider. NextAuth tự động sinh cookie bảo mật chứa JWT Session, giúp các trang Web frontend có thể gọi API đồng bộ thông qua NextAuth client.
+* **Trạng thái**: ❌ **Chưa có (Missing)**
+* **Mô tả kỹ thuật**: Chưa có NestJS OAuth flow. Cần bổ sung Passport Google strategy, callback endpoint, và cơ chế phát hành JWT nội bộ sau khi xác thực provider thành công.
 
 #### UC06: Đăng nhập bằng Username/Password (Student, Admin)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: Dữ liệu email đóng vai trò duy nhất thay thế Username. Được xác thực qua hàm `login()` của `AuthService` và được ánh xạ tương ứng vào `CredentialsProvider` trong cấu hình NextAuth để thống nhất luồng đăng nhập.
+* **Mô tả kỹ thuật**: Dữ liệu email đóng vai trò duy nhất thay thế Username. Được xác thực qua `AuthController.login()` và `AuthService.login()`, sau đó phát hành access token và refresh token bằng JWT.
 
 #### UC07: Quên mật khẩu (Student, Admin, Email System)
 * **Trạng thái**: ❌ **Chưa có (Missing)**
@@ -99,13 +99,13 @@ Mã nguồn tại thư mục `src/modules/admin/` và sử dụng [admin.service
 * **Hướng dẫn lập trình tiếp theo**:
   1. Thêm trường `isLocked: { type: Boolean, default: false }` vào [user.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/models/user.model.ts).
   2. Thêm hàm `toggleUserLock(userId)` vào `AdminService` để lật giá trị `isLocked`.
-  3. Cập nhật middleware xác thực [auth.middleware.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/middlewares/auth.middleware.ts) — nếu user đang có `isLocked === true` thì chặn ngay lập tức và quăng lỗi `UnauthorizedError('Tài khoản của bạn đã bị khóa bởi Admin.')`.
+  3. Cập nhật `JwtAuthGuard` để kiểm tra trạng thái khóa tài khoản — nếu user đang có `isLocked === true` thì chặn ngay lập tức và quăng lỗi `UnauthorizedError('Tài khoản của bạn đã bị khóa bởi Admin.')`.
 
 #### UC12: Xem danh sách Student (Admin)
 * **Trạng thái**: 🔶 **Một phần (Partial)**
 * **Chi tiết kỹ thuật & Hướng dẫn bổ sung**:
   * **Hiện trạng**: Đã viết hàm nghiệp vụ phân trang `AdminService.listUsers(page, limit)` lấy toàn bộ user sắp xếp theo ngày đăng ký mới nhất.
-  * **Hướng dẫn lập trình tiếp theo**: Cần đăng ký endpoint route cụ thể tại `src/app/api/v1/admin/users/route.ts` (GET) bọc qua `apiHandler` với phân quyền `{ requireAuth: true, roles: ['ADMIN'] }` để gọi tới `AdminService.listUsers`.
+  * **Hướng dẫn lập trình tiếp theo**: Cần thêm method `GET /api/v1/admin/users` trong `AdminController`, dùng `@UseGuards(JwtAuthGuard)` và `@Roles('ADMIN')` để gọi tới `AdminService.listUsers`.
 
 #### UC13: Cập nhật thông tin Student (Admin)
 * **Trạng thái**: ❌ **Chưa có (Missing)**
@@ -124,7 +124,7 @@ Mã nguồn tại `src/modules/analytics/`.
   * **Hướng dẫn lập trình tiếp theo**:
     1. Để phục vụ việc vẽ biểu đồ, cần viết thêm các MongoDB aggregation pipelines để nhóm dữ liệu (Ví dụ: đếm số lượt đăng ký học viên mới nhóm theo tuần/tháng).
     2. Mở rộng trường Doanh thu: Khi có UC31, lập bảng `Payment` và tính tổng số tiền giao dịch thành công.
-    3. Đăng ký API Route `GET` tại [stats/route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/admin/stats/route.ts) để expose dữ liệu này ra bên ngoài.
+    3. Dùng hoặc mở rộng `AdminController.getStats()` tại `GET /api/v1/admin/stats` để expose dữ liệu này ra bên ngoài.
 
 ---
 
@@ -169,7 +169,7 @@ Mã nguồn tại `src/modules/lessons/`.
   * **Hiện trạng**: [lesson.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/lessons/models/lesson.model.ts) có trường lưu Markdown (`content`), File đính kèm (`attachmentUrl`), và số thứ tự bài học (`order`).
   * **Hướng dẫn lập trình tiếp theo**:
     1. Bổ sung trường `duration: { type: Number, required: true, default: 0 }` (thời lượng tính theo phút) và `videoUrl: { type: String }` vào `LessonSchema`.
-    2. Mở file [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/lessons/%5Bid%5D/route.ts) hoặc viết file Route mới để khai báo luồng `POST` tạo bài học liên kết với `LessonsService.createLesson()`.
+    2. Mở rộng `LessonsController` để khai báo luồng `POST` tạo bài học liên kết với `LessonsService.createLesson()`.
 
 #### UC20: Chỉnh sửa/Nâng cấp bài học (Admin)
 * **Trạng thái**: ❌ **Chưa có (Missing)**
@@ -185,7 +185,7 @@ Mã nguồn tại `src/modules/lessons/`.
 
 #### UC23: Xem khóa học (Admin, Student, Guest)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: API GET tại [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/courses/route.ts) cho phép xem toàn bộ danh sách khóa học ở chế độ public, hỗ trợ phân trang (`page`, `limit`) và tìm kiếm văn bản đầy đủ.
+* **Mô tả kỹ thuật**: API `GET /api/v1/courses` tại `CoursesController.getCourses()` cho phép xem toàn bộ danh sách khóa học ở chế độ public, hỗ trợ phân trang (`page`, `limit`) và tìm kiếm văn bản đầy đủ.
 
 #### UC24: Tìm kiếm/Lọc khóa học - Vector MongoDB (Student, Guest, Admin)
 * **Trạng thái**: 🔶 **Một phần (Partial)**
@@ -199,7 +199,7 @@ Mã nguồn tại `src/modules/lessons/`.
 
 #### UC25: Xem bài học (Admin, Student)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: API GET tại [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/lessons/%5Bid%5D/route.ts) cho phép lấy đầy đủ thông tin bài học theo ID bao gồm nội dung Markdown và URL file đính kèm.
+* **Mô tả kỹ thuật**: API `GET /api/v1/lessons/:id` tại `LessonsController.getLessonById()` cho phép lấy đầy đủ thông tin bài học theo ID bao gồm nội dung Markdown và URL file đính kèm.
 
 ---
 
@@ -276,7 +276,7 @@ Mã nguồn tại `src/modules/quiz/`.
 * **Hướng dẫn lập trình tiếp theo**:
   1. Tạo thư mục `src/modules/comments/`.
   2. Tạo model `CommentSchema` lưu trữ: `{ lessonId, userId, content, parentId, likes: [Schema.Types.ObjectId] }`.
-  3. Viết API POST `/api/v1/comments` bọc qua `apiHandler` kiểm tra bắt buộc đăng nhập, cho phép lưu nội dung thảo luận.
+  3. Viết `CommentsController` với API `POST /api/v1/comments`, dùng `JwtAuthGuard` kiểm tra bắt buộc đăng nhập, cho phép lưu nội dung thảo luận.
 
 #### UC35: Trả lời comment (Student, Admin)
 * **Trạng thái**: ❌ **Chưa có (Missing)**
@@ -356,7 +356,7 @@ Mã nguồn tại `src/modules/ai/`.
 
 #### UC47: Gửi bài và yêu cầu AI Recommend (Student, AI System)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**
-* **Mô tả kỹ thuật**: API POST tại [recommendation/route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/ai/recommendation/route.ts) nhận `courseId`. [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`requestRecommendation()`) tự động lập chu trình lộ trình cá nhân hóa dựa trên học lực hiện tại của học viên và lưu lại đầy đủ dữ liệu trao đổi vào [ai-history.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/models/ai-history.model.ts).
+* **Mô tả kỹ thuật**: API `POST /api/v1/ai/recommendation` tại `AIController.requestRecommendation()` nhận `courseId`. [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`requestRecommendation()`) tự động lập chu trình lộ trình cá nhân hóa dựa trên học lực hiện tại của học viên và lưu lại đầy đủ dữ liệu trao đổi vào [ai-history.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/models/ai-history.model.ts).
 
 #### UC48: Xem lịch sử Chat AI (Student, AI System)
 * **Trạng thái**: ✅ **Đã hoàn thiện (Done)**

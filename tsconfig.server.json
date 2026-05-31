@@ -3,8 +3,11 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
     "noEmit": false,
     "outDir": "./dist"
   },
-  "include": ["server.ts", "src/socket/**/*", "src/configs/**/*", "src/common/**/*", "src/utils/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

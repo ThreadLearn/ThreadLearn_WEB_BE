@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 export interface ApiResponsePayload<T = any> {
   success: boolean;
   message: string;
@@ -18,41 +16,35 @@ export class ApiResponse {
     message = 'Success',
     data,
     meta,
-    statusCode = 200,
+    statusCode: _statusCode = 200,
   }: {
     message?: string;
     data?: T;
     meta?: any;
     statusCode?: number;
-  }): NextResponse<ApiResponsePayload<T>> {
-    return NextResponse.json(
-      {
-        success: true,
-        message,
-        data,
-        meta,
-      },
-      { status: statusCode }
-    );
+  }): ApiResponsePayload<T> {
+    return {
+      success: true,
+      message,
+      data,
+      meta,
+    };
   }
 
   static error({
     message = 'An error occurred',
     errors = null,
-    statusCode = 500,
+    statusCode: _statusCode = 500,
   }: {
     message?: string;
     errors?: any[] | null;
     statusCode?: number;
-  }): NextResponse<ApiResponsePayload> {
-    return NextResponse.json(
-      {
-        success: false,
-        message,
-        errors,
-      },
-      { status: statusCode }
-    );
+  }): ApiResponsePayload {
+    return {
+      success: false,
+      message,
+      errors,
+    };
   }
 }
 export default ApiResponse;

@@ -1,11 +1,19 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiResponse } from '../../../common/api-response';
-import { AuthService } from '../services/auth.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../../../common/api-handler';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
+import { AuthService } from '../services/auth.service';
+import { loginSchema, refreshTokenSchema, registerSchema } from '../validators/auth.validator';
 
+@ApiTags('Auth')
+@Controller('v1/auth')
 export class AuthController {
-  static async register(req: AuthenticatedNextRequest) {
-    const body = await req.json();
+  @Post('register')
+  async register(@Body(new ZodValidationPipe(registerSchema)) body: unknown) {
     const result = await AuthService.register(body);
     return ApiResponse.success({
       message: 'User registered successfully.',
@@ -14,8 +22,9 @@ export class AuthController {
     });
   }
 
-  static async login(req: AuthenticatedNextRequest) {
-    const body = await req.json();
+  @Post('login')
+  @HttpCode(200)
+  async login(@Body(new ZodValidationPipe(loginSchema)) body: unknown) {
     const result = await AuthService.login(body);
     return ApiResponse.success({
       message: 'Login successful.',
@@ -23,8 +32,9 @@ export class AuthController {
     });
   }
 
-  static async refresh(req: AuthenticatedNextRequest) {
-    const body = await req.json();
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
     const result = await AuthService.refresh(body.refreshToken);
     return ApiResponse.success({
       message: 'Tokens refreshed successfully.',
@@ -32,22 +42,27 @@ export class AuthController {
     });
   }
 
-  static async logout(req: AuthenticatedNextRequest) {
-    const body = await req.json();
+  @Post('logout')
+  @HttpCode(200)
+  async logout(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
     await AuthService.logout(body.refreshToken);
     return ApiResponse.success({
       message: 'Logged out successfully.',
     });
   }
 
-  static async getSessionUser(req: AuthenticatedNextRequest) {
-    if (!req.user) {
+  @Get('session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async getSessionUser(@CurrentUser() user?: AuthenticatedUser) {
+    if (!user) {
       throw new BadRequestError('User context missing from request.');
     }
     return ApiResponse.success({
       message: 'User context retrieved successfully.',
-      data: { user: req.user },
+      data: { user },
     });
   }
 }
+
 export default AuthController;
