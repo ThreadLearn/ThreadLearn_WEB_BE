@@ -8,3 +8,5 @@ logs
 .env.local
 dist
 Dockerfile
+tsconfig.tsbuildinfo
+*.tsbuildinfo
