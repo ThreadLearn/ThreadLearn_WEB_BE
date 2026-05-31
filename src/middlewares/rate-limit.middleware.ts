@@ -1,3 +1,5 @@
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { NextFunction, Request, Response } from 'express';
 import { getRedisClient } from '../configs/redis';
 import { env } from '../configs/env';
 import { logger } from '../configs/logger';
@@ -50,5 +52,18 @@ export async function rateLimiter(ip: string): Promise<void> {
   if (record.count > limit) {
     logger.warn(`🚫 Rate limit exceeded for IP: ${ip} (In-Memory count: ${record.count}/${limit})`);
     throw new TooManyRequestsError();
+  }
+}
+
+@Injectable()
+export class RateLimitMiddleware implements NestMiddleware {
+  async use(req: Request, _res: Response, next: NextFunction) {
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const ip = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor || req.ip || '127.0.0.1';
+
+    await rateLimiter(ip);
+    next();
   }
 }

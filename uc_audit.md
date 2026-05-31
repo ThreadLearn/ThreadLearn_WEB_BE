@@ -4,9 +4,9 @@
 
 | Trạng thái | Số lượng | Tỷ lệ |
 |---|---|---|
-| ✅ **Đã hoàn thiện (Done)** | **22** | 45% |
+| ✅ **Đã hoàn thiện (Done)** | **20** | 41% |
 | 🔶 **Một phần (Partial)** | **10** | 20% |
-| ❌ **Chưa có (Missing)** | **17** | 35% |
+| ❌ **Chưa có (Missing)** | **19** | 39% |
 | **Tổng số Use Case** | **49** | 100% |
 
 ---
@@ -17,15 +17,15 @@
 
 | UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
 |---|---|---|---|
-| **UC01** | Đăng ký tài khoản (Guest) | ✅ Done | [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`register()`), [auth.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/controllers/auth.controller.ts) (`register()`), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/auth/register/route.ts) |
-| **UC02** | Đăng ký bằng Google (Guest) | ✅ Done | [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/auth/%5B...nextauth%5D/route.ts) — Tự động lưu user mới vào MongoDB khi OAuth thành công |
+| **UC01** | Đăng ký tài khoản (Guest) | ✅ Done | `AuthController.register()`, `AuthService.register()`, endpoint `POST /api/v1/auth/register` |
+| **UC02** | Đăng ký bằng Google (Guest) | ❌ Missing | OAuth framework cũ đã được gỡ khi migrate sang NestJS. Cần triển khai lại bằng Passport strategy nếu muốn hỗ trợ Google. |
 | **UC03** | Đăng ký bằng thông tin + xác thực email | 🔶 Partial | **Có logic Đăng ký**, nhưng *thiếu* Email Verification System (Token verification & NodeMailer service) |
-| **UC04** | Đăng nhập (Student, Admin) | ✅ Done | [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`login()`), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/auth/login/route.ts) |
-| **UC05** | Đăng nhập bằng Google | ✅ Done | [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/auth/%5B...nextauth%5D/route.ts) (NextAuth Google Provider Setup) |
+| **UC04** | Đăng nhập (Student, Admin) | ✅ Done | `AuthController.login()`, `AuthService.login()`, endpoint `POST /api/v1/auth/login` |
+| **UC05** | Đăng nhập bằng Google | ❌ Missing | Chưa có NestJS OAuth controller/strategy. Cần triển khai bằng Passport Google nếu tính năng này vẫn nằm trong scope. |
 | **UC06** | Đăng nhập bằng Username/Password | ✅ Done | Sử dụng email/password tại [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`login()`) |
 | **UC07** | Quên mật khẩu | ❌ Missing | *Thiếu*: Cần tạo model Token quên mật khẩu, Email Service, và API `/auth/forgot-password` |
 | **UC08** | Đặt lại mật khẩu | ❌ Missing | *Thiếu*: API `/auth/reset-password` kiểm tra Token và hash mật khẩu mới |
-| **UC09** | Cập nhật hồ sơ & Upload Avatar | ✅ Done | [users.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/users/controllers/users.controller.ts), [upload.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/configs/upload.ts), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/users/avatar/route.ts) |
+| **UC09** | Cập nhật hồ sơ & Upload Avatar | ✅ Done | `UsersController.uploadAvatar()`, `UsersService.updateAvatar()`, `saveUploadedFile()`, endpoint `POST /api/v1/users/avatar` |
 
 ---
 
@@ -67,9 +67,9 @@
 | **UC20** | Chỉnh sửa/Nâng cấp bài học | ❌ Missing | *Thiếu*: Endpoint và logic sửa bài học |
 | **UC21** | Khóa/Mở khóa bài học | ❌ Missing | *Thiếu*: Trường `isLocked` trong Lesson model |
 | **UC22** | Xóa bài học | ❌ Missing | *Thiếu*: Logic xóa bài học |
-| **UC23** | Xem khóa học (Admin, Student, Guest) | ✅ Done | `CoursesService.listCourses()`, `getCourseDetail()` và [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/courses/route.ts) |
+| **UC23** | Xem khóa học (Admin, Student, Guest) | ✅ Done | `CoursesController.getCourses()`, `CoursesController.getCourseById()`, `CoursesService.listCourses()`, `CoursesService.getCourseDetail()` |
 | **UC24** | Tìm kiếm/Lọc khóa học | 🔶 Partial | Có tìm kiếm Text Index trong MongoDB. *Thiếu*: Vector Search và Lọc theo Tag, Level, Language |
-| **UC25** | Xem bài học (Admin, Student) | ✅ Done | [lessons.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/lessons/services/lessons.service.ts) (`getLesson()`), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/lessons/%5Bid%5D/route.ts) |
+| **UC25** | Xem bài học (Admin, Student) | ✅ Done | `LessonsController.getLessonById()`, `LessonsService.getLesson()`, endpoint `GET /api/v1/lessons/:id` |
 
 ---
 
@@ -97,7 +97,7 @@
 | UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
 |---|---|---|---|
 | **UC31** | Mua gói tính năng | ❌ Missing | *Thiếu*: Payment Gateway Integration (Stripe/Momo/VNPAY...) |
-| **UC32** | Xem thông báo | ✅ Done | [notifications.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/notifications/services/notifications.service.ts), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/notifications/route.ts) |
+| **UC32** | Xem thông báo | ✅ Done | `NotificationsController.getNotificationsForUser()`, `NotificationsService.getNotificationsForUser()`, endpoint `GET /api/v1/notifications` |
 
 ---
 
@@ -147,7 +147,7 @@
 
 | UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
 |---|---|---|---|
-| **UC47** | Yêu cầu AI Recommend + Phản hồi | ✅ Done | [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`requestRecommendation()`), [route.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/app/api/v1/ai/recommendation/route.ts) |
+| **UC47** | Yêu cầu AI Recommend + Phản hồi | ✅ Done | `AIController.requestRecommendation()`, `AIService.requestRecommendation()`, endpoint `POST /api/v1/ai/recommendation` |
 | **UC48** | Xem lịch sử Chat AI | ✅ Done | [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`getHistoryLogs()`) |
 
 ---

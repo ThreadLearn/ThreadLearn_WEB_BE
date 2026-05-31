@@ -1,15 +1,24 @@
-import { AuthenticatedNextRequest } from '../../../common/api-handler';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiResponse } from '../../../common/api-response';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CoursesService } from '../services/courses.service';
 
+@ApiTags('Courses')
+@Controller('v1/courses')
 export class CoursesController {
-  static async getCourses(req: AuthenticatedNextRequest) {
-    const { searchParams } = req.nextUrl;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
-    const search = searchParams.get('search') || '';
-
-    const result = await CoursesService.listCourses(page, limit, search);
+  @Get()
+  async getCourses(
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('search') search = ''
+  ) {
+    const result = await CoursesService.listCourses(
+      parseInt(page, 10),
+      parseInt(limit, 10),
+      search
+    );
 
     return ApiResponse.success({
       message: 'Courses fetched successfully.',
@@ -23,16 +32,20 @@ export class CoursesController {
     });
   }
 
-  static async getCourseById(req: AuthenticatedNextRequest, { params }: { params: { id: string } }) {
-    const courseDetail = await CoursesService.getCourseDetail(params.id);
+  @Get(':id')
+  async getCourseById(@Param('id') id: string) {
+    const courseDetail = await CoursesService.getCourseDetail(id);
     return ApiResponse.success({
       message: 'Course details fetched successfully.',
       data: courseDetail,
     });
   }
 
-  static async createCourse(req: AuthenticatedNextRequest) {
-    const body = await req.json();
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('BearerAuth')
+  async createCourse(@Body() body: unknown) {
     const course = await CoursesService.createCourse(body);
     return ApiResponse.success({
       message: 'Course created successfully.',
@@ -41,4 +54,5 @@ export class CoursesController {
     });
   }
 }
+
 export default CoursesController;

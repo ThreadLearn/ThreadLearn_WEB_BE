@@ -1,34 +1,42 @@
-import { Server as SocketIOServer } from 'socket.io';
-import { Server as HTTPServer } from 'http';
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
 import { logger } from '../configs/logger';
 
-let ioInstance: SocketIOServer | null = null;
+let ioInstance: Server | null = null;
 
-export function initializeSocketServer(server: HTTPServer) {
-  ioInstance = new SocketIOServer(server, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
-  });
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+})
+export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server!: Server;
 
-  logger.info('🔌 Initializing Socket.IO connection manager...');
+  afterInit(server: Server) {
+    ioInstance = server;
+    logger.info('Socket.IO gateway initialized.');
+  }
 
-  ioInstance.on('connection', (socket) => {
-    logger.info(`🔌 Realtime client connected: ${socket.id}`);
+  handleConnection(socket: Socket) {
+    logger.info(`Realtime client connected: ${socket.id}`);
 
     const userId = socket.handshake.auth.userId || socket.handshake.query.userId;
     if (userId) {
       socket.join(`user:${userId}`);
-      logger.info(`👥 Socket ${socket.id} joined room "user:${userId}"`);
+      logger.info(`Socket ${socket.id} joined room "user:${userId}"`);
     }
+  }
 
-    socket.on('disconnect', () => {
-      logger.info(`🔌 Realtime client disconnected: ${socket.id}`);
-    });
-  });
-
-  return ioInstance;
+  handleDisconnect(socket: Socket) {
+    logger.info(`Realtime client disconnected: ${socket.id}`);
+  }
 }
 
 export function getSocketServer() {
