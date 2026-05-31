@@ -3,6 +3,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const optionalNonEmptyString = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().optional()
+);
+
+const optionalPositiveNumber = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.coerce.number().int().positive().optional()
+);
+
+const optionalBoolean = z.preprocess((value) => {
+  if (value === undefined || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
+  return value;
+}, z.boolean().optional());
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -20,6 +37,13 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   FRONTEND_AUTH_SUCCESS_REDIRECT_URL: z.string().url().optional(),
   FRONTEND_AUTH_FAILURE_REDIRECT_URL: z.string().url().optional(),
+  SMTP_HOST: optionalNonEmptyString,
+  SMTP_PORT: optionalPositiveNumber,
+  SMTP_SECURE: optionalBoolean.default(false),
+  SMTP_USER: optionalNonEmptyString,
+  SMTP_PASS: optionalNonEmptyString,
+  MAIL_FROM_NAME: z.string().default('ThreadLearn'),
+  MAIL_FROM_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
