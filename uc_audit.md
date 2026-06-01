@@ -1,159 +1,136 @@
-# ThreadLearn Backend — Bảng Đối Chiếu Use Case (49 UC)
+# ThreadLearn Backend — Bảng Đối Chiếu Use Case Final (53 UC — Phân Công 4 Dev)
 
-## 📊 Thống Kê Tổng Quan
-
-| Trạng thái | Số lượng | Tỷ lệ |
-|---|---|---|
-| ✅ **Đã hoàn thiện (Done)** | **20** | 41% |
-| 🔶 **Một phần (Partial)** | **10** | 20% |
-| ❌ **Chưa có (Missing)** | **19** | 39% |
-| **Tổng số Use Case** | **49** | 100% |
+Bản đối chiếu này được cập nhật theo danh sách **53 Use Case (UC) chính thức** được phân chia khoa học cho 4 lập trình viên (DEV 1, DEV 2, DEV 3, DEV 4) chịu trách nhiệm phát triển dự án ThreadLearn. Mục đích nhằm quản lý tiến độ, giám sát trạng thái hiện tại (Done, Partial, Missing) và đảm bảo sự khớp nối hoàn hảo giữa tầng nghiệp vụ và mã nguồn thực tế.
 
 ---
 
-## 📋 Danh Sách Chi Tiết 49 Use Case
+## 📊 Thống Kê Tổng Quan Hệ Thống
 
-### 🔐 1. Authentication (UC01 - UC09)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC01** | Đăng ký tài khoản (Guest) | ✅ Done | `AuthController.register()`, `AuthService.register()`, endpoint `POST /api/v1/auth/register` |
-| **UC02** | Đăng ký bằng Google (Guest) | ❌ Missing | OAuth framework cũ đã được gỡ khi migrate sang NestJS. Cần triển khai lại bằng Passport strategy nếu muốn hỗ trợ Google. |
-| **UC03** | Đăng ký bằng thông tin + xác thực email | 🔶 Partial | **Có logic Đăng ký**, nhưng *thiếu* Email Verification System (Token verification & NodeMailer service) |
-| **UC04** | Đăng nhập (Student, Admin) | ✅ Done | `AuthController.login()`, `AuthService.login()`, endpoint `POST /api/v1/auth/login` |
-| **UC05** | Đăng nhập bằng Google | ❌ Missing | Chưa có NestJS OAuth controller/strategy. Cần triển khai bằng Passport Google nếu tính năng này vẫn nằm trong scope. |
-| **UC06** | Đăng nhập bằng Username/Password | ✅ Done | Sử dụng email/password tại [auth.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/services/auth.service.ts) (`login()`) |
-| **UC07** | Quên mật khẩu | ❌ Missing | *Thiếu*: Cần tạo model Token quên mật khẩu, Email Service, và API `/auth/forgot-password` |
-| **UC08** | Đặt lại mật khẩu | ❌ Missing | *Thiếu*: API `/auth/reset-password` kiểm tra Token và hash mật khẩu mới |
-| **UC09** | Cập nhật hồ sơ & Upload Avatar | ✅ Done | `UsersController.uploadAvatar()`, `UsersService.updateAvatar()`, `saveUploadedFile()`, endpoint `POST /api/v1/users/avatar` |
+| Trạng thái | Số lượng | Tỷ lệ | Mô tả |
+| :--- | :---: | :---: | :--- |
+| ✅ **Đã hoàn thiện (Done)** | **19** | 35.8% | Tính năng đã triển khai đầy đủ cả ở tầng Controller (API Route) và Service. |
+| 🔶 **Một phần (Partial)** | **10** | 18.9% | Đã viết logic Service thô hoặc một phần DB Schema nhưng chưa có Route API hoặc còn thiếu tính năng nhỏ. |
+| ❌ **Chưa có (Missing)** | **24** | 45.3% | Chưa có mã nguồn hoặc mới chỉ là khung rỗng, cần phát triển mới từ đầu. |
+| **Tổng số Use Case** | **53** | **100%** | **Hệ thống lõi ThreadLearn** |
 
 ---
 
-### 👨‍💼 2. Admin — Quản lý người dùng (UC10 - UC13)
+## 👥 Phân Bổ Công Việc Theo Developer
 
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC10** | Thêm Student (Admin) | ❌ Missing | *Thiếu*: Logic tạo Student thủ công từ giao diện Admin trong `AdminService` |
-| **UC11** | Khóa/Mở khóa Student (Admin) | ❌ Missing | *Thiếu*: Cần thêm trường `isLocked` (Boolean) vào [user.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/auth/models/user.model.ts) và API toggle status |
-| **UC12** | Xem danh sách Student (Admin) | 🔶 Partial | Đã có `AdminService.listUsers()` nhưng **chưa viết Route API** cho chức năng này |
-| **UC13** | Cập nhật thông tin Student (Admin) | ❌ Missing | *Thiếu*: Logic update thông tin người dùng bởi Admin |
+```mermaid
+gantt
+    title Phân công & Trọng tâm công việc 4 Dev
+    dateFormat  YYYY-MM-DD
+    section DEV 1
+    Auth, User, Dash, Payment & Noti :active, des1, 2026-05-31, 14d
+    section DEV 2
+    Course, Lesson & Learning Flow  :active, des2, 2026-05-31, 14d
+    section DEV 3
+    Comment, Bookmark, IDE & AI     :active, des3, 2026-05-31, 14d
+    section DEV 4
+    Quiz, Gamification, Subs        :active, des4, 2026-05-31, 14d
+```
 
----
-
-### 📊 3. Dashboard & Thống kê (UC14)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC14** | Xem biểu đồ thống kê | 🔶 Partial | Đã có [analytics.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/analytics/services/analytics.service.ts) (`getPlatformStats()`) đếm số lượng khóa học, bài học, tỷ lệ tương tác. *Thiếu*: Doanh thu (vì chưa có Premium), người dùng hoạt động theo thời gian, và chưa vẽ biểu đồ time-series. |
-
----
-
-### 📚 4. Quản lý khóa học (UC15 - UC18)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC15** | Thêm khóa học mới (Tag, Level, Language, Cover) | 🔶 Partial | Đã có `CoursesService.createCourse()`. *Thiếu*: Các trường `tags[]`, `level`, `language` trong [course.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/courses/models/course.model.ts) và API upload file riêng cho thumbnail |
-| **UC16** | Chỉnh sửa thông tin khóa học | ❌ Missing | *Thiếu*: Logic và endpoint update Course |
-| **UC17** | Ẩn/Hiện khóa học | ✅ Done | [admin.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/admin/services/admin.service.ts) (`toggleCoursePublish()`) |
-| **UC18** | Xóa khóa học | ❌ Missing | *Thiếu*: Khái niệm Soft Delete / Hard Delete cho khóa học |
+| Developer | Lĩnh vực phụ trách chính | Số lượng UC | Trạng thái hiện tại |
+| :--- | :--- | :---: | :--- |
+| **DEV 1** | Auth, OAuth, User Management, Dashboard Statistics, Payment, Core System | 14 UC (UC01 - UC14) | ✅ 4 Done, 🔶 3 Partial, ❌ 7 Missing |
+| **DEV 2** | Course, Lesson, Learning Experience, Vector Search, Progress | 14 UC (UC15 - UC28) | ✅ 4 Done, 🔶 5 Partial, ❌ 5 Missing |
+| **DEV 3** | Comments, Bookmarks, Notes, Monaco IDE, Judge0, AI Recommendation | 12 UC (UC29-35, UC44-47, UC53) | ✅ 5 Done, 🔶 0 Partial, ❌ 7 Missing |
+| **DEV 4** | Quiz Engine, Grading, XP Engine, Leaderboard, Subscription Plans | 13 UC (UC36-43, UC48-52) | ✅ 6 Done, 🔶 2 Partial, ❌ 5 Missing |
 
 ---
 
-### 📖 5. Quản lý bài học (UC19 - UC25)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC19** | Thêm bài học (Thời lượng, Markdown, Đính kèm, Video URL) | 🔶 Partial | Đã có `LessonsService.createLesson()` lưu Markdown và Attachment. *Thiếu*: Trường `duration`, `videoUrl` trong [lesson.model.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/lessons/models/lesson.model.ts) và **thiếu Route API POST** tạo bài học |
-| **UC20** | Chỉnh sửa/Nâng cấp bài học | ❌ Missing | *Thiếu*: Endpoint và logic sửa bài học |
-| **UC21** | Khóa/Mở khóa bài học | ❌ Missing | *Thiếu*: Trường `isLocked` trong Lesson model |
-| **UC22** | Xóa bài học | ❌ Missing | *Thiếu*: Logic xóa bài học |
-| **UC23** | Xem khóa học (Admin, Student, Guest) | ✅ Done | `CoursesController.getCourses()`, `CoursesController.getCourseById()`, `CoursesService.listCourses()`, `CoursesService.getCourseDetail()` |
-| **UC24** | Tìm kiếm/Lọc khóa học | 🔶 Partial | Có tìm kiếm Text Index trong MongoDB. *Thiếu*: Vector Search và Lọc theo Tag, Level, Language |
-| **UC25** | Xem bài học (Admin, Student) | ✅ Done | `LessonsController.getLessonById()`, `LessonsService.getLesson()`, endpoint `GET /api/v1/lessons/:id` |
+## 📋 Chi Tiết 53 Use Case & Bảng Ánh Xạ Mã Nguồn
 
 ---
 
-### 📝 6. Quản lý bài kiểm tra - Quiz (UC26 - UC29)
+### 💻 DEV 1 — Authentication, User Management, Dashboard, Payment & Notification
+*Trọng tâm công nghệ: JWT, OAuth, RBAC, Middleware, User stats initialization, Analytics Aggregation Pipelines.*
 
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC26** | Tạo Quiz (Admin) | ✅ Done | [quiz.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/services/quiz.service.ts) (`createQuiz()`) |
-| **UC27** | Thêm câu hỏi | 🔶 Partial | Thêm câu hỏi trực tiếp lúc tạo Quiz. *Thiếu*: Endpoint push câu hỏi đơn lẻ vào Quiz đang chạy |
-| **UC28** | Chỉnh sửa câu hỏi | ❌ Missing | *Thiếu*: Logic edit câu hỏi |
-| **UC29** | Xóa câu hỏi | ❌ Missing | *Thiếu*: Logic xóa câu hỏi khỏi Quiz |
-
----
-
-### 💎 7. Hệ thống gói dịch vụ (UC30)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC30** | Phân cấp gói dịch vụ | ❌ Missing | *Thiếu*: Cần tạo model Subscription Plan, lưu cấp độ gói của User |
-
----
-
-### 💎 8. Student — Gói & Thông báo (UC31 - UC32)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC31** | Mua gói tính năng | ❌ Missing | *Thiếu*: Payment Gateway Integration (Stripe/Momo/VNPAY...) |
-| **UC32** | Xem thông báo | ✅ Done | `NotificationsController.getNotificationsForUser()`, `NotificationsService.getNotificationsForUser()`, endpoint `GET /api/v1/notifications` |
+| UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
+| :--- | :--- | :---: | :--- |
+| **UC01** | Register Account (Guest) | ✅ Done | `AuthController.register()`, `AuthService.register()`, endpoint `POST /api/v1/auth/register`. Tự động tạo `UserStats`. |
+| **UC02** | Register with Google (Guest, Google OAuth System) | ❌ Missing | OAuth cũ đã bị gỡ khi migrate. Cần triển khai Passport Google strategy. |
+| **UC03** | Verify Email (Guest, Email System) | 🔶 Partial | Có logic đăng ký thô nhưng chưa chặn login khi chưa verify, chưa gửi mail verify qua Nodemailer. |
+| **UC04** | Log In (Student, Admin) | ✅ Done | `AuthController.login()`, `AuthService.login()`, endpoint `POST /api/v1/auth/login`. So khớp hash bằng `bcrypt.compare()`. |
+| **UC05** | Log In with Google (Student, Admin, Google OAuth System) | ❌ Missing | Chưa có NestJS OAuth strategy. Cần tích hợp Passport Google OAuth 2.0. |
+| **UC06** | Log Out (Student, Admin, Authentication System) | ✅ Done | `AuthController.logout()`, `AuthService.logout()`, endpoint `POST /api/v1/auth/logout`. Xóa RefreshToken. |
+| **UC07** | Forgot Password (Student, Admin, Email System) | ❌ Missing | Chưa có. Cần tạo model `PasswordResetToken` và API `/auth/forgot-password`. |
+| **UC08** | Reset Password (Student, Admin, Authentication System) | ❌ Missing | Chưa có. Cần API `/auth/reset-password` xác thực token và cập nhật password mới. |
+| **UC09** | Update Personal Profile / Upload Avatar (Student, Admin, Storage System) | ✅ Done | `UsersController.uploadAvatar()`, `saveUploadedFile()`, endpoint `POST /api/v1/users/avatar`. |
+| **UC10** | Add Student (Admin) | ❌ Missing | Chưa có. Cần hàm `createStudent` trong `AdminService` để tạo tài khoản thủ công từ dashboard. |
+| **UC11** | Lock / Unlock Student (Admin) | ❌ Missing | Chưa có. Cần trường `isLocked` trong `User` model, hàm lật trạng thái ở `AdminService` và chặn tại `JwtAuthGuard`. |
+| **UC12** | View Student List (Admin) | 🔶 Partial | Đã có hàm `AdminService.listUsers()` nhưng chưa viết API Route `GET /api/v1/admin/users`. |
+| **UC13** | Update Student Information (Admin) | ❌ Missing | Chưa có. Cần viết hàm `updateUserByAdmin()` cho phép Admin đổi tên, role, trạng thái. |
+| **UC14** | View Statistics Charts (Admin, Analytics System) | 🔶 Partial | Có [analytics.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/analytics/services/analytics.service.ts) đếm số lượng người dùng/khóa học/làm bài. Thiếu biểu đồ time-series và doanh thu. |
 
 ---
 
-### 📈 9. Tiến độ học tập (UC33)
+### 📚 DEV 2 — Course, Lesson & Learning Experience
+*Trọng tâm công nghệ: Course/Lesson Schemas, Mongoose Text Indexes, MongoDB Atlas Vector Search, Enrollment Progress Engine.*
 
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC33** | Hoàn thành bài học & cập nhật tiến độ | ✅ Done | [enrollments.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/enrollments/services/enrollments.service.ts) (`updateLessonProgress()`), thưởng 500 XP khi hoàn thành 100% |
-
----
-
-### 💬 10. Comment System (UC34 - UC37)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC34** | Thêm comment trong lesson | ❌ Missing | *Thiếu*: Module Comment (Model, Service, API) chưa được lập trình |
-| **UC35** | Trả lời comment | ❌ Missing | *Thiếu*: Quan hệ cha-con (parentId) trong Model Comment |
-| **UC36** | Chỉnh sửa comment | ❌ Missing | *Thiếu*: Logic cập nhật comment của chính chủ |
-| **UC37** | Xóa comment | ❌ Missing | *Thiếu*: Logic soft/hard delete comment |
-
----
-
-### 🔖 11. Bookmark & Note (UC38 - UC40)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC38** | Xem Bookmark bài học | ❌ Missing | *Thiếu*: Toàn bộ module Bookmark chưa triển khai |
-| **UC39** | Lưu Bookmark bài học | ❌ Missing | *Thiếu*: API endpoint lưu trữ bài học đánh dấu |
-| **UC40** | Ghi chú (Note) trong lesson | ❌ Missing | *Thiếu*: Model và API lưu Note cá nhân của từng bài học |
+| UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
+| :--- | :--- | :---: | :--- |
+| **UC15** | Add New Course (Admin) | 🔶 Partial | Đã có `CoursesService.createCourse()`. Thiếu trường `tags[]`, `level`, `language` trong model và API upload thumbnail riêng. |
+| **UC16** | Edit Course Information (Admin) | ❌ Missing | Chưa có. Cần viết hàm `updateCourse` trong `CoursesService` và Route `PUT /api/v1/courses/:id`. |
+| **UC17** | Hide / Show Course (Admin) | ✅ Done | `AdminService.toggleCoursePublish()`, thay đổi cờ `isPublished` giữa `true` và `false`. |
+| **UC18** | Delete Course (Admin) | ❌ Missing | Chưa có. Cần cấu trúc Soft Delete bằng cờ `isDeleted` trong `CourseSchema`. |
+| **UC19** | Add Lesson to Course (Admin) | 🔶 Partial | Có `LessonsService.createLesson()`. Thiếu trường `duration`, `videoUrl` trong `LessonSchema` và thiếu Route API POST tạo bài học. |
+| **UC20** | Edit / Upgrade Lesson (Admin) | ❌ Missing | Chưa có. Cần hàm `updateLesson` trong `LessonsService` và API Route sửa bài học. |
+| **UC21** | Lock / Unlock Lesson (Admin) | ❌ Missing | Chưa có. Cần trường `isLocked` trong `Lesson` model và cơ chế chặn học viên truy cập nếu chưa hoàn thành bài trước. |
+| **UC22** | Delete Lesson (Admin) | ❌ Missing | Chưa có. Cần hàm `deleteLesson` trong `LessonsService` và API Route DELETE. |
+| **UC23** | View Course Detail (Guest, Student, Admin) | ✅ Done | `CoursesController.getCourseById()`, `CoursesService.getCourseDetail()`. Trả đầy đủ thông tin chi tiết. |
+| **UC24** | Search / Filter Courses - MongoDB Vector Search (Guest, Student, Admin) | 🔶 Partial | Có tìm kiếm text index cơ bản. Thiếu Semantic Search với Vector Embeddings và lọc nâng cao theo tags/level/lang. |
+| **UC25** | View Lesson (Student, Admin, Guest if free lesson) | ✅ Done | `LessonsController.getLessonById()`, `LessonsService.getLesson()`. Trả Markdown content và attachmentUrl. |
+| **UC26** | Enroll in Course (Student) | 🔶 Partial | Có `EnrollmentsService.enrollInCourse()` tạo bản ghi. Chưa có Route API POST `GET/POST /api/v1/enrollments` để học viên đăng ký. |
+| **UC27** | Complete Lesson (Student) | 🔶 Partial | Có `EnrollmentsService.updateLessonProgress()` tính tiến trình học và cộng 500 XP. Chưa có Route API để trigger tiến độ bài học. |
+| **UC28** | Track Learning Progress (Student, System) | ✅ Done | Hoạt động thông qua `Enrollment` model cập nhật trường `progress` (%) và tự động chuyển đổi cờ `completed` khi đạt 100%. |
 
 ---
 
-### 🏆 12. Quiz & XP System (UC41 - UC46)
+### 💬 DEV 3 — Comment, Bookmark, Note, IDE & AI Features
+*Trọng tâm công nghệ: Comment Tree Hierarchy, Monaco Editor integration, Judge0 integration, AI recommendation, Socket.IO.*
 
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC41** | Làm bài kiểm tra + tính thời gian | 🔶 Partial | Đã có `submitAttempt()`. *Thiếu*: `timeLimit` trong Quiz model và so sánh `startedAt`/`submittedAt` |
-| **UC42** | Chấm điểm Quiz (Hệ thống) | ✅ Done | [quiz-attempts.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/services/quiz-attempts.service.ts) (`submitAttempt()`) |
-| **UC43** | Xem kết quả Quiz (Student) | ✅ Done | Trả về ngay trong phản hồi của API `/quiz/submit` |
-| **UC44** | Tích lũy điểm kinh nghiệm (XP System) | ✅ Done | Logic tự động cộng XP cho UserStats khi hoàn thành bài học / pass Quiz |
-| **UC45** | Xem cấp độ + tự động thăng cấp + thông báo | ✅ Done | [gamification.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/gamification/services/gamification.service.ts), tự thăng cấp theo công thức: `level = floor(xp / 1000) + 1` |
-| **UC46** | Xem bảng xếp hạng (Leaderboard) | ✅ Done | [leaderboard.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/leaderboard/services/leaderboard.service.ts), sử dụng **Redis Sorted Set** (`ZADD`, `ZREVRANGEWITHSCORES`) |
-
----
-
-### 🤖 13. AI Features (UC47 - UC48)
-
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC47** | Yêu cầu AI Recommend + Phản hồi | ✅ Done | `AIController.requestRecommendation()`, `AIService.requestRecommendation()`, endpoint `POST /api/v1/ai/recommendation` |
-| **UC48** | Xem lịch sử Chat AI | ✅ Done | [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`getHistoryLogs()`) |
+| UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
+| :--- | :--- | :---: | :--- |
+| **UC29** | Add Comment in Lesson (Student) | ❌ Missing | Chưa có. Cần tạo model `Comment` và API POST `/comments` lưu nội dung. |
+| **UC30** | Reply to Comment (Student, Admin) | ❌ Missing | Chưa có. Cần trường `parentId` trong model `Comment` tạo cây phân cấp. |
+| **UC31** | Edit Comment (Student, Admin) | ❌ Missing | Chưa có. Cần API PUT `/comments/:id` và kiểm tra quyền sở hữu chính chủ. |
+| **UC32** | Delete Comment (Student, Admin) | ❌ Missing | Chưa có. Cần API DELETE `/comments/:id` hỗ trợ xóa bởi chủ nhân hoặc Admin. |
+| **UC33** | View Lesson Bookmarks (Student) | ❌ Missing | Chưa có. Cần model `Bookmark` `{ userId, lessonId }` và API GET `/bookmarks`. |
+| **UC34** | Save Lesson Bookmark (Student) | ❌ Missing | Chưa có. Cần API POST `/bookmarks` để toggle lưu/hủy đánh dấu bài học. |
+| **UC35** | Add Note in Lesson (Student) | ❌ Missing | Chưa có. Cần model `Note` `{ userId, lessonId, noteText }` và API CRUD `/notes`. |
+| **UC44** | Run Code in IDE (Student, Code Execution System / Judge0) | ✅ Done | `CodeExecutionService.executeCode()`, chuyển đổi mã nguồn sang Base64 gửi Judge0 API. Có Mock local fallback. |
+| **UC45** | View Code Execution Output (Student, Code Execution System) | ✅ Done | Decode kết quả stdout/stderr từ Base64, hiển thị kèm bộ nhớ (memory) và thời gian thực thi (time) từ Judge0. |
+| **UC46** | Submit Code and Request AI Recommendation (Student, AI System) | ✅ Done | `AIController.requestRecommendation()`, `AIService.requestRecommendation()`. Gửi lộ trình cá nhân hóa dựa trên học lực. |
+| **UC47** | View AI Chat / Analysis History (Student, AI System) | ✅ Done | [ai.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/ai/services/ai.service.ts) (`getHistoryLogs()`) lấy logs từ `ai-history.model.ts`. |
+| **UC53** | View Notifications (Student, Admin, Notification System) | ✅ Done | [notifications.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/notifications/services/notifications.service.ts), lưu DB và phát Socket.IO thời gian thực. |
 
 ---
 
-### ⏳ 14. Quiz History (UC49)
+### 🏆 DEV 4 — Quiz, Quiz Runtime, Quiz History, Gamification, Leaderboard & Subscription
+*Trọng tâm công nghệ: Quiz Schema, attempts grading, Redis Sorted Set (`ZADD`, `ZREVRANGEWITHSCORES`), XP & Level engine, Payment Gateway Integration.*
 
-| UC | Mô tả | Trạng thái | Mã nguồn liên quan / Chỉ dẫn kỹ thuật |
-|---|---|---|---|
-| **UC49** | Xem lịch sử làm Quiz (Attempt History) | ❌ Missing | *Thiếu*: Endpoint GET danh sách attempt của từng Student |
+| UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
+| :--- | :--- | :---: | :--- |
+| **UC36** | Create Quiz (Admin) | ✅ Done | [quiz.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/services/quiz.service.ts) (`createQuiz()`) lưu Quiz thuộc Lesson kèm đáp án đúng. |
+| **UC37** | Add Question (Admin) | 🔶 Partial | Thêm câu hỏi trực tiếp khi tạo Quiz. Chưa có API riêng lẻ để push câu hỏi sử dụng toán tử `$push` của Mongoose. |
+| **UC38** | Edit Question (Admin) | ❌ Missing | Chưa có. Cần API sửa câu hỏi theo vị trí trong Quiz dựa vào toán tử `$set` có định vị phần tử của MongoDB. |
+| **UC39** | Delete Question (Admin) | ❌ Missing | Chưa có. Cần API xóa câu hỏi khỏi Quiz sử dụng toán tử `$pull`. |
+| **UC40** | Take Quiz (Student) | 🔶 Partial | Đã có `QuizAttemptsService.submitAttempt()`. Thiếu trường `timeLimit` trong model và logic so sánh thời gian làm bài. |
+| **UC41** | Grade Quiz (System) | ✅ Done | [quiz-attempts.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/services/quiz-attempts.service.ts) chấm điểm tự động và lưu lịch sử. |
+| **UC42** | View Quiz Result (Student) | ✅ Done | Kết quả chấm điểm (Score, Status Pass/Fail) được trả về ngay lập tức trong payload của API nộp bài. |
+| **UC43** | View Quiz Attempt History (Student) | ❌ Missing | Chưa có. Cần API GET `/api/v1/quiz/attempts` truy vấn từ `QuizAttempt.find({ userId })` giảm dần theo `createdAt`. |
+| **UC48** | Accumulate Experience Points - XP Engine (Student, XP System) | ✅ Done | Tự động cộng XP qua `gamification.service.ts` (`awardXP()`) khi pass Quiz (theo `xpReward`) hoặc hoàn thành khóa học (500 XP). |
+| **UC49** | View User Level (Student) | ✅ Done | Cấp độ tự thăng cấp theo công thức: `level = Math.floor(xp / 1000) + 1` và đẩy tin nhắn socket.io thăng cấp. |
+| **UC50** | View Leaderboard (Student, Admin) | ✅ Done | Bảng xếp hạng XP cực nhanh thông qua **Redis Sorted Set** kết hợp cơ chế DB Aggregation fallback. |
+| **UC51** | Manage Service Plans - Subscription / Plan Management (Admin, Payment System, Subscription System) | ❌ Missing | Chưa có. Cần tạo trường `planType` (FREE/PREMIUM), hạn dùng và viết middleware phân quyền `requirePremium`. |
+| **UC52** | Purchase Feature Plan (Student, Payment Gateway) | ❌ Missing | Chưa có. Cần kết nối cổng thanh toán (Stripe/VNPAY/Momo) và webhook xử lý gia hạn gói tính năng. |
+
+---
+
+> [!TIP]
+> **Chú thích quy chuẩn ký hiệu**:
+> - ✅ **Done**: Mã nguồn đã sẵn sàng, API hoạt động tốt.
+> - 🔶 **Partial**: Logic nền tảng đã ổn, cần bổ sung API Route hoặc các trường dữ liệu phụ trợ.
+> - ❌ **Missing**: Cần tạo mới hoàn toàn theo cấu trúc hướng dẫn kỹ thuật chi tiết.

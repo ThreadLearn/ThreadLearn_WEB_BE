@@ -9,6 +9,9 @@ export interface IQuestion {
 export interface IQuiz extends Document {
   lessonId: mongoose.Types.ObjectId;
   title: string;
+  description?: string;
+  passingScorePercent: number;
+  timeLimitSeconds?: number;
   xpReward: number;
   questions: IQuestion[];
   createdAt: Date;
@@ -17,8 +20,17 @@ export interface IQuiz extends Document {
 
 const QuizSchema: Schema<IQuiz> = new Schema(
   {
-    lessonId: { type: Schema.Types.ObjectId, ref: 'Lesson', required: true, index: true },
+    lessonId: { 
+      type: Schema.Types.ObjectId, 
+      ref: 'Lesson', 
+      required: true, 
+      index: true,
+      unique: true,
+    },
     title: { type: String, required: true, trim: true },
+    description: { type: String },
+    passingScorePercent: { type: Number, default: 80 },
+    timeLimitSeconds: { type: Number },
     xpReward: { type: Number, default: 100 },
     questions: [
       {

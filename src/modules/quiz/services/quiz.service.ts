@@ -1,5 +1,6 @@
 import { Quiz } from '../models/quiz.model';
-import { NotFoundError } from '../../../common/custom-error';
+import { NotFoundError, BadRequestError } from '../../../common/custom-error';
+import { CreateQuizDto } from '../schemas/quiz.schema';
 
 export class QuizService {
   static async getQuizByLesson(lessonId: string) {
@@ -10,13 +11,23 @@ export class QuizService {
     return quiz;
   }
 
-  static async createQuiz(data: any) {
-    return await Quiz.create({
-      lessonId: data.lessonId,
-      title: data.title,
-      xpReward: data.xpReward || 100,
-      questions: data.questions,
-    });
+  static async createQuiz(dto: CreateQuizDto) {
+    // Check if lesson already has a quiz
+    const existing = await Quiz.findOne({ lessonId: dto.lessonId });
+    if (existing) {
+      throw new BadRequestError('Quiz already exists for this lesson.');
+    }
+
+    return await Quiz.create(dto);
+  }
+
+  static async updateQuiz(quizId: string, dto: Partial<CreateQuizDto>) {
+    const quiz = await Quiz.findByIdAndUpdate(quizId, dto, { new: true });
+    if (!quiz) {
+      throw new NotFoundError('Quiz not found.');
+    }
+    return quiz;
   }
 }
+
 export default QuizService;
