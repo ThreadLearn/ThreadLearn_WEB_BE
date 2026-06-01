@@ -21,8 +21,9 @@ export class QuizAttemptsService {
       }
     });
 
+    const passingThreshold = quiz.passingScorePercent !== undefined ? quiz.passingScorePercent : 80;
     const score = Math.round((correctCount / questions.length) * 100);
-    const passed = score >= 80;
+    const passed = score >= passingThreshold;
 
     const attempt = await QuizAttempt.create({
       quizId,
@@ -73,6 +74,7 @@ export class QuizAttemptsService {
       score,
       passed,
       xpRewarded,
+      passingScorePercent: passingThreshold,
     };
   }
 }
