@@ -5,7 +5,7 @@ import { Notification } from '../../notifications/models/notification.model';
 import { NotFoundError } from '../../../common/custom-error';
 
 export class QuizAttemptsService {
-  static async submitAttempt(userId: string, quizId: string, answers: Record<string, number>) {
+  async submitAttempt(userId: string, quizId: string, answers: Record<string, number>) {
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
       throw new NotFoundError('Quiz not found.');
@@ -40,7 +40,7 @@ export class QuizAttemptsService {
       if (stats) {
         stats.xp += xpRewarded;
         stats.quizzesCompleted += 1;
-        
+
         const now = new Date();
         const lastActive = new Date(stats.lastActiveDate);
         const dayDifference = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
