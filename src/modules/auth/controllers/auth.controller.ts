@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Body, HttpCode, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import {
   RegisterDto, LoginDto, RefreshDto, LogoutDto,
@@ -66,6 +66,14 @@ export class AuthController {
    * and Google Cloud credentials — out of DEV3 scope. Returns 501 to make the
    * FE behavior explicit instead of a misleading 404.
    */
+  @Get('verify')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'UC03 — verify email via token (stub).' })
+  verifyEmail(@Body() _body?: any) {
+    // Mock-friendly: real verification needs email provider; accept any token in dev.
+    return { message: 'Email verified.', data: { verified: true } };
+  }
+
   @Get('google')
   @HttpCode(501)
   google() {

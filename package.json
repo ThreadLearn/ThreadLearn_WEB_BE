@@ -3,11 +3,16 @@
   "version": "2.0.0",
   "description": "ThreadLearn API — NestJS + MongoDB + Redis + Socket.IO",
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
-    "start": "node dist/main",
-    "lint": "eslint \"{src,test}/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\""
+    "dev":            "nest start --watch",
+    "build":          "nest build",
+    "start":          "node dist/main",
+    "lint":           "eslint \"{src,test}/**/*.ts\"",
+    "format":         "prettier --write \"src/**/*.ts\"",
+    "test:rules":     "ts-node -P tsconfig.json test/business-rules.ts",
+    "test:logic":     "ts-node -P tsconfig.json test/logic-rules.ts",
+    "test:e2e":       "ts-node -P tsconfig.json test/e2e-smoke.ts",
+    "test:journey":   "ts-node -P tsconfig.json test/seed-and-smoke.ts",
+    "test:contracts": "ts-node -P tsconfig.json src/scripts/mock-integration-check.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

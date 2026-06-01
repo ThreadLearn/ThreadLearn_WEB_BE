@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { IEnrollment } from '../models/enrollment.model';
+import { ILessonProgress } from '../models/lesson-progress.model';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 
@@ -11,100 +12,116 @@ export class EnrollmentsService {
   private readonly logger = new Logger(EnrollmentsService.name);
 
   constructor(
-    @InjectModel('Enrollment') private enrollmentModel: Model<IEnrollment>,
-    @InjectModel('Course')     private courseModel:     Model<any>,
-    @InjectModel('Lesson')     private lessonModel:     Model<any>,
-    @InjectModel('UserStats')  private userStatsModel:  Model<any>,
+    @InjectModel('Enrollment')     private enrollmentModel: Model<IEnrollment>,
+    @InjectModel('Course')         private courseModel:     Model<any>,
+    @InjectModel('Lesson')         private lessonModel:     Model<any>,
+    @InjectModel('LessonProgress') private progressModel:   Model<ILessonProgress>,
+    @InjectModel('UserStats')      private userStatsModel:  Model<any>,
+    @InjectModel('User')           private userModel:       Model<any>,
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** Mark a lesson complete, notify LESSON_COMPLETED, recalculate course progress. */
-  async markLessonComplete(userId: string, lessonId: string, completedLessonsCount: number) {
-    if (!mongoose.isValidObjectId(lessonId)) throw new NotFoundError('Lesson not found.');
-
-    const lesson = await this.lessonModel.findById(lessonId);
-    if (!lesson) throw new NotFoundError('Lesson not found.');
-
-    const enrollment = await this.enrollmentModel.findOne({ userId, courseId: lesson.courseId });
-    if (!enrollment) {
-      throw new ForbiddenError('You must be enrolled in this course to mark lessons as complete.');
-    }
-
-    this.notifications.notify(
-      userId, 'LESSON_COMPLETED',
-      'Bài học hoàn thành!',
-      `Bạn đã hoàn thành bài "${lesson.title}"`,
-      { lessonId: lesson._id, courseId: lesson.courseId },
-    ).catch((err) => this.logger.warn('LESSON_COMPLETED notify failed (non-critical).', err));
-
-    return this.updateLessonProgress(userId, lesson.courseId.toString(), completedLessonsCount);
-  }
+  // ─── UC26 — Enroll in course ────────────────────────────────────────────────
 
   async enrollInCourse(userId: string, courseId: string) {
-    const course = await this.courseModel.findById(courseId);
-    if (!course) throw new NotFoundError('Course not found.');
+    if (!mongoose.isValidObjectId(courseId)) throw new NotFoundError('Course not found.');
+    const course = await this.courseModel.findOne({
+      _id: courseId, isDeleted: false, isPublished: true,
+    });
+    if (!course) throw new NotFoundError('Course not found or not available.');
+
+    // BR UC26 — Premium gating: course Premium → user phải có isPremium.
+    if (course.isPremium) {
+      const user = await this.userModel.findById(userId)
+        .select('isPremium').lean<{ isPremium?: boolean } | null>();
+      if (!user?.isPremium) {
+        throw new ForbiddenError('This is a Premium course. Upgrade to Premium to enroll.');
+      }
+    }
 
     const existing = await this.enrollmentModel.findOne({ userId, courseId });
-    if (existing) throw new BadRequestError('User is already enrolled in this course.');
+    if (existing) {
+      throw new BadRequestError('You are already enrolled in this course.');
+    }
 
-    const enrollment = await this.enrollmentModel.create({
-      userId, courseId, progress: 0, completed: false,
-    });
+    // Race-safe enroll: nếu 2 request đồng thời, request thứ 2 sẽ E11000
+    // (unique compound userId+courseId) — bắt và trả thông báo nhất quán.
+    let enrollment;
+    try {
+      enrollment = await this.enrollmentModel.create({
+        userId, courseId, progress: 0, completed: false,
+      });
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        throw new BadRequestError('You are already enrolled in this course.');
+      }
+      throw err;
+    }
+
+    // Bump denormalized counter on the course.
+    await this.courseModel.updateOne(
+      { _id: courseId }, { $inc: { totalEnrollments: 1 } },
+    );
 
     this.notifications.notify(
       userId, 'COURSE_ENROLLED',
       'Đăng ký khóa học thành công! 🎓',
       `Bạn đã tham gia khóa học "${course.title}". Chúc bạn học tốt!`,
       { courseId: course._id, courseTitle: course.title },
-    ).catch((err) => this.logger.warn('COURSE_ENROLLED notify failed (non-critical).', err));
+    ).catch((err) =>
+      this.logger.warn('COURSE_ENROLLED notify failed (non-critical).', err),
+    );
 
     return enrollment;
   }
 
-  async updateLessonProgress(userId: string, courseId: string, completedLessonsCount: number) {
-    const enrollment = await this.enrollmentModel.findOne({ userId, courseId });
-    if (!enrollment) throw new NotFoundError('Active enrollment not found for this course.');
+  // ─── UC28 — Track learning progress ─────────────────────────────────────────
 
-    const totalLessons = await this.lessonModel.countDocuments({ courseId });
-    if (totalLessons === 0) throw new BadRequestError('This course contains no lessons yet.');
+  async getMyEnrollments(userId: string) {
+    const enrollments = await this.enrollmentModel.find({ userId })
+      .populate({
+        path:   'courseId',
+        select: 'title thumbnailUrl level totalLessons durationMinutes isDeleted isPublished',
+        match:  { isDeleted: false },
+      })
+      .sort({ updatedAt: -1 })
+      .lean();
+    // Drop rows where the populated course was filtered out (deleted).
+    return enrollments.filter((e: any) => e.courseId != null);
+  }
 
-    const progressPercentage = Math.min(100, Math.max(0, (completedLessonsCount / totalLessons) * 100));
-    const wasCompleted = enrollment.completed;
-    enrollment.progress = progressPercentage;
-    if (progressPercentage === 100) enrollment.completed = true;
-    await enrollment.save();
+  async getCourseProgress(userId: string, courseId: string) {
+    if (!mongoose.isValidObjectId(courseId)) throw new BadRequestError('Invalid courseId.');
 
-    let xpRewarded = 0;
-    if (enrollment.completed && !wasCompleted) {
-      xpRewarded = 500;
-      const stats = await this.userStatsModel.findOne({ userId });
-      if (stats) {
-        const oldLevel = stats.level;
-        stats.xp += xpRewarded;
-        stats.coursesCompleted += 1;
-        stats.level = Math.floor(stats.xp / 1000) + 1;
-        await stats.save();
-
-        const course = await this.courseModel.findById(courseId).select('title').lean<{ title?: string }>();
-
-        this.notifications.notify(
-          userId, 'COURSE_COMPLETED',
-          'Hoàn thành khóa học! 🏆',
-          `Xuất sắc! Bạn đã hoàn thành "${course?.title ?? 'khóa học'}" và nhận 500 XP!`,
-          { courseId, xpRewarded: 500 },
-        ).catch((err) => this.logger.warn('COURSE_COMPLETED notify failed (non-critical).', err));
-
-        if (stats.level > oldLevel) {
-          this.notifications.notify(
-            userId, 'LEVEL_UP',
-            `Lên Level ${stats.level}! 🚀`,
-            `Chúc mừng! Bạn đã đạt Level ${stats.level}.`,
-            { newLevel: stats.level, xp: stats.xp },
-          ).catch((err) => this.logger.warn('LEVEL_UP notify failed (non-critical).', err));
-        }
-      }
+    const enrollment = await this.enrollmentModel.findOne({ userId, courseId }).lean();
+    if (!enrollment) {
+      throw new NotFoundError('You are not enrolled in this course.');
     }
 
-    return { enrollment, xpRewarded };
+    // Only count progress against still-active lessons (L7 fix).
+    const activeLessons = await this.lessonModel.find({ courseId, isDeleted: false })
+      .select('_id').lean<{ _id: any }[]>();
+    const activeIds     = new Set(activeLessons.map((l) => l._id.toString()));
+    const totalLessons  = activeLessons.length;
+    const progressRows  = await this.progressModel
+      .find({ userId, courseId }).select('lessonId').lean<{ lessonId: any }[]>();
+    const completedLessonIds = progressRows
+      .map((r) => r.lessonId.toString())
+      .filter((id) => activeIds.has(id));
+
+    return {
+      enrollment,
+      totalLessons,
+      completedLessonIds,
+      completedCount: completedLessonIds.length,
+      progress:       enrollment.progress,
+      completed:      enrollment.completed,
+    };
+  }
+
+  async isEnrolled(userId: string, courseId: string): Promise<boolean> {
+    if (!mongoose.isValidObjectId(courseId)) return false;
+    const exists = await this.enrollmentModel.exists({ userId, courseId });
+    return !!exists;
   }
 }

@@ -22,6 +22,9 @@ import { NoteModule }          from './modules/note/note.module';
 import { CodeExecutionModule } from './modules/code-execution/code-execution.module';
 import { AIAnalysisModule }    from './modules/ai-analysis/ai-analysis.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AdminModule }         from './modules/admin/admin.module';
+import { CertificatesModule }  from './modules/certificates/certificates.module';
+import { ReviewsModule }       from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -48,6 +51,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     CodeExecutionModule,
     AIAnalysisModule,
     NotificationsModule,
+    AdminModule,
+    CertificatesModule,
+    ReviewsModule,
   ],
 })
 export class AppModule {}

@@ -6,7 +6,7 @@ import { IExercise } from '../models/exercise.model';
 import { ICodeExecution } from '../models/code-execution.model';
 import { RedisService } from '../../../config/redis.service';
 import { Judge0Service, Judge0Language } from './judge0.service';
-import { BadRequestError, NotFoundError } from '../../../common/custom-error';
+import { BadRequestError, NotFoundError, TooManyRequestsError } from '../../../common/custom-error';
 
 const CODE_RUN_LIMIT = 20;
 
@@ -140,11 +140,11 @@ export class CodeExecutionService {
           await this.redisService.expire(key, ttl);
         }
         if (hits > CODE_RUN_LIMIT) {
-          throw new BadRequestError(`Daily code execution limit reached (${CODE_RUN_LIMIT}/day).`);
+          throw new TooManyRequestsError(`Daily code execution limit reached (${CODE_RUN_LIMIT}/day).`);
         }
         return;
       } catch (err) {
-        if (err instanceof BadRequestError) throw err;
+        if (err instanceof TooManyRequestsError) throw err;
         this.logger.warn('Redis rate limit unavailable, using in-memory fallback.', err);
       }
     }
@@ -159,7 +159,7 @@ export class CodeExecutionService {
     }
     record.count++;
     if (record.count > CODE_RUN_LIMIT) {
-      throw new BadRequestError(`Daily code execution limit reached (${CODE_RUN_LIMIT}/day).`);
+      throw new TooManyRequestsError(`Daily code execution limit reached (${CODE_RUN_LIMIT}/day).`);
     }
   }
 }

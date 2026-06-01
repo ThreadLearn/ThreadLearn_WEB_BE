@@ -44,7 +44,7 @@ export class CommentController {
   @Roles('STUDENT', 'ADMIN')
   @ApiBearerAuth()
   async createComment(@CurrentUser() user: JwtPayload, @Body() dto: CreateCommentDto) {
-    const data = await this.commentService.createComment(user.id, dto);
+    const data = await this.commentService.createComment(user.id, dto, user.role);
     return { message: 'Comment created.', data, statusCode: 201 };
   }
 

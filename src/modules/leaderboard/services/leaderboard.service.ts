@@ -1,20 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { RedisService } from '../../../config/redis.service';
 
 @Injectable()
 export class LeaderboardService {
   private readonly logger = new Logger(LeaderboardService.name);
-  private readonly LEADERBOARD_KEY = 'leaderboard:xp';
 
   constructor(
     @InjectModel('UserStats') private userStatsModel: Model<any>,
-    private readonly redis: RedisService,
   ) {}
 
-  async getTopRankings(limit = 10) {
-    // Always query DB — Redis ZSET path adds complexity without strong upside at this scale.
+  async getTopRankings(limit = 50) {
     const stats = await this.userStatsModel
       .find()
       .populate('userId', 'firstName lastName avatarUrl')
@@ -26,13 +22,26 @@ export class LeaderboardService {
         ? `${stat.userId.firstName ?? ''} ${stat.userId.lastName ?? ''}`.trim() || 'Anonymous'
         : 'Unknown User';
       return {
-        rank:        index + 1,
-        userId:      stat.userId ? stat.userId._id : stat._id,
+        rank:      index + 1,
+        userId:    stat.userId ? stat.userId._id : stat._id,
         displayName,
-        avatarUrl:   stat.userId?.avatarUrl,
-        xp:          stat.xp,
-        level:       stat.level,
+        avatarUrl: stat.userId?.avatarUrl,
+        xp:        stat.xp,
+        level:     stat.level,
       };
     });
+  }
+
+  async getMyRank(userId: string): Promise<{ rank: number; xp: number; level: number }> {
+    const userStat = await this.userStatsModel.findOne({ userId }).lean<{ xp?: number; level?: number } | null>();
+    if (!userStat) return { rank: 0, xp: 0, level: 1 };
+
+    // Rank = 1 + (count of users with strictly higher XP)
+    const higher = await this.userStatsModel.countDocuments({ xp: { $gt: userStat.xp ?? 0 } });
+    return {
+      rank:  higher + 1,
+      xp:    userStat.xp    ?? 0,
+      level: userStat.level ?? 1,
+    };
   }
 }

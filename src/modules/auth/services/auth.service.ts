@@ -29,15 +29,30 @@ export class AuthService {
     const accessExp     = this.config.get<string>('jwt.accessExpiresIn')  ?? '15m';
     const refreshExp    = this.config.get<string>('jwt.refreshExpiresIn') ?? '7d';
 
-    const accessToken  = jwt.sign(payload, accessSecret,  { expiresIn: accessExp  as any });
-    const refreshToken = jwt.sign(payload, refreshSecret, { expiresIn: refreshExp as any });
+    // Add a unique `jti` to the refresh token so two logins in the same
+    // second never collide on the `token` unique index (E11000 fix).
+    const accessToken  = jwt.sign(payload, accessSecret,  { expiresIn: accessExp as any });
+    const refreshToken = jwt.sign(
+      { ...payload, jti: (require('crypto') as typeof import('crypto')).randomBytes(8).toString('hex') },
+      refreshSecret,
+      { expiresIn: refreshExp as any },
+    );
     return { accessToken, refreshToken };
   }
 
+  /**
+   * Save a new refresh token. If the same token already exists (highly
+   * unlikely with jti), treat it as success.
+   */
   private async saveRefreshToken(userId: any, token: string) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    await this.refreshTokenModel.create({ token, userId, expiresAt });
+    try {
+      await this.refreshTokenModel.create({ token, userId, expiresAt });
+    } catch (err: any) {
+      if (err?.code !== 11000) throw err;
+      // Token already persisted in the same instant — fine.
+    }
   }
 
   // ── Endpoints ─────────────────────────────────────────────────────────────

@@ -76,8 +76,9 @@ export class CommentService {
   async createComment(
     userId: string,
     data: { targetType: 'COURSE' | 'LESSON'; targetId: string; content: string; parentId?: string },
+    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT',
   ) {
-    await this.checkTargetAccess(userId, data.targetType, data.targetId);
+    await this.checkTargetAccess(userId, data.targetType, data.targetId, userRole);
 
     if (data.parentId) {
       if (!mongoose.isValidObjectId(data.parentId)) {
@@ -152,6 +153,7 @@ export class CommentService {
     userId: string,
     targetType: 'COURSE' | 'LESSON',
     targetId: string,
+    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT',
   ) {
     if (!mongoose.isValidObjectId(targetId)) {
       throw new NotFoundError(targetType === 'COURSE' ? 'Course not found.' : 'Lesson not found.');
@@ -160,11 +162,14 @@ export class CommentService {
     if (targetType === 'COURSE') {
       const course = await this.courseModel.findById(targetId);
       if (!course) throw new NotFoundError('Course not found.');
+      // UC30: Admin can reply/comment anywhere without enrollment.
+      if (userRole === 'ADMIN') return;
       const enrolled = await this.enrollmentModel.findOne({ userId, courseId: targetId });
       if (!enrolled) throw new ForbiddenError('You must be enrolled to comment on this course.');
     } else {
       const lesson = await this.lessonModel.findById(targetId);
       if (!lesson) throw new NotFoundError('Lesson not found.');
+      if (userRole === 'ADMIN') return;
       const enrolled = await this.enrollmentModel.findOne({ userId, courseId: lesson.courseId });
       if (!enrolled) throw new ForbiddenError('You must be enrolled to comment on this lesson.');
     }

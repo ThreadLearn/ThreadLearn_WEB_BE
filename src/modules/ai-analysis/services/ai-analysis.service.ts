@@ -6,7 +6,7 @@ import { IAIAnalysis } from '../models/ai-analysis.model';
 import { IUser } from '../../auth/models/user.model';
 import { RedisService } from '../../../config/redis.service';
 import { AIEngineService } from './ai-engine.service';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+import { BadRequestError, ForbiddenError, NotFoundError, TooManyRequestsError } from '../../../common/custom-error';
 
 const FREE_QUOTA    = 10;
 const PREMIUM_QUOTA = 40;
@@ -74,7 +74,15 @@ export class AIAnalysisService {
         ? new mongoose.Types.ObjectId(dto.codeExecutionId)
         : undefined;
 
-    const analysis = await this.aiEngine.analyze(dto.inputCode, dto.language);
+    // L21 — pre-increment quota for fairness, but rollback on AI failure so
+    // users don't lose a quota slot when OpenAI/network errors.
+    let analysis;
+    try {
+      analysis = await this.aiEngine.analyze(dto.inputCode, dto.language);
+    } catch (err) {
+      await this.decrementQuota(userId, key).catch(() => { /* noop */ });
+      throw err;
+    }
 
     const record = await this.aiAnalysisModel.create({
       userId,
@@ -120,12 +128,12 @@ export class AIAnalysisService {
       try {
         const hits = await this.redisService.incr(key);
         if (hits === 1) await this.redisService.expire(key, secondsUntilMidnight());
-        if (hits > limit) throw new BadRequestError(
+        if (hits > limit) throw new TooManyRequestsError(
           `Daily AI quota reached (${limit}${isPremium ? ' Premium' : ' Free — upgrade for more'}).`,
         );
         return;
       } catch (err) {
-        if (err instanceof BadRequestError) throw err;
+        if (err instanceof TooManyRequestsError) throw err;
         this.logger.warn('Redis quota increment failed, using in-memory.', err);
       }
     }
@@ -141,7 +149,20 @@ export class AIAnalysisService {
     }
     record.count++;
     if (record.count > limit) {
-      throw new BadRequestError(`Daily AI quota reached (${limit}).`);
+      throw new TooManyRequestsError(`Daily AI quota reached (${limit}).`);
     }
+  }
+
+  /** L21 — release quota on AI provider failure. */
+  private async decrementQuota(_userId: string, key: string) {
+    if (this.redisService.isOpen) {
+      try {
+        await this.redisService.set(key, String(Math.max(0, parseInt(
+          (await this.redisService.get(key)) ?? '0', 10) - 1)));
+        return;
+      } catch { /* fall through to in-memory */ }
+    }
+    const rec = quotaStore.get(key);
+    if (rec && rec.count > 0) rec.count -= 1;
   }
 }
