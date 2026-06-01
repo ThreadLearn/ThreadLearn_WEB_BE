@@ -94,6 +94,18 @@ if (!parsed.success) {
   throw new Error('Environment validation failed');
 }
 
+if (
+  parsed.data.NODE_ENV === 'production' &&
+  !parsed.data.FRONTEND_URL.some(
+    (origin) => !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/?$/i.test(origin),
+  )
+) {
+  console.error(
+    'Environment validation failed: FRONTEND_URL must include the deployed frontend origin in production',
+  );
+  throw new Error('Environment validation failed');
+}
+
 const buildMongoUrl = () => {
   const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_DATABASE } = parsed.data;
   if (!MONGODB_USER || !MONGODB_PASSWORD || !MONGODB_HOST || !MONGODB_DATABASE) {
