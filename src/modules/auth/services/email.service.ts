@@ -29,7 +29,7 @@ export class EmailService {
       return;
     }
 
-    await this.sendMail({
+    this.dispatch('Verification email', {
       to: payload.email,
       subject: 'Verify your ThreadLearn email',
       text: [
@@ -47,8 +47,6 @@ export class EmailService {
         <p>This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.</p>
       `,
     });
-
-    logger.info(`Verification email sent to ${payload.email}`);
   }
 
   static async sendPasswordResetEmail(payload: PasswordResetEmailPayload) {
@@ -57,7 +55,7 @@ export class EmailService {
       return;
     }
 
-    await this.sendMail({
+    this.dispatch('Password reset email', {
       to: payload.email,
       subject: 'Reset your ThreadLearn password',
       text: [
@@ -75,18 +73,62 @@ export class EmailService {
         <p>This link will expire soon. If you did not request a password reset, you can ignore this email.</p>
       `,
     });
-
-    logger.info(`Password reset email sent to ${payload.email}`);
   }
 
   static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
-    logger.info(
-      `Mock student invitation email sent to ${payload.email} for ${payload.firstName}. Temporary password: ${payload.temporaryPassword}`
-    );
+    if (!this.hasSmtpConfig()) {
+      logger.info(
+        `Mock student invitation email sent to ${payload.email} for ${payload.firstName}. Temporary password: ${payload.temporaryPassword}`
+      );
+      return;
+    }
+
+    this.dispatch('Student invitation email', {
+      to: payload.email,
+      subject: 'Your ThreadLearn account is ready',
+      text: [
+        `Hi ${payload.firstName},`,
+        '',
+        'An admin has created a ThreadLearn account for you.',
+        `Temporary password: ${payload.temporaryPassword}`,
+        '',
+        'Please sign in and change your password as soon as possible.',
+      ].join('\n'),
+      html: `
+        <p>Hi ${this.escapeHtml(payload.firstName)},</p>
+        <p>An admin has created a ThreadLearn account for you.</p>
+        <p><strong>Temporary password:</strong> ${this.escapeHtml(payload.temporaryPassword)}</p>
+        <p>Please sign in and change your password as soon as possible.</p>
+      `,
+    });
   }
 
   private static hasSmtpConfig() {
     return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS);
+  }
+
+  /**
+   * Fire-and-forget queue with exponential-backoff retry. Caller does not
+   * await SMTP, so register/forgot-password/admin-invite return immediately
+   * (~1ms instead of 1-3s waiting on Gmail). If all retries fail we log loudly
+   * so ops can investigate; the user is never surfaced an SMTP error.
+   */
+  private static dispatch(label: string, message: { to: string; subject: string; text: string; html: string }) {
+    const attempt = async (n: number): Promise<void> => {
+      try {
+        await this.sendMail(message);
+        logger.info(`${label} delivered to ${message.to}${n > 1 ? ` (retry ${n - 1})` : ''}`);
+      } catch (err) {
+        if (n >= 3) {
+          logger.error(`${label} permanently failed for ${message.to} after ${n} attempts.`, err as Error);
+          return;
+        }
+        const delay = 1000 * Math.pow(2, n - 1); // 1s, 2s
+        setTimeout(() => void attempt(n + 1), delay);
+      }
+    };
+    // Detached intentionally — don't block the HTTP request.
+    void attempt(1);
   }
 
   private static async sendMail(message: { to: string; subject: string; text: string; html: string }) {

@@ -6,10 +6,14 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '3000:3000'
+      - '5000:5000'
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=mongodb://mongo:27017/threadlearn
+      - PORT=5000
+      - MOCK_MODE=false
+      # DATABASE_URL is NOT set here so that MONGODB_* (Atlas) from .env wins.
       - REDIS_URL=redis://redis:6379
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}

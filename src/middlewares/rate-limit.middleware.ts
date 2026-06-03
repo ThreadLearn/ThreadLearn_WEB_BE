@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { getRedisClient } from '../configs/redis';
 import { env } from '../configs/env';
 import { logger } from '../configs/logger';
@@ -13,10 +14,10 @@ export class TooManyRequestsError extends AppError {
   }
 }
 
-export async function rateLimiter(ip: string): Promise<void> {
+export async function rateLimiter(scope: string): Promise<void> {
   const windowMs = env.RATE_LIMIT_WINDOW_MS;
   const limit = env.RATE_LIMIT_LIMIT;
-  const key = `rate-limit:${ip}`;
+  const key = `rate-limit:${scope}`;
 
   const redis = getRedisClient();
   if (redis.isOpen) {
@@ -27,7 +28,7 @@ export async function rateLimiter(ip: string): Promise<void> {
       }
 
       if (hits > limit) {
-        logger.warn(`🚫 Rate limit exceeded for IP: ${ip} (Redis count: ${hits}/${limit})`);
+        logger.warn(`🚫 Rate limit exceeded for ${scope} (Redis count: ${hits}/${limit})`);
         throw new TooManyRequestsError();
       }
       return;
@@ -38,10 +39,10 @@ export async function rateLimiter(ip: string): Promise<void> {
   }
 
   const now = Date.now();
-  const record = localStore.get(ip);
+  const record = localStore.get(scope);
 
   if (!record || now > record.resetTime) {
-    localStore.set(ip, {
+    localStore.set(scope, {
       count: 1,
       resetTime: now + windowMs,
     });
@@ -50,10 +51,20 @@ export async function rateLimiter(ip: string): Promise<void> {
 
   record.count++;
   if (record.count > limit) {
-    logger.warn(`🚫 Rate limit exceeded for IP: ${ip} (In-Memory count: ${record.count}/${limit})`);
+    logger.warn(`🚫 Rate limit exceeded for ${scope} (In-Memory count: ${record.count}/${limit})`);
     throw new TooManyRequestsError();
   }
 }
+
+const extractUserIdFromAuth = (auth: string | undefined): string | undefined => {
+  if (!auth?.startsWith('Bearer ')) return undefined;
+  try {
+    const payload = jwt.verify(auth.split(' ')[1], env.JWT_ACCESS_SECRET) as { id?: string };
+    return payload.id;
+  } catch {
+    return undefined;
+  }
+};
 
 @Injectable()
 export class RateLimitMiddleware implements NestMiddleware {
@@ -63,7 +74,14 @@ export class RateLimitMiddleware implements NestMiddleware {
       ? forwardedFor[0]
       : forwardedFor || req.ip || '127.0.0.1';
 
-    await rateLimiter(ip);
+    // Per-IP bucket (anonymous / pre-auth traffic).
+    await rateLimiter(`ip:${ip}`);
+
+    // Per-user bucket (authenticated traffic). Prevents a single account from
+    // exhausting the shared IP quota or DoSing the API by opening many tabs.
+    const userId = extractUserIdFromAuth(req.headers.authorization as string | undefined);
+    if (userId) await rateLimiter(`user:${userId}`);
+
     next();
   }
 }

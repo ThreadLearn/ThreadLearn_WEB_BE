@@ -6,6 +6,8 @@ export interface IUser extends Document {
   firstName: string;
   lastName: string;
   role: 'STUDENT' | 'ADMIN';
+  planType?: 'FREE' | 'PREMIUM';
+  subscriptionExpiresAt?: Date;
   avatarUrl?: string;
   googleId?: string;
   githubId?: string;
@@ -14,6 +16,8 @@ export interface IUser extends Document {
   isActive: boolean;
   lockedAt?: Date;
   lockedReason?: string;
+  failedLoginAttempts?: number;
+  lockedUntil?: Date;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +30,8 @@ const UserSchema: Schema<IUser> = new Schema(
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT' },
+    planType: { type: String, enum: ['FREE', 'PREMIUM'], default: 'FREE' },
+    subscriptionExpiresAt: { type: Date },
     avatarUrl: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     githubId: { type: String, unique: true, sparse: true },
@@ -34,6 +40,8 @@ const UserSchema: Schema<IUser> = new Schema(
     isActive: { type: Boolean, default: true },
     lockedAt: { type: Date },
     lockedReason: { type: String, trim: true },
+    failedLoginAttempts: { type: Number, default: 0, min: 0 },
+    lockedUntil: { type: Date },
     lastLoginAt: { type: Date },
   },
   { timestamps: true }

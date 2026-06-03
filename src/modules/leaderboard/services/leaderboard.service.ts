@@ -26,6 +26,13 @@ export class LeaderboardService {
     }
   }
 
+  static async getMyRank(userId: string) {
+    const stats = await UserStats.find().sort({ xp: -1 }).select('userId xp');
+    const index = stats.findIndex((s) => s.userId?.toString() === userId);
+    if (index === -1) return { rank: null, xp: 0 };
+    return { rank: index + 1, xp: stats[index].xp };
+  }
+
   static async getTopRankings(limit = 10) {
     try {
       const redis = getRedisClient();

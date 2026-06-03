@@ -8,11 +8,14 @@ import { RefreshToken } from '../models/refresh-token.model';
 import { assertUserCanAuthenticate, sanitizeUser, SafeUser } from '../utils/user-sanitizer';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { env } from '../../../configs/env';
+import { logger } from '../../../configs/logger';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../../common/custom-error';
 import { EmailService } from './email.service';
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3000/reset-password';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -82,11 +85,35 @@ export class AuthService {
   static async login(data: any) {
     const user = await User.findOne({ email: data.email });
     if (!user || !user.passwordHash) {
+      // Always run a dummy bcrypt comparison on missing-user path so the
+      // response timing is comparable to the wrong-password path. Prevents
+      // user enumeration via timing side-channel.
+      await bcrypt.compare(data.password ?? '', '$2a$10$invalidsaltdummyHASHvaluetomatchTHEbcryptOPCOST');
       throw new BadRequestError('Invalid email or password credentials.');
+    }
+
+    // SECURITY (P0): account lockout after consecutive failed attempts.
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      throw new ForbiddenError(
+        `Account temporarily locked due to repeated failed login attempts. Try again in ${minutes} minute(s).`
+      );
     }
 
     const matches = await bcrypt.compare(data.password, user.passwordHash);
     if (!matches) {
+      const attempts = (user.failedLoginAttempts ?? 0) + 1;
+      user.failedLoginAttempts = attempts;
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        user.lockedUntil = new Date(Date.now() + LOGIN_LOCKOUT_MS);
+        user.failedLoginAttempts = 0;
+        await user.save();
+        logger.warn(`Account locked: ${user.email} (${attempts} failed attempts)`);
+        throw new ForbiddenError(
+          `Account locked for ${LOGIN_LOCKOUT_MS / 60000} minutes after too many failed attempts.`
+        );
+      }
+      await user.save();
       throw new BadRequestError('Invalid email or password credentials.');
     }
 
@@ -95,6 +122,9 @@ export class AuthService {
       throw new ForbiddenError('Please verify your email before logging in.');
     }
 
+    // Successful login: reset counters.
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
     user.lastLoginAt = new Date();
     await user.save();
 
@@ -199,8 +229,28 @@ export class AuthService {
 
   static async refresh(token: string) {
     const storedToken = await RefreshToken.findOne({ token });
-    if (!storedToken || storedToken.expiresAt < new Date()) {
-      if (storedToken) await RefreshToken.deleteOne({ _id: storedToken._id });
+
+    // SECURITY (P0): refresh-token reuse detection. If the token cryptographically
+    // verifies but is NOT in our store, assume it was rotated previously and the
+    // bearer is replaying a stolen copy. Revoke all of that user's refresh
+    // tokens to force re-login everywhere.
+    if (!storedToken) {
+      try {
+        const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as { id: string };
+        if (decoded?.id) {
+          await RefreshToken.deleteMany({ userId: decoded.id });
+          logger.warn(
+            `Refresh-token reuse detected for user ${decoded.id}. All sessions revoked.`
+          );
+        }
+      } catch {
+        // Bad signature — nothing to revoke, just reject.
+      }
+      throw new UnauthorizedError('Refresh token is invalid or has expired.');
+    }
+
+    if (storedToken.expiresAt < new Date()) {
+      await RefreshToken.deleteOne({ _id: storedToken._id });
       throw new UnauthorizedError('Refresh token is invalid or has expired.');
     }
 

@@ -155,10 +155,11 @@ export class AdminController {
   @Post('execute')
   @HttpCode(200)
   async executeCode(
+    @CurrentUser() admin: AuthenticatedUser,
     @Body(new ZodValidationPipe(executeSchema))
     body: { sourceCode: string; languageId: number; stdin?: string }
   ) {
-    const result = await CodeExecutionService.executeCode(body);
+    const result = await CodeExecutionService.executeCode(admin.id, body);
     return ApiResponse.success({
       message: 'Code execution completed.',
       data: result,

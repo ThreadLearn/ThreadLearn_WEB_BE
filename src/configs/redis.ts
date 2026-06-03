@@ -24,6 +24,10 @@ export function getRedisClient() {
   logger.info('🔌 Connecting to Redis...');
   const client = createClient({
     url: env.REDIS_URL,
+    socket: {
+      reconnectStrategy: false,
+      connectTimeout: 1000,
+    },
   });
 
   client.on('error', (err) => {

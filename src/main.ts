@@ -14,7 +14,11 @@ import { createSwaggerConfig } from './swagger/config';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
-  await connectToDatabase();
+  if (!env.MOCK_MODE) {
+    await connectToDatabase();
+  } else {
+    logger.warn('ThreadLearn backend is running in MOCK_MODE. Database connection is skipped.');
+  }
 
   const app = await NestFactory.create(AppModule);
   const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
