@@ -22,7 +22,7 @@ const questionSchema = z.object({
   { message: 'correctAnswerIndex must be less than options length.' }
 );
 
-// ─── Create Quiz Schema ────────────────────────────────────────
+// ─── Create Quiz Schema (Admin) ────────────────────────────────
 export const createQuizSchema = z.object({
   lessonId: z.string()
     .min(1, 'Lesson ID is required.')
@@ -42,9 +42,11 @@ export const createQuizSchema = z.object({
     .openapi({ example: 100 }),
   questions: z.array(questionSchema)
     .min(1, 'Quiz must have at least 1 question.'),
-}).openapi('CreateQuizDto');  // ← tên hiển thị trong Swagger UI
+}).openapi('CreateQuizDto');
 
-// ─── Update Quiz Schema ────────────────────────────────────────
+// ─── Update Quiz Schema (Admin) ────────────────────────────────
+// Schema riêng — KHÔNG dùng createQuizSchema.partial()
+// vì partial() cho phép questions: [] (mảng rỗng) pass validation
 export const updateQuizSchema = z.object({
   title: z.string().min(1).max(255).optional()
     .openapi({ example: 'Updated Quiz Title' }),
@@ -56,7 +58,7 @@ export const updateQuizSchema = z.object({
   questions: z.array(questionSchema).min(1).optional(),
 }).openapi('UpdateQuizDto');
 
-// ─── Submit Quiz Schema ────────────────────────────────────────
+// ─── Submit Quiz Schema (Student) ─────────────────────────────
 export const quizSubmitSchema = z.object({
   quizId: z.string()
     .min(1, 'Quiz ID is required.')
@@ -74,4 +76,4 @@ registry.register('QuizSubmitDto', quizSubmitSchema);
 export type CreateQuizDto = z.infer<typeof createQuizSchema>;
 export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
 export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
-export type QuestionDto = z.infer<typeof questionSchema>;
+export type QuestionDto   = z.infer<typeof questionSchema>;
