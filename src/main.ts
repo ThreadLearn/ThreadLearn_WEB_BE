@@ -10,7 +10,7 @@ import { AppModule } from './app/app.module';
 import { connectToDatabase } from './configs/db';
 import { env } from './configs/env';
 import { logger } from './configs/logger';
-import { createSwaggerConfig } from './swagger/config';
+import { createSwaggerConfig, setupSwagger } from './swagger/config';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
@@ -37,12 +37,11 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
     })
-  );
+  ); 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  const swaggerDocument = SwaggerModule.createDocument(app, createSwaggerConfig());
-  SwaggerModule.setup('api/docs', app, swaggerDocument);
-
+  setupSwagger(app); // Set up Swagger documentation
+  
   await app.listen(env.PORT, '0.0.0.0');
   logger.info(`ThreadLearn NestJS server is running at http://localhost:${env.PORT}`);
   logger.info(`Swagger UI is available at http://localhost:${env.PORT}/api/docs`);
