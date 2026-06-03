@@ -23,7 +23,12 @@ const optionalBoolean = z.preprocess((value) => {
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  MOCK_MODE: optionalBoolean.default(false),
+  DATABASE_URL: z.string().optional(),
+  MONGODB_USER: optionalNonEmptyString,
+  MONGODB_PASSWORD: optionalNonEmptyString,
+  MONGODB_HOST: optionalNonEmptyString,
+  MONGODB_DATABASE: optionalNonEmptyString,
   REDIS_URL: z.string().default('redis://localhost:6379'),
   RATE_LIMIT_LIMIT: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
@@ -59,4 +64,25 @@ if (!parsed.success) {
   throw new Error('Environment validation failed');
 }
 
-export const env = parsed.data;
+const buildMongoUrl = () => {
+  const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_DATABASE } = parsed.data;
+  if (!MONGODB_USER || !MONGODB_PASSWORD || !MONGODB_HOST || !MONGODB_DATABASE) {
+    return undefined;
+  }
+
+  const user = encodeURIComponent(MONGODB_USER);
+  const password = encodeURIComponent(MONGODB_PASSWORD);
+  return `mongodb+srv://${user}:${password}@${MONGODB_HOST}/${MONGODB_DATABASE}?retryWrites=true&w=majority`;
+};
+
+const databaseUrl = buildMongoUrl() ?? parsed.data.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.error('Environment validation failed: DATABASE_URL or full MONGODB_* config is required');
+  throw new Error('Environment validation failed');
+}
+
+export const env = {
+  ...parsed.data,
+  DATABASE_URL: databaseUrl,
+};
