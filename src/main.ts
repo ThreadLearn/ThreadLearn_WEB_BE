@@ -4,13 +4,12 @@ import express from 'express';
 import helmet from 'helmet';
 import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
-import { SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app/app.module';
 import { connectToDatabase } from './configs/db';
 import { env } from './configs/env';
 import { logger } from './configs/logger';
-import { createSwaggerConfig, setupSwagger } from './swagger/config';
+import {  setupSwagger } from './swagger/config';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
