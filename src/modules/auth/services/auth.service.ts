@@ -113,13 +113,7 @@ export class AuthService {
     });
 
     return {
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: sanitizeUser(user),
       ...tokens,
     };
   }
@@ -211,7 +205,13 @@ export class AuthService {
         role: string;
       };
     } catch (err) {
+      await RefreshToken.deleteOne({ _id: storedToken._id });
       throw new UnauthorizedError('Refresh token verification failed.');
+    }
+
+    if (storedToken.userId.toString() !== decoded.id) {
+      await RefreshToken.deleteOne({ _id: storedToken._id });
+      throw new UnauthorizedError('Refresh token user mismatch.');
     }
 
     const user = await User.findById(decoded.id);
@@ -224,9 +224,9 @@ export class AuthService {
     await RefreshToken.deleteOne({ _id: storedToken._id });
 
     const tokens = this.generateTokens({
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
     });
 
     const expiresAt = new Date();
@@ -234,7 +234,7 @@ export class AuthService {
 
     await RefreshToken.create({
       token: tokens.refreshToken,
-      userId: decoded.id as any,
+      userId: user._id,
       expiresAt,
     });
 
