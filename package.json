@@ -12,7 +12,8 @@
     "dev": "npm run start:dev",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "jest --passWithNoTests"
+    "test": "jest --passWithNoTests",
+    "seed": "ts-node src/database/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.2",
