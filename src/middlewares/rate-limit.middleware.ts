@@ -66,21 +66,32 @@ const extractUserIdFromAuth = (auth: string | undefined): string | undefined => 
   }
 };
 
+const normalizeIp = (value: string | undefined) =>
+  (value ?? '127.0.0.1').split(',')[0].trim().replace(/^::ffff:/, '');
+
+const isLoopbackIp = (ip: string) =>
+  ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+
 @Injectable()
 export class RateLimitMiddleware implements NestMiddleware {
   async use(req: Request, _res: Response, next: NextFunction) {
     const forwardedFor = req.headers['x-forwarded-for'];
-    const ip = Array.isArray(forwardedFor)
-      ? forwardedFor[0]
-      : forwardedFor || req.ip || '127.0.0.1';
+    const ip = normalizeIp(
+      Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor || req.ip
+    );
 
-    // Per-IP bucket (anonymous / pre-auth traffic).
-    await rateLimiter(`ip:${ip}`);
+    // Local development generates many parallel API calls during hot reloads
+    // and should never lock the developer out of the application.
+    if (env.NODE_ENV === 'development' && isLoopbackIp(ip)) {
+      next();
+      return;
+    }
 
-    // Per-user bucket (authenticated traffic). Prevents a single account from
-    // exhausting the shared IP quota or DoSing the API by opening many tabs.
     const userId = extractUserIdFromAuth(req.headers.authorization as string | undefined);
-    if (userId) await rateLimiter(`user:${userId}`);
+
+    // Authenticated requests use a per-user bucket. Anonymous traffic uses the
+    // client IP, so users behind the same NAT do not consume both quotas.
+    await rateLimiter(userId ? `user:${userId}` : `ip:${ip}`);
 
     next();
   }

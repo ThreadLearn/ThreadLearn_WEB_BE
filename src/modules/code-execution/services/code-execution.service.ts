@@ -193,7 +193,11 @@ export class CodeExecutionService {
     return resolved;
   }
 
-  static async executeCode(userId: string, payload: CodeSubmitPayload) {
+  static async executeCode(
+    userId: string,
+    payload: CodeSubmitPayload,
+    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT'
+  ) {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
     if (sourceCode.length > 50000) {
@@ -225,8 +229,8 @@ export class CodeExecutionService {
     if (payload.lessonId) {
       const lesson = await LessonsService.assertLessonAccess(payload.lessonId, {
         id: userId,
-        role: 'STUDENT',
-      });
+        role: userRole,
+      }, { allowPreview: true });
       courseId = courseId ?? lesson.courseId.toString();
     }
 

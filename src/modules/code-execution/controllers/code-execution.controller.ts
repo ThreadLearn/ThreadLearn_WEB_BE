@@ -28,7 +28,7 @@ export class CodeExecutionController {
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(runCodeSchema)) body: z.infer<typeof runCodeSchema>
   ) {
-    const result = await CodeExecutionService.executeCode(user.id, body);
+    const result = await CodeExecutionService.executeCode(user.id, body, user.role);
     return ApiResponse.success({ message: 'Code executed successfully.', data: result });
   }
 

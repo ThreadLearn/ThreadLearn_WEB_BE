@@ -5,6 +5,7 @@ import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { NotFoundError } from '../../../common/custom-error';
 import { EnrollmentsService } from '../services/enrollments.service';
 
 @ApiTags('Enrollments')
@@ -33,6 +34,7 @@ export class EnrollmentsController {
   @Get('me/progress/:courseId')
   async myProgress(@CurrentUser() user: AuthenticatedUser, @Param('courseId') courseId: string) {
     const enrollment = await EnrollmentsService.getMyCourseEnrollment(user.id, courseId);
+    if (!enrollment) throw new NotFoundError('Enrollment not found.');
     return ApiResponse.success({ message: 'Progress fetched.', data: enrollment });
   }
 

@@ -5,18 +5,34 @@ import { logger } from '../../../configs/logger';
 export class LeaderboardService {
   private static LEADERBOARD_KEY = 'leaderboard:xp';
 
+  static async invalidateCache() {
+    try {
+      const redis = getRedisClient();
+      if (redis.isOpen) await redis.del(this.LEADERBOARD_KEY);
+    } catch (err) {
+      logger.warn('Leaderboard cache invalidation failed.', err);
+    }
+  }
+
   static async syncLeaderboardToRedis() {
     try {
       const redis = getRedisClient();
       if (!redis.isOpen) return;
 
-      const stats = await UserStats.find().populate('userId', 'firstName lastName');
+      const stats = await UserStats.find().populate('userId', 'firstName lastName avatarUrl');
       for (const stat of stats) {
         if (stat.userId) {
-          const displayName = `${(stat.userId as any).firstName} ${(stat.userId as any).lastName}`;
+          const displayName =
+            `${(stat.userId as any).firstName ?? ''} ${(stat.userId as any).lastName ?? ''}`.trim() ||
+            'Student';
           await redis.zAdd(this.LEADERBOARD_KEY, {
             score: stat.xp,
-            value: JSON.stringify({ userId: stat.userId._id, displayName }),
+            value: JSON.stringify({
+              userId: stat.userId._id,
+              name: displayName,
+              avatarUrl: (stat.userId as any).avatarUrl,
+              level: stat.level,
+            }),
           });
         }
       }
@@ -46,9 +62,11 @@ export class LeaderboardService {
             const parsed = JSON.parse(item.value);
             return {
               rank: index + 1,
-              userId: parsed.userId,
-              displayName: parsed.displayName,
-              xp: item.score,
+              userId: String(parsed.userId ?? ''),
+              name: parsed.name ?? parsed.displayName ?? 'Student',
+              avatarUrl: parsed.avatarUrl,
+              level: Number(parsed.level) || Math.floor(item.score / 1000) + 1,
+              xp: Number(item.score) || 0,
             };
           });
         }
@@ -58,18 +76,20 @@ export class LeaderboardService {
     }
 
     const stats = await UserStats.find()
-      .populate('userId', 'firstName lastName')
+      .populate('userId', 'firstName lastName avatarUrl')
       .sort({ xp: -1 })
       .limit(limit);
 
     return stats.map((stat, index) => {
       const displayName = stat.userId
-        ? `${(stat.userId as any).firstName} ${(stat.userId as any).lastName}`
-        : 'Unknown User';
+        ? `${(stat.userId as any).firstName ?? ''} ${(stat.userId as any).lastName ?? ''}`.trim()
+        : '';
       return {
         rank: index + 1,
-        userId: stat.userId ? stat.userId._id : stat._id,
-        displayName,
+        userId: String(stat.userId ? (stat.userId as any)._id : stat._id),
+        name: displayName || 'Student',
+        avatarUrl: stat.userId ? (stat.userId as any).avatarUrl : undefined,
+        level: stat.level ?? Math.floor(stat.xp / 1000) + 1,
         xp: stat.xp,
       };
     });

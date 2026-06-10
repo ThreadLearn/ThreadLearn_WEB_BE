@@ -7,6 +7,11 @@ import { User } from '../../auth/models/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CertificatesService } from '../../certificates/services/certificates.service';
+import {
+  COURSE_COMPLETION_XP,
+  LESSON_COMPLETION_XP,
+} from '../../gamification/constants';
+import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
 
 export class EnrollmentsService {
   static async enrollInCourse(userId: string, courseId: string) {
@@ -75,9 +80,10 @@ export class EnrollmentsService {
   }
 
   static async listMyEnrollments(userId: string) {
-    return Enrollment.find({ userId })
+    const enrollments = await Enrollment.find({ userId })
       .populate('courseId', 'title slug thumbnailUrl level language status isPremium totalLessons')
       .sort({ updatedAt: -1 });
+    return enrollments.filter((enrollment) => enrollment.courseId);
   }
 
   static async getMyResume(userId: string) {
@@ -89,9 +95,7 @@ export class EnrollmentsService {
   }
 
   static async getMyCourseEnrollment(userId: string, courseId: string) {
-    const enrollment = await Enrollment.findOne({ userId, courseId });
-    if (!enrollment) throw new NotFoundError('Enrollment not found.');
-    return enrollment;
+    return Enrollment.findOne({ userId, courseId });
   }
 
   static async markLessonComplete(userId: string, lessonId: string) {
@@ -132,7 +136,8 @@ export class EnrollmentsService {
     enrollment.progressPercent = enrollment.progress;
     enrollment.totalLessons = totalLessons;
 
-    if (enrollment.progress >= 100 && !enrollment.completed) {
+    const courseJustCompleted = enrollment.progress >= 100 && !enrollment.completed;
+    if (courseJustCompleted) {
       enrollment.completed = true;
       enrollment.completedAt = new Date();
       await CertificatesService.issueCertificate(userId, lesson.courseId.toString());
@@ -157,12 +162,41 @@ export class EnrollmentsService {
 
     await enrollment.save();
 
+    let xpRewarded = 0;
+    let stats = null;
+    if (!alreadyCompleted) {
+      xpRewarded =
+        LESSON_COMPLETION_XP + (courseJustCompleted ? COURSE_COMPLETION_XP : 0);
+      stats = await UserStats.findOneAndUpdate(
+        { userId },
+        {
+          $inc: {
+            xp: xpRewarded,
+            totalLessonsCompleted: 1,
+            coursesCompleted: courseJustCompleted ? 1 : 0,
+          },
+          $set: { lastActiveDate: new Date() },
+          $setOnInsert: { userId },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      stats.level = Math.floor(stats.xp / 1000) + 1;
+      if (stats.currentStreak < 1) stats.currentStreak = 1;
+      if (stats.highestStreak < stats.currentStreak) {
+        stats.highestStreak = stats.currentStreak;
+      }
+      await stats.save();
+      await LeaderboardService.invalidateCache();
+    }
+
     return {
       enrollment,
       totalLessons,
       completedLessons,
       progressPercent: enrollment.progress,
       courseCompleted: enrollment.completed,
+      xpRewarded,
+      stats,
     };
   }
 

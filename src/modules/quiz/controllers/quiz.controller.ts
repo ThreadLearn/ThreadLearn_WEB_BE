@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { AuthenticatedUser } from '../../../common/api-handler';
@@ -7,6 +7,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.service';
+import { QuizService } from '../services/quiz.service';
 
 const quizSubmitSchema = z.object({
   quizId: z.string().min(1, 'Quiz ID is required.'),
@@ -16,6 +17,22 @@ const quizSubmitSchema = z.object({
 @ApiTags('Quiz')
 @Controller('v1/quiz')
 export class QuizController {
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async getByLesson(@Query('lessonId') lessonId: string) {
+    const quiz = await QuizService.getQuizByLesson(lessonId);
+    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: quiz });
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async getById(@Param('id') id: string) {
+    const quiz = await QuizService.getQuizById(id);
+    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: quiz });
+  }
+
   @Post('submit')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -29,7 +46,7 @@ export class QuizController {
     return ApiResponse.success({
       message: result.passed
         ? 'Congratulations! You passed the quiz successfully.'
-        : 'Attempt recorded. You did not reach the 80% passing threshold yet.',
+        : 'Attempt recorded. You did not reach the required passing score yet.',
       data: result,
     });
   }

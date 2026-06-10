@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IQuestion {
+  _id?: mongoose.Types.ObjectId;
   questionText: string;
   options: string[];
   correctAnswerIndex: number;
@@ -10,6 +11,8 @@ export interface IQuiz extends Document {
   lessonId: mongoose.Types.ObjectId;
   title: string;
   xpReward: number;
+  timeLimit: number;
+  passingScore: number;
   questions: IQuestion[];
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +23,8 @@ const QuizSchema: Schema<IQuiz> = new Schema(
     lessonId: { type: Schema.Types.ObjectId, ref: 'Lesson', required: true, index: true },
     title: { type: String, required: true, trim: true },
     xpReward: { type: Number, default: 100 },
+    timeLimit: { type: Number, default: 1800, min: 0 },
+    passingScore: { type: Number, default: 80, min: 0, max: 100 },
     questions: [
       {
         questionText: { type: String, required: true },

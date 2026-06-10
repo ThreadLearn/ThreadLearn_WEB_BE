@@ -10,7 +10,8 @@ export class NotesService {
 
   static async listByLesson(userId: string, lessonId: string) {
     await this.assertLessonAccess(userId, lessonId);
-    return Note.find({ userId, lessonId }).sort({ updatedAt: -1 });
+    const latest = await Note.findOne({ userId, lessonId }).sort({ updatedAt: -1 });
+    return latest ? [latest] : [];
   }
 
   static async upsert(userId: string, input: { lessonId: string; noteText: string; codeSnippet?: string }) {
@@ -25,7 +26,7 @@ export class NotesService {
           codeSnippet: input.codeSnippet,
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true, sort: { updatedAt: -1 } }
     );
     return note;
   }
