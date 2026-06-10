@@ -3,6 +3,7 @@ import { Quiz } from '../../quiz/models/quiz.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { Notification } from '../../notifications/models/notification.model';
 import { NotFoundError } from '../../../common/custom-error';
+import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
 
 export class QuizAttemptsService {
   async submitAttempt(userId: string, quizId: string, answers: Record<string, number>) {
@@ -15,13 +16,16 @@ export class QuizAttemptsService {
     let correctCount = 0;
 
     questions.forEach((question, index) => {
-      const userAnswer = answers[index.toString()];
+      const questionId = question._id?.toString();
+      const userAnswer =
+        (questionId ? answers[questionId] : undefined) ??
+        answers[index.toString()];
       if (userAnswer === question.correctAnswerIndex) {
         correctCount++;
       }
     });
 
-    const passingThreshold = quiz.passingScorePercent !== undefined ? quiz.passingScorePercent : 80;
+    const passingThreshold = quiz.passingScorePercent ?? quiz.passingScore ?? 80;
     const score = Math.round((correctCount / questions.length) * 100);
     const passed = score >= passingThreshold;
 
@@ -59,6 +63,7 @@ export class QuizAttemptsService {
         stats.lastActiveDate = now;
         stats.level = Math.floor(stats.xp / 1000) + 1;
         await stats.save();
+        await LeaderboardService.invalidateCache();
       }
 
       await Notification.create({

@@ -1,48 +1,59 @@
-// src/modules/quiz/services/quiz.service.ts
-
+import mongoose from 'mongoose';
+import { BadRequestError, NotFoundError } from '../../../common/custom-error';
 import { Quiz } from '../models/quiz.model';
-import { NotFoundError, BadRequestError } from '../../../common/custom-error';
 import { CreateQuizDto, UpdateQuizDto } from '../schemas/quiz.schema';
 
 export class QuizService {
-
-  // ─── Student ───────────────────────────────────────────────
   async getQuizByLesson(lessonId: string) {
-    const quiz = await Quiz.findOne({ lessonId });
+    this.assertObjectId(lessonId, 'lesson');
+    const quiz = await Quiz.findOne({ lessonId }).lean();
     if (!quiz) throw new NotFoundError('Quiz not found for this lesson.');
-    return quiz;
+    return this.toStudentQuiz(quiz);
   }
 
-  // ─── UC36-1: Admin tạo quiz ────────────────────────────────
   async createQuiz(dto: CreateQuizDto) {
-    const existing = await Quiz.findOne({ lessonId: dto.lessonId });
+    this.assertObjectId(dto.lessonId, 'lesson');
+    const existing = await Quiz.exists({ lessonId: dto.lessonId });
     if (existing) throw new BadRequestError('Quiz already exists for this lesson.');
-    return await Quiz.create(dto);
+    return Quiz.create(dto);
   }
 
-  // ─── UC36-2: Admin cập nhật quiz ──────────────────────────
   async updateQuiz(quizId: string, dto: UpdateQuizDto) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findByIdAndUpdate(
       quizId,
-      { $set: dto },   // dùng $set tránh ghi đè toàn bộ document
+      { $set: dto },
       { new: true, runValidators: true }
     );
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
-  // ─── UC36-3: Admin xem chi tiết quiz ──────────────────────
   async getQuizById(quizId: string) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findById(quizId).lean();
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
-  // ─── UC36-4: Admin xóa quiz ───────────────────────────────
   async deleteQuiz(quizId: string) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findByIdAndDelete(quizId).lean();
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
+  }
+
+  private assertObjectId(id: string, resource: string) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestError(`Invalid ${resource} id.`);
+    }
+  }
+
+  private toStudentQuiz(quiz: any) {
+    return {
+      ...quiz,
+      questions: quiz.questions.map(({ correctAnswerIndex: _answer, ...question }: any) => question),
+    };
   }
 }
 

@@ -1,0 +1,48 @@
+import mongoose, { Schema, Document, Model, Types } from 'mongoose';
+
+export type CommentTargetType = 'COURSE' | 'LESSON';
+export type CommentStatus     = 'active' | 'hidden' | 'deleted';
+
+export interface IComment extends Document {
+  targetType: CommentTargetType;
+  targetId:   Types.ObjectId | string;
+  lessonId?:  Types.ObjectId;
+  courseId?:  Types.ObjectId;
+  userId:     Types.ObjectId;
+  parentId?:  Types.ObjectId | null;
+  content:    string;
+  status:     CommentStatus;
+  isEdited:   boolean;
+  editedAt?:  Date;
+  createdAt:  Date;
+  updatedAt:  Date;
+  deletedAt?: Date;
+  reactionCount?: number;
+  mentionUserIds?: Types.ObjectId[];
+}
+
+const CommentSchema: Schema<IComment> = new Schema(
+  {
+    targetType: { type: String, enum: ['COURSE', 'LESSON'], required: true },
+    targetId:   { type: Schema.Types.ObjectId, required: true, index: true },
+    lessonId:   { type: Schema.Types.ObjectId, ref: 'Lesson', index: true },
+    courseId:   { type: Schema.Types.ObjectId, ref: 'Course', index: true },
+    userId:     { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    parentId:   { type: Schema.Types.ObjectId, ref: 'Comment', default: null },
+    content:    { type: String, required: true, trim: true, maxlength: 2000 },
+    status:     { type: String, enum: ['active', 'hidden', 'deleted'], default: 'active' },
+    isEdited:   { type: Boolean, default: false },
+    editedAt:   { type: Date },
+    deletedAt:  { type: Date },
+    reactionCount: { type: Number, default: 0, min: 0 },
+    mentionUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  },
+  { timestamps: true },
+);
+
+CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, createdAt: -1 });
+
+export const Comment: Model<IComment> =
+  mongoose.models.Comment || mongoose.model<IComment>('Comment', CommentSchema);
+export { CommentSchema };
+export default Comment;
