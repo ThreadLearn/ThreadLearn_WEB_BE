@@ -80,6 +80,19 @@ export class QuizController {
     });
   }
 
+  // ─── UC36-5: Admin xem danh sách quiz ───────────────────
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('BearerAuth')
+  async listQuizzes() {
+    const quizzes = await this.quizService.getAllQuizzes();
+    return ApiResponse.success({
+      message: 'Quizzes fetched successfully.',
+      data: quizzes,
+    });
+  }
+
   // ─── Student: lấy quiz theo lesson ───────────────────────
   @Get('lesson/:lessonId')
   @UseGuards(JwtAuthGuard)
