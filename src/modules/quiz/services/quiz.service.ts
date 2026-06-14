@@ -4,7 +4,7 @@ import { isValidObjectId } from 'mongoose';
 import { Quiz } from '../models/quiz.model';
 import { Lesson } from '@/database/models';
 import { NotFoundError, BadRequestError } from '../../../common/custom-error';
-import { CreateQuizDto, UpdateQuizDto } from '../schemas/quiz.schema';
+import { CreateQuizDto, QuestionDto, UpdateQuizDto } from '../schemas/quiz.schema';
 
 export class QuizService {
   // ════════════════════════════════════════════════════════════
@@ -54,6 +54,25 @@ export class QuizService {
   // ─── UC36-5: Xem danh sách quiz ────────────────────────────
   async getAllQuizzes() {
     return await Quiz.find().lean();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  UC37 — Add Question (Admin)
+  // ════════════════════════════════════════════════════════════
+
+  // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
+  async addQuestion(quizId: string, question: QuestionDto) {
+    if (!isValidObjectId(quizId)) {
+      throw new BadRequestError('Invalid quiz ID.');
+    }
+
+    const quiz = await Quiz.findByIdAndUpdate(
+      quizId,
+      { $push: { questions: question } },
+      { new: true, runValidators: true }
+    );
+    if (!quiz) throw new NotFoundError('Quiz not found.');
+    return quiz;
   }
 
   // ════════════════════════════════════════════════════════════
