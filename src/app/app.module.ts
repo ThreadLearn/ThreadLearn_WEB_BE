@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RateLimitMiddleware } from '../middlewares/rate-limit.middleware';
 import { SocketGateway } from '../socket';
 import { AdminModule } from '../modules/admin/admin.module';
@@ -18,10 +18,17 @@ import { QuizModule } from '../modules/quiz/quiz.module';
 import { QuizAttemptsModule } from '../modules/quiz-attempts/quiz-attempts.module';
 import { UsersModule } from '../modules/users/users.module';
 import { AppController } from './app.controller';
+import { MongooseModule } from '@nestjs/mongoose';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        uri: config.get<string>('DATABASE_URL'),
+      }),
+    }),
     AdminModule,
     AIModule,
     AnalyticsModule,
