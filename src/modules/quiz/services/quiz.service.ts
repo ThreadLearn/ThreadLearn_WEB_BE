@@ -1,90 +1,145 @@
 // src/modules/quiz/services/quiz.service.ts
 
-import { isValidObjectId } from 'mongoose';
-import { Quiz } from '../models/quiz.model';
-import { Lesson } from '@/database/models';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { FilterQuery, Model, Types, isValidObjectId } from 'mongoose';
+import { Quiz, QuizDocument } from '../schemas/quiz.schema';
 import { NotFoundError, BadRequestError } from '../../../common/custom-error';
-import { CreateQuizDto, QuestionDto, UpdateQuizDto } from '../schemas/quiz.schema';
+import { CreateQuizDto, QuestionDto, QueryQuizDto, UpdateQuizDto } from '../dto';
+import { Lesson, LessonDocument } from '@/modules/lessons/schemas/lesson.schema';
+import { PaginatedResult } from '../../../common/interfaces/paginated-result.interface';
 
+@Injectable()
 export class QuizService {
+  constructor(
+    @InjectModel(Quiz.name) private readonly quizModel: Model<QuizDocument>,
+    @InjectModel(Lesson.name) private readonly lessonModel: Model<LessonDocument>,
+  ) {}
+
+  private assertObjectId(id: string, label = 'ID'): void {
+    if (!isValidObjectId(id)) {
+      throw new BadRequestError(`Invalid ${label}.`);
+    }
+  }
+
   // ════════════════════════════════════════════════════════════
   //  UC36 — Admin Quiz CRUD
   // ════════════════════════════════════════════════════════════
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
-  async createQuiz(dto: CreateQuizDto) {
-    if (!isValidObjectId(dto.lessonId)) {
-      throw new BadRequestError('Invalid lesson ID.');
-    }
+  async createQuiz(dto: CreateQuizDto, userId: string): Promise<QuizDocument> {
+    this.assertObjectId(dto.lessonId, 'lesson ID');
+    this.assertObjectId(userId, 'user ID');
 
-    const lesson = await Lesson.findById(dto.lessonId);
+    const lesson = await this.lessonModel.findById(dto.lessonId);
     if (!lesson) throw new NotFoundError('Lesson not found.');
 
-    const existing = await Quiz.findOne({ lessonId: dto.lessonId });
+    const existing = await this.quizModel.findOne({
+      lessonId: dto.lessonId,
+      isDeleted: { $ne: true },
+    });
     if (existing) throw new BadRequestError('Quiz already exists for this lesson.');
 
-    return await Quiz.create(dto);
+    return this.quizModel.create({
+      ...dto,
+      createdBy: new Types.ObjectId(userId),
+    });
   }
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
-  async updateQuiz(quizId: string, dto: UpdateQuizDto) {
-    const quiz = await Quiz.findByIdAndUpdate(
-      quizId,
-      { $set: dto }, // dùng $set tránh ghi đè toàn bộ document
-      { new: true, runValidators: true }
+  async updateQuiz(quizId: string, dto: UpdateQuizDto): Promise<QuizDocument> {
+    this.assertObjectId(quizId, 'quiz ID');
+
+    const quiz = await this.quizModel.findOneAndUpdate(
+      { _id: quizId, isDeleted: { $ne: true } },
+      { $set: dto },
+      { new: true, runValidators: true },
     );
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
   // ─── UC36-3: Xem chi tiết quiz ─────────────────────────────
-  async getQuizById(quizId: string) {
-    const quiz = await Quiz.findById(quizId).lean();
+  async getQuizById(quizId: string): Promise<QuizDocument> {
+    this.assertObjectId(quizId, 'quiz ID');
+
+    const quiz = await this.quizModel.findOne({
+      _id: quizId,
+      isDeleted: { $ne: true },
+    });
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
-  // ─── UC36-4: Xóa quiz ──────────────────────────────────────
-  async deleteQuiz(quizId: string) {
-    const quiz = await Quiz.findByIdAndDelete(quizId).lean();
+  // ─── UC36-4: Xóa quiz (soft-delete) ────────────────────────
+  async deleteQuiz(quizId: string): Promise<QuizDocument> {
+    this.assertObjectId(quizId, 'quiz ID');
+
+    const quiz = await this.quizModel.findOneAndUpdate(
+      { _id: quizId, isDeleted: { $ne: true } },
+      { $set: { isDeleted: true } },
+      { new: true },
+    );
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
-  // ─── UC36-5: Xem danh sách quiz ────────────────────────────
-  async getAllQuizzes() {
-    return await Quiz.find().lean();
+  // ─── UC36-5: Xem danh sách quiz (pagination + filter) ──────
+  async getAllQuizzes(query: QueryQuizDto): Promise<PaginatedResult<QuizDocument>> {
+    const { page, limit, search, lessonId, status } = query;
+
+    const filter: FilterQuery<QuizDocument> = { isDeleted: { $ne: true } };
+
+    if (lessonId) {
+      this.assertObjectId(lessonId, 'lesson ID');
+      filter.lessonId = new Types.ObjectId(lessonId);
+    }
+    if (status) filter.status = status;
+    if (search) filter.title = { $regex: search, $options: 'i' };
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.quizModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      this.quizModel.countDocuments(filter),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 0,
+    };
   }
 
   // ════════════════════════════════════════════════════════════
   //  UC37 — Add Question (Admin)
   // ════════════════════════════════════════════════════════════
 
-  // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
-  async addQuestion(quizId: string, question: QuestionDto) {
-    if (!isValidObjectId(quizId)) {
-      throw new BadRequestError('Invalid quiz ID.');
-    }
+  async addQuestion(quizId: string, question: QuestionDto): Promise<QuizDocument> {
+    this.assertObjectId(quizId, 'quiz ID');
 
-    const quiz = await Quiz.findByIdAndUpdate(
-      quizId,
+    const quiz = await this.quizModel.findOneAndUpdate(
+      { _id: quizId, isDeleted: { $ne: true } },
       { $push: { questions: question } },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
   }
 
-  // ════════════════════════════════════════════════════════════
-  //  Student
-  // ════════════════════════════════════════════════════════════
+  // ─── Student: lấy quiz theo lesson ─────────────────────────
+  // NOTE: chưa sanitize correctAnswerIndex / chưa filter status=PUBLISHED
+  // (ngoài phạm vi UC36/37 — sẽ làm khi tới student view).
+  async getQuizByLesson(lessonId: string): Promise<QuizDocument> {
+    this.assertObjectId(lessonId, 'lesson ID');
 
-  // ─── Lấy quiz theo lesson ──────────────────────────────────
-  async getQuizByLesson(lessonId: string) {
-    const quiz = await Quiz.findOne({ lessonId });
+    const quiz = await this.quizModel.findOne({
+      lessonId,
+      isDeleted: { $ne: true },
+    });
     if (!quiz) throw new NotFoundError('Quiz not found for this lesson.');
     return quiz;
   }
 }
-
-export default QuizService;

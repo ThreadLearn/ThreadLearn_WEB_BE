@@ -1,83 +1,100 @@
 // src/modules/quiz/schemas/quiz.schema.ts
 
-import { z } from '../../../common/zod/z';
-import { registry } from '../../../common/zod/openapi.registry';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { QuizStatus } from '../enums/quiz-status.enum';
+import { QUIZ_DEFAULTS, QUIZ_LIMITS } from '../constants/quiz.constant';
 
-// ─── Question Schema ───────────────────────────────────────────
-const questionSchema = z.object({
-  questionText: z.string()
-    .min(1, 'Question text is required.')
-    .openapi({ example: 'What is a race condition?' }),
-  options: z
-    .array(z.string().min(1, 'Option cannot be empty.'))
-    .min(2, 'At least 2 options are required.')
-    .max(6, 'Maximum 6 options allowed.')
-    .openapi({ example: ['Option A', 'Option B', 'Option C'] }),
-  correctAnswerIndex: z.number()
-    .int()
-    .min(0, 'Index must be >= 0')
-    .openapi({ example: 0 }),
-}).refine(
-  (q) => q.correctAnswerIndex < q.options.length,
-  { message: 'correctAnswerIndex must be less than options length.' }
-);
+export type QuizDocument = HydratedDocument<Quiz>;
 
-// ─── Create Quiz Schema (Admin) ────────────────────────────────
-export const createQuizSchema = z.object({
-  lessonId: z.string()
-    .min(1, 'Lesson ID is required.')
-    .openapi({ example: '665f1b2c3d4e5f6a7b8c9d0e' }),
-  title: z.string()
-    .min(1, 'Title is required.')
-    .max(255)
-    .openapi({ example: 'JavaScript Event Loop Quiz' }),
-  description: z.string()
-    .optional()
-    .openapi({ example: 'Test your knowledge of async JS.' }),
-  passingScorePercent: z.number().int().min(0).max(100).default(80)
-    .openapi({ example: 80 }),
-  timeLimitSeconds: z.number().int().positive().optional()
-    .openapi({ example: 300 }),
-  xpReward: z.number().int().positive().default(100)
-    .openapi({ example: 100 }),
-  questions: z.array(questionSchema)
-    .min(1, 'Quiz must have at least 1 question.'),
-}).openapi('CreateQuizDto');
+// ─── Question Sub-Schema ───────────────────────────────────────
+@Schema({ _id: true })
+export class Question {
+  @Prop({ required: true, trim: true })
+  questionText!: string;
 
-// ─── Update Quiz Schema (Admin) ────────────────────────────────
-// Schema riêng — KHÔNG dùng createQuizSchema.partial()
-// vì partial() cho phép questions: [] (mảng rỗng) pass validation
-export const updateQuizSchema = z.object({
-  title: z.string().min(1).max(255).optional()
-    .openapi({ example: 'Updated Quiz Title' }),
-  description: z.string().optional(),
-  passingScorePercent: z.number().int().min(0).max(100).optional()
-    .openapi({ example: 70 }),
-  timeLimitSeconds: z.number().int().positive().optional(),
-  xpReward: z.number().int().positive().optional(),
-  questions: z.array(questionSchema).min(1).optional(),
-}).openapi('UpdateQuizDto');
+  @Prop({
+    type: [String],
+    required: true,
+    validate: [
+      {
+        validator: (v: string[]) =>
+          Array.isArray(v) &&
+          v.length >= QUIZ_LIMITS.OPTIONS_MIN &&
+          v.length <= QUIZ_LIMITS.OPTIONS_MAX,
+        message: `options must contain between ${QUIZ_LIMITS.OPTIONS_MIN} and ${QUIZ_LIMITS.OPTIONS_MAX} items.`,
+      },
+    ],
+  })
+  options!: string[];
 
-// ─── Submit Quiz Schema (Student) ─────────────────────────────
-export const quizSubmitSchema = z.object({
-  quizId: z.string()
-    .min(1, 'Quiz ID is required.')
-    .openapi({ example: '665f1b2c3d4e5f6a7b8c9d0e' }),
-  answers: z.record(z.coerce.number())
-    .openapi({ example: { '0': 1, '1': 2, '2': 0 } }),
-}).openapi('QuizSubmitDto');
+  @Prop({ required: true, min: QUIZ_LIMITS.CORRECT_ANSWER_INDEX_MIN })
+  correctAnswerIndex!: number;
+}
 
-// ─── Add Question Schema (UC37) ────────────────────────────
-export const addQuestionSchema = questionSchema.openapi('AddQuestionDto');
+export const QuestionSchema = SchemaFactory.createForClass(Question);
 
-// ─── Đăng ký vào Swagger registry ─────────────────────────────
-registry.register('CreateQuizDto', createQuizSchema);
-registry.register('UpdateQuizDto', updateQuizSchema);
-registry.register('QuizSubmitDto', quizSubmitSchema);
-registry.register('AddQuestionDto', addQuestionSchema);
+// Defense-in-depth: correctAnswerIndex < options.length
+QuestionSchema.pre('validate', function (next) {
+  const doc = this as unknown as Question;
+  if (doc.options && doc.correctAnswerIndex >= doc.options.length) {
+    return next(new Error('correctAnswerIndex must be less than options length.'));
+  }
+  next();
+});
 
-// ─── Types ────────────────────────────────────────────────────
-export type CreateQuizDto = z.infer<typeof createQuizSchema>;
-export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
-export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
-export type QuestionDto   = z.infer<typeof questionSchema>;
+// ─── Quiz Schema ───────────────────────────────────────────────
+@Schema({ timestamps: true })
+export class Quiz {
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Lesson',
+    required: true,
+    index: true,
+    unique: true,
+  })
+  lessonId!: Types.ObjectId;
+
+  @Prop({ required: true, trim: true, maxlength: QUIZ_LIMITS.TITLE_MAX })
+  title!: string;
+
+  @Prop()
+  description?: string;
+
+  @Prop({
+    default: QUIZ_DEFAULTS.PASSING_SCORE_PERCENT,
+    min: QUIZ_LIMITS.PASSING_SCORE_MIN,
+    max: QUIZ_LIMITS.PASSING_SCORE_MAX,
+  })
+  passingScorePercent!: number;
+
+  @Prop()
+  timeLimitSeconds?: number;
+
+  @Prop({ default: QUIZ_DEFAULTS.XP_REWARD, min: QUIZ_LIMITS.XP_REWARD_MIN })
+  xpReward!: number;
+
+  @Prop({
+    type: [QuestionSchema],
+    required: true,
+    validate: [
+      {
+        validator: (v: unknown[]) =>
+          Array.isArray(v) && v.length >= QUIZ_LIMITS.QUESTIONS_MIN,
+        message: `Quiz must have at least ${QUIZ_LIMITS.QUESTIONS_MIN} question.`,
+      },
+    ],
+  })
+  questions!: Question[];
+
+  @Prop({ type: String, enum: QuizStatus, default: QuizStatus.DRAFT, index: true })
+  status!: QuizStatus;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  createdBy!: Types.ObjectId;
+
+  @Prop({ default: false, index: true })
+  isDeleted!: boolean;
+}
+
+export const QuizSchema = SchemaFactory.createForClass(Quiz);

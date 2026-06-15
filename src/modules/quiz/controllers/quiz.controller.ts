@@ -1,6 +1,6 @@
 import {
   Body, Controller, Delete, Get, HttpCode,
-  Param, Post, Put, UseGuards
+  Param, Post, Put, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -11,26 +11,37 @@ import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
 import { QuizService } from '../services/quiz.service';
 import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.service';
-import { createQuizSchema, quizSubmitSchema, CreateQuizDto, updateQuizSchema, UpdateQuizDto, addQuestionSchema, QuestionDto } from '../schemas/quiz.schema';
+import {
+  addQuestionSchema,
+  CreateQuizDto,
+  createQuizSchema,
+  QueryQuizDto,
+  queryQuizSchema,
+  QuestionDto,
+  quizSubmitSchema,
+  UpdateQuizDto,
+  updateQuizSchema,
+} from '../dto';
 
 @ApiTags('Quiz')
 @Controller('v1/quiz')
 export class QuizController {
-  // constructor phải inject đủ
   constructor(
     private readonly quizService: QuizService,
     private readonly quizAttemptsService: QuizAttemptsService,
-  ) { }
-  // ✅ UC36 — Admin tạo quiz
+  ) {}
+
+  // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
   @HttpCode(201)
   @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
   async createQuiz(
-    @Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto,
   ) {
-    const quiz = await this.quizService.createQuiz(dto);
+    const quiz = await this.quizService.createQuiz(dto, user.id);
     return ApiResponse.success({
       message: 'Quiz created successfully.',
       data: quiz,
@@ -45,7 +56,7 @@ export class QuizController {
   @ApiBearerAuth('BearerAuth')
   async addQuestion(
     @Param('quizId') quizId: string,
-    @Body(new ZodValidationPipe(addQuestionSchema)) question: QuestionDto
+    @Body(new ZodValidationPipe(addQuestionSchema)) question: QuestionDto,
   ) {
     const quiz = await this.quizService.addQuestion(quizId, question);
     return ApiResponse.success({
@@ -61,7 +72,7 @@ export class QuizController {
   @ApiBearerAuth('BearerAuth')
   async updateQuiz(
     @Param('quizId') quizId: string,
-    @Body(new ZodValidationPipe(updateQuizSchema)) dto: UpdateQuizDto
+    @Body(new ZodValidationPipe(updateQuizSchema)) dto: UpdateQuizDto,
   ) {
     const quiz = await this.quizService.updateQuiz(quizId, dto);
     return ApiResponse.success({
@@ -83,7 +94,7 @@ export class QuizController {
     });
   }
 
-  // ─── UC36-4: Admin xóa quiz ──────────────────────────────
+  // ─── UC36-4: Admin xóa quiz (soft-delete) ────────────────
   @Delete(':quizId')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -97,20 +108,22 @@ export class QuizController {
     });
   }
 
-  // ─── UC36-5: Admin xem danh sách quiz ───────────────────
+  // ─── UC36-5: Admin xem danh sách quiz (paginated) ────────
   @Get()
   @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
-  async listQuizzes() {
-    const quizzes = await this.quizService.getAllQuizzes();
+  async listQuizzes(
+    @Query(new ZodValidationPipe(queryQuizSchema)) query: QueryQuizDto,
+  ) {
+    const result = await this.quizService.getAllQuizzes(query);
     return ApiResponse.success({
       message: 'Quizzes fetched successfully.',
-      data: quizzes,
+      data: result,
     });
   }
 
-  // ─── Student: lấy quiz theo lesson ───────────────────────
+  // ─── Student: lấy quiz theo lesson (NGOÀI PHẠM VI — không sửa) ─
   @Get('lesson/:lessonId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('BearerAuth')
@@ -119,7 +132,7 @@ export class QuizController {
     return ApiResponse.success({ data: quiz });
   }
 
-  // ─── Student: submit quiz ─────────────────────────────────
+  // ─── Student: submit quiz (NGOÀI PHẠM VI — không sửa) ─────
   @Post('submit')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -127,10 +140,10 @@ export class QuizController {
   async submitAttempt(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(quizSubmitSchema))
-    body: { quizId: string; answers: Record<string, number> }
+    body: { quizId: string; answers: Record<string, number> },
   ) {
     const result = await this.quizAttemptsService.submitAttempt(
-      user.id, body.quizId, body.answers
+      user.id, body.quizId, body.answers,
     );
     return ApiResponse.success({
       message: result.passed
