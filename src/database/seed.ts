@@ -1,24 +1,60 @@
 import mongoose from 'mongoose';
 import connectToDatabase from '../configs/db';
 import { logger } from '../configs/logger';
+
+// ─── Models còn Mongoose THUẦN — import qua aggregator như cũ ───────
 import {
-  User,
   UserStats,
   Course,
   Lesson,
-  Quiz,
   Enrollment,
   QuizAttempt,
-  RefreshToken,
   Notification,
   AIHistory,
 } from './models';
+
+// ─── Models đã NestJS hóa — không còn ở aggregator. ─────────────────
+// Seed là script NGOÀI DI (không có @InjectModel) nên dựng Model thủ công
+// từ các file schemas/. Dùng pattern `mongoose.models.X || mongoose.model(...)`
+// để tránh OverwriteModelError nếu Mongoose runtime đã đăng ký model
+// (vd. khi seed chạy chung process với app).
+import {
+  User as UserClass,
+  UserSchema,
+  UserDocument,
+} from '../modules/auth/schemas/user.schema';
+import {
+  RefreshToken as RefreshTokenClass,
+  RefreshTokenSchema,
+  RefreshTokenDocument,
+} from '../modules/auth/schemas/refresh-token.schema';
+import {
+  Quiz as QuizClass,
+  QuizSchema,
+  QuizDocument,
+} from '../modules/quiz/schemas/quiz.schema';
+
+// Cast schema sang `any` để bypass TS conflict giữa kiểu Schema do
+// @nestjs/mongoose suy luận và kiểu Schema gốc của mongoose runtime.
+// Seed là script — không cần type-safety chặt ở lớp này.
+const User =
+  (mongoose.models[UserClass.name] as mongoose.Model<UserDocument>) ||
+  mongoose.model<UserDocument>(UserClass.name, UserSchema as any);
+
+const RefreshToken =
+  (mongoose.models[RefreshTokenClass.name] as mongoose.Model<RefreshTokenDocument>) ||
+  mongoose.model<RefreshTokenDocument>(RefreshTokenClass.name, RefreshTokenSchema as any);
+
+const Quiz =
+  (mongoose.models[QuizClass.name] as mongoose.Model<QuizDocument>) ||
+  mongoose.model<QuizDocument>(QuizClass.name, QuizSchema as any);
+
 import { hashPassword } from '../utils';
 
 async function seed() {
   try {
     logger.info('🚀 Database Seeding Tool Initializing...');
-    
+
     // Connect to Database
     await connectToDatabase();
     logger.info('🔌 Connected to MongoDB for seeding.');
@@ -121,7 +157,7 @@ async function seed() {
 
     // 6. Create Lessons
     logger.info('📖 Populating lessons for courses...');
-    
+
     // HTML/CSS Lessons
     const htmlLessons = await Lesson.create([
       {
@@ -170,7 +206,7 @@ async function seed() {
 
     // 7. Create Quizzes
     logger.info('🧠 Designing interactive quizzes...');
-    
+
     // CSS Selectors Quiz
     const cssQuiz = await Quiz.create({
       lessonId: htmlLessons[1]._id, // CSS Selectors lesson

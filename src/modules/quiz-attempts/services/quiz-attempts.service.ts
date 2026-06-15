@@ -1,12 +1,21 @@
-import { QuizAttempt } from '../models/quiz-attempt.model';
-import { Quiz } from '../../quiz/models/quiz.model';
-import { UserStats } from '../../gamification/models/user-stats.model';
-import { Notification } from '../../notifications/models/notification.model';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+
+import { Quiz, QuizDocument } from '../../quiz/schemas/quiz.schema';
+// Các model dưới đây CÒN MONGOOSE THUẦN — gọi static qua aggregator.
+// Sẽ chuyển sang DI khi migrate cụm tương ứng.
+import { QuizAttempt, UserStats, Notification } from '@/database/models';
 import { NotFoundError } from '../../../common/custom-error';
 
+@Injectable()
 export class QuizAttemptsService {
+  constructor(
+    @InjectModel(Quiz.name) private readonly quizModel: Model<QuizDocument>,
+  ) {}
+
   async submitAttempt(userId: string, quizId: string, answers: Record<string, number>) {
-    const quiz = await Quiz.findById(quizId);
+    const quiz = await this.quizModel.findById(quizId);
     if (!quiz) {
       throw new NotFoundError('Quiz not found.');
     }
@@ -78,4 +87,3 @@ export class QuizAttemptsService {
     };
   }
 }
-export default QuizAttemptsService;
