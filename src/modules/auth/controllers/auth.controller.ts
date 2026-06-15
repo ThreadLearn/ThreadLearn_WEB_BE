@@ -12,9 +12,11 @@ import { loginSchema, refreshTokenSchema, registerSchema } from '../validators/a
 @ApiTags('Auth')
 @Controller('v1/auth')
 export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
   @Post('register')
   async register(@Body(new ZodValidationPipe(registerSchema)) body: unknown) {
-    const result = await AuthService.register(body);
+    const result = await this.authService.register(body);
     return ApiResponse.success({
       message: 'User registered successfully.',
       data: result,
@@ -25,7 +27,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   async login(@Body(new ZodValidationPipe(loginSchema)) body: unknown) {
-    const result = await AuthService.login(body);
+    const result = await this.authService.login(body);
     return ApiResponse.success({
       message: 'Login successful.',
       data: result,
@@ -35,7 +37,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    const result = await AuthService.refresh(body.refreshToken);
+    const result = await this.authService.refresh(body.refreshToken);
     return ApiResponse.success({
       message: 'Tokens refreshed successfully.',
       data: result,
@@ -45,7 +47,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   async logout(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    await AuthService.logout(body.refreshToken);
+    await this.authService.logout(body.refreshToken);
     return ApiResponse.success({
       message: 'Logged out successfully.',
     });
@@ -64,5 +66,3 @@ export class AuthController {
     });
   }
 }
-
-export default AuthController;
