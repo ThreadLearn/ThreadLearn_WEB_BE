@@ -67,10 +67,14 @@ export const quizSubmitSchema = z.object({
     .openapi({ example: { '0': 1, '1': 2, '2': 0 } }),
 }).openapi('QuizSubmitDto');
 
+// ─── Add Question Schema (UC37) ────────────────────────────
+export const addQuestionSchema = questionSchema.openapi('AddQuestionDto');
+
 // ─── Đăng ký vào Swagger registry ─────────────────────────────
 registry.register('CreateQuizDto', createQuizSchema);
 registry.register('UpdateQuizDto', updateQuizSchema);
 registry.register('QuizSubmitDto', quizSubmitSchema);
+registry.register('AddQuestionDto', addQuestionSchema);
 
 // ─── Types ────────────────────────────────────────────────────
 export type CreateQuizDto = z.infer<typeof createQuizSchema>;

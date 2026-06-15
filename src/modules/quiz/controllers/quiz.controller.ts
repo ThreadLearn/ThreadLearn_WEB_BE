@@ -11,7 +11,7 @@ import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
 import { QuizService } from '../services/quiz.service';
 import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.service';
-import { createQuizSchema, quizSubmitSchema, CreateQuizDto, updateQuizSchema, UpdateQuizDto } from '../schemas/quiz.schema';
+import { createQuizSchema, quizSubmitSchema, CreateQuizDto, updateQuizSchema, UpdateQuizDto, addQuestionSchema, QuestionDto } from '../schemas/quiz.schema';
 
 @ApiTags('Quiz')
 @Controller('v1/quiz')
@@ -33,6 +33,23 @@ export class QuizController {
     const quiz = await this.quizService.createQuiz(dto);
     return ApiResponse.success({
       message: 'Quiz created successfully.',
+      data: quiz,
+    });
+  }
+
+  // ─── UC37: Admin thêm 1 câu hỏi vào quiz ─────────────────
+  @Post(':quizId/questions')
+  @HttpCode(201)
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('BearerAuth')
+  async addQuestion(
+    @Param('quizId') quizId: string,
+    @Body(new ZodValidationPipe(addQuestionSchema)) question: QuestionDto
+  ) {
+    const quiz = await this.quizService.addQuestion(quizId, question);
+    return ApiResponse.success({
+      message: 'Question added successfully.',
       data: quiz,
     });
   }
