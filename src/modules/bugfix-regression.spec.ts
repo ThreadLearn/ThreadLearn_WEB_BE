@@ -200,4 +200,25 @@ describe('reported bug regressions', () => {
     expect(result.passed).toBe(false);
     expect(result.isTimeout).toBe(true);
   });
+
+  it('retrieves user quiz attempts history successfully', async () => {
+    const mockAttempts = [{ _id: 'attempt-1', score: 100 }];
+    const populateMock = jest.fn().mockResolvedValue(mockAttempts);
+    const sortMock = jest.fn().mockReturnValue({ populate: populateMock });
+    jest.spyOn(QuizAttempt, 'find').mockReturnValue({ sort: sortMock } as never);
+
+    const result = await new QuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
+    expect(result).toEqual(mockAttempts);
+    expect(QuizAttempt.find).toHaveBeenCalledWith({ userId: '507f1f77bcf86cd799439011' });
+  });
+
+  it('retrieves specific user quiz attempt by id successfully', async () => {
+    const mockAttempt = { _id: 'attempt-1', userId: '507f1f77bcf86cd799439011', score: 100 };
+    const populateMock = jest.fn().mockResolvedValue(mockAttempt);
+    jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ populate: populateMock } as never);
+
+    const result = await new QuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
+    expect(result).toEqual(mockAttempt);
+    expect(QuizAttempt.findOne).toHaveBeenCalledWith({ _id: '507f1f77bcf86cd799439012', userId: '507f1f77bcf86cd799439011' });
+  });
 });
