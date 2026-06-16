@@ -50,8 +50,6 @@ export class Quiz {
     type: Types.ObjectId,
     ref: 'Lesson',
     required: true,
-    index: true,
-    unique: true,
   })
   lessonId!: Types.ObjectId;
 
@@ -98,3 +96,13 @@ export class Quiz {
 }
 
 export const QuizSchema = SchemaFactory.createForClass(Quiz);
+
+// Partial unique index: chỉ áp ràng buộc unique cho quiz CHƯA bị soft-delete.
+// Quiz đã soft-delete (isDeleted: true) không tính vào ràng buộc → admin có thể
+// xóa quiz của một lesson rồi tạo lại quiz cho cùng lesson đó mà không đụng E11000.
+// Yêu cầu: mọi document active phải có isDeleted === false THẬT SỰ
+// (đảm bảo bởi @Prop({ default: false }) ở trên — document mới luôn có isDeleted: false).
+QuizSchema.index(
+  { lessonId: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
