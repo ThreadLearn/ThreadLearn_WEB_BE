@@ -14,6 +14,7 @@ import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.
 import {
   createQuizSchema, quizSubmitSchema, CreateQuizDto,
   updateQuizSchema, UpdateQuizDto, addQuestionSchema, QuestionDto,
+  updateQuestionSchema, UpdateQuestionDto,
 } from '../schemas/quiz.schema';
 
 @ApiTags('Quiz')
@@ -55,11 +56,17 @@ export class QuizController {
     return ApiResponse.success({ message: 'Question added successfully.', data: quiz });
   }
 
-  // ─── UC38: Admin sửa câu hỏi (SẮP THÊM) ──────────────────
-  // @Put(':quizId/questions/:questionId') ...
-
-  // ─── UC39: Admin xóa câu hỏi (SẮP THÊM) ──────────────────
-  // @Delete(':quizId/questions/:questionId') ...
+  // ─── UC38: Admin sửa câu hỏi ──────────────────────────────
+  @Put(':quizId/questions/:questionId')
+  @Roles('ADMIN')
+  async editQuestion(
+    @Param('quizId') quizId: string,
+    @Param('questionId') questionId: string,
+    @Body(new ZodValidationPipe(updateQuestionSchema)) dto: UpdateQuestionDto,
+  ) {
+    const quiz = await this.quizService.editQuestion(quizId, questionId, dto);
+    return ApiResponse.success({ message: 'Question updated successfully.', data: quiz });
+  }
 
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
