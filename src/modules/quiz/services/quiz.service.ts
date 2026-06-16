@@ -130,6 +130,42 @@ export class QuizService {
   }
 
   // ════════════════════════════════════════════════════════════
+  //  UC39 — Delete Question (Admin)
+  // ════════════════════════════════════════════════════════════
+
+  // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
+  async deleteQuestion(quizId: string, questionId: string) {
+    this.assertObjectId(quizId, 'quiz');
+    this.assertObjectId(questionId, 'question');
+
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) throw new NotFoundError('Quiz not found.');
+
+    // Kiểm tra câu hỏi tồn tại
+    const questionExists = quiz.questions.some(
+      (q) => q._id?.toString() === questionId,
+    );
+    if (!questionExists) {
+      throw new NotFoundError('Question not found in this quiz.');
+    }
+
+    // Không cho phép xóa câu hỏi cuối cùng — quiz phải có ít nhất 1 câu
+    if (quiz.questions.length <= 1) {
+      throw new BadRequestError(
+        'Cannot delete the last question. A quiz must have at least 1 question.',
+      );
+    }
+
+    const updated = await Quiz.findByIdAndUpdate(
+      quizId,
+      { $pull: { questions: { _id: questionId } } },
+      { new: true },
+    );
+
+    return updated;
+  }
+
+  // ════════════════════════════════════════════════════════════
   //  Student
   // ════════════════════════════════════════════════════════════
 
