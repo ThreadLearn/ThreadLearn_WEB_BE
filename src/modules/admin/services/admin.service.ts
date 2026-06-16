@@ -1,6 +1,33 @@
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { User } from '../../auth/models/user.model';
+import { EmailService } from '../../auth/services/email.service';
+import { assertUserCanAuthenticate, sanitizeUser } from '../../auth/utils/user-sanitizer';
 import { Course } from '../../courses/models/course.model';
-import { NotFoundError } from '../../../common/custom-error';
+import { UserStats } from '../../gamification/models/user-stats.model';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+
+type CreateStudentData = {
+  email: string;
+  password?: string;
+  firstName: string;
+  lastName: string;
+};
+
+type ListStudentsQuery = {
+  page: number;
+  limit: number;
+  search?: string;
+  isActive?: boolean;
+  isVerified?: boolean;
+};
+
+type UpdateStudentData = {
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+  isVerified?: boolean;
+};
 
 export class AdminService {
   /**
@@ -14,6 +41,121 @@ export class AdminService {
     ]);
 
     return { users, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  static async ensureActiveAdmin(adminId: string) {
+    const admin = await User.findById(adminId);
+    if (!admin) {
+      throw new ForbiddenError('Admin account not found.');
+    }
+
+    if (admin.role !== 'ADMIN') {
+      throw new ForbiddenError('You do not have permission to manage students.');
+    }
+
+    assertUserCanAuthenticate(admin);
+  }
+
+  static async createStudent(data: CreateStudentData) {
+    const existing = await User.findOne({ email: data.email });
+    if (existing) {
+      throw new BadRequestError('Email address is already in use.');
+    }
+
+    const generatedPassword = data.password ? null : this.generateTemporaryPassword();
+    const password = data.password || generatedPassword;
+    const passwordHash = await bcrypt.hash(password as string, 10);
+    const verifiedAt = new Date();
+
+    const user = await User.create({
+      email: data.email,
+      passwordHash,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: 'STUDENT',
+      isActive: true,
+      isVerified: true,
+      emailVerifiedAt: verifiedAt,
+    });
+
+    await UserStats.create({
+      userId: user._id,
+      xp: 0,
+      level: 1,
+    });
+
+    if (generatedPassword) {
+      await EmailService.sendStudentInvitationEmail({
+        email: user.email,
+        firstName: user.firstName,
+        temporaryPassword: generatedPassword,
+      });
+    }
+
+    return {
+      student: this.toSafeStudent(user),
+      temporaryPasswordSent: Boolean(generatedPassword),
+    };
+  }
+
+  static async listStudents(query: ListStudentsQuery) {
+    const filter: any = { role: 'STUDENT' };
+    if (query.isActive !== undefined) filter.isActive = query.isActive;
+    if (query.isVerified !== undefined) filter.isVerified = query.isVerified;
+
+    if (query.search) {
+      const searchRegex = new RegExp(this.escapeRegex(query.search), 'i');
+      filter.$or = [{ email: searchRegex }, { firstName: searchRegex }, { lastName: searchRegex }];
+    }
+
+    const skip = (query.page - 1) * query.limit;
+    const [students, total] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit),
+      User.countDocuments(filter),
+    ]);
+
+    return {
+      items: students.map((student) => this.toSafeStudent(student)),
+      meta: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+      },
+    };
+  }
+
+  static async updateStudent(studentId: string, data: UpdateStudentData) {
+    const student = await this.getStudentOrThrow(studentId);
+
+    if (data.firstName !== undefined) student.firstName = data.firstName;
+    if (data.lastName !== undefined) student.lastName = data.lastName;
+    if (data.avatarUrl !== undefined) student.avatarUrl = data.avatarUrl;
+    if (data.isVerified !== undefined) {
+      student.isVerified = data.isVerified;
+      student.emailVerifiedAt = data.isVerified ? student.emailVerifiedAt || new Date() : undefined;
+    }
+
+    await student.save();
+    return this.toSafeStudent(student);
+  }
+
+  static async lockStudent(studentId: string, lockedReason?: string) {
+    const student = await this.getStudentOrThrow(studentId);
+    student.isActive = false;
+    student.lockedAt = new Date();
+    student.lockedReason = lockedReason;
+    await student.save();
+    return this.toSafeStudent(student);
+  }
+
+  static async unlockStudent(studentId: string) {
+    const student = await this.getStudentOrThrow(studentId);
+    student.isActive = true;
+    student.lockedAt = undefined;
+    student.lockedReason = undefined;
+    await student.save();
+    return this.toSafeStudent(student);
   }
 
   /**
@@ -49,6 +191,31 @@ export class AdminService {
       throw new NotFoundError('User not found.');
     }
     return true;
+  }
+
+  private static async getStudentOrThrow(studentId: string) {
+    const student = await User.findById(studentId);
+    if (!student) {
+      throw new NotFoundError('Student not found.');
+    }
+
+    if (student.role !== 'STUDENT') {
+      throw new BadRequestError('Target user is not a student.');
+    }
+
+    return student;
+  }
+
+  private static generateTemporaryPassword() {
+    return crypto.randomBytes(12).toString('base64url');
+  }
+
+  private static escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private static toSafeStudent(user: any) {
+    return sanitizeUser(user);
   }
 }
 export default AdminService;

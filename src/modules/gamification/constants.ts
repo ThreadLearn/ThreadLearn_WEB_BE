@@ -1,0 +1,2 @@
+export const LESSON_COMPLETION_XP = 100;
+export const COURSE_COMPLETION_XP = 500;

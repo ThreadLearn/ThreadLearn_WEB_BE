@@ -8,6 +8,7 @@ export interface IUserStats extends Document {
   highestStreak: number;
   quizzesCompleted: number;
   coursesCompleted: number;
+  totalLessonsCompleted: number;
   lastActiveDate: Date;
   updatedAt: Date;
 }
@@ -21,6 +22,7 @@ const UserStatsSchema: Schema<IUserStats> = new Schema(
     highestStreak: { type: Number, default: 0 },
     quizzesCompleted: { type: Number, default: 0 },
     coursesCompleted: { type: Number, default: 0 },
+    totalLessonsCompleted: { type: Number, default: 0 },
     lastActiveDate: { type: Date, default: Date.now },
   },
   { timestamps: true }

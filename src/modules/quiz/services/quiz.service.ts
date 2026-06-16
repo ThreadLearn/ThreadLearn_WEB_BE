@@ -3,7 +3,7 @@
 import { isValidObjectId } from 'mongoose';
 import { Quiz } from '../models/quiz.model';
 import { Lesson } from '@/database/models';
-import { NotFoundError, BadRequestError } from '../../../common/custom-error';
+import { BadRequestError, NotFoundError } from '../../../common/custom-error';
 import { CreateQuizDto, QuestionDto, UpdateQuizDto } from '../schemas/quiz.schema';
 
 export class QuizService {
@@ -13,9 +13,7 @@ export class QuizService {
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
   async createQuiz(dto: CreateQuizDto) {
-    if (!isValidObjectId(dto.lessonId)) {
-      throw new BadRequestError('Invalid lesson ID.');
-    }
+    this.assertObjectId(dto.lessonId, 'lesson');
 
     const lesson = await Lesson.findById(dto.lessonId);
     if (!lesson) throw new NotFoundError('Lesson not found.');
@@ -28,6 +26,7 @@ export class QuizService {
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
   async updateQuiz(quizId: string, dto: UpdateQuizDto) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findByIdAndUpdate(
       quizId,
       { $set: dto }, // dùng $set tránh ghi đè toàn bộ document
@@ -39,6 +38,7 @@ export class QuizService {
 
   // ─── UC36-3: Xem chi tiết quiz ─────────────────────────────
   async getQuizById(quizId: string) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findById(quizId).lean();
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
@@ -46,6 +46,7 @@ export class QuizService {
 
   // ─── UC36-4: Xóa quiz ──────────────────────────────────────
   async deleteQuiz(quizId: string) {
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findByIdAndDelete(quizId).lean();
     if (!quiz) throw new NotFoundError('Quiz not found.');
     return quiz;
@@ -62,10 +63,7 @@ export class QuizService {
 
   // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
   async addQuestion(quizId: string, question: QuestionDto) {
-    if (!isValidObjectId(quizId)) {
-      throw new BadRequestError('Invalid quiz ID.');
-    }
-
+    this.assertObjectId(quizId, 'quiz');
     const quiz = await Quiz.findByIdAndUpdate(
       quizId,
       { $push: { questions: question } },
@@ -79,11 +77,28 @@ export class QuizService {
   //  Student
   // ════════════════════════════════════════════════════════════
 
-  // ─── Lấy quiz theo lesson ──────────────────────────────────
+  // ─── Lấy quiz theo lesson (ẩn correctAnswerIndex khỏi student) ─
   async getQuizByLesson(lessonId: string) {
-    const quiz = await Quiz.findOne({ lessonId });
+    this.assertObjectId(lessonId, 'lesson');
+    const quiz = await Quiz.findOne({ lessonId }).lean();
     if (!quiz) throw new NotFoundError('Quiz not found for this lesson.');
-    return quiz;
+    return this.toStudentQuiz(quiz);
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────
+  private assertObjectId(id: string, resource: string) {
+    if (!isValidObjectId(id)) {
+      throw new BadRequestError(`Invalid ${resource} id.`);
+    }
+  }
+
+  private toStudentQuiz(quiz: any) {
+    return {
+      ...quiz,
+      questions: quiz.questions.map(
+        ({ correctAnswerIndex: _answer, ...question }: any) => question
+      ),
+    };
   }
 }
 
