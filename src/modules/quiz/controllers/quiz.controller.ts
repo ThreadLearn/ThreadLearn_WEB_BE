@@ -120,9 +120,9 @@ export class QuizController {
   @HttpCode(200)
   async submit(
     @CurrentUser() user: AuthenticatedUser,
-    @Body(new ZodValidationPipe(quizSubmitSchema)) body: { quizId: string; answers: Record<string, number> },
+    @Body(new ZodValidationPipe(quizSubmitSchema)) body: { quizId: string; answers: Record<string, number>; startTime?: string },
   ) {
-    const result = await this.quizAttemptsService.submitAttempt(user.id, body.quizId, body.answers);
+    const result = await this.quizAttemptsService.submitAttempt(user.id, body.quizId, body.answers, body.startTime);
     return ApiResponse.success({
       message: result.passed
         ? 'Congratulations! You passed the quiz successfully.'

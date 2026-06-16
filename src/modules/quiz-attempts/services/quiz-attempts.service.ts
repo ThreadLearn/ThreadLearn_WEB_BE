@@ -6,7 +6,12 @@ import { NotFoundError } from '../../../common/custom-error';
 import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
 
 export class QuizAttemptsService {
-  async submitAttempt(userId: string, quizId: string, answers: Record<string, number>) {
+  async submitAttempt(
+    userId: string,
+    quizId: string,
+    answers: Record<string, number>,
+    startTime?: string,
+  ) {
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
       throw new NotFoundError('Quiz not found.');
@@ -26,8 +31,26 @@ export class QuizAttemptsService {
     });
 
     const passingThreshold = quiz.passingScorePercent ?? quiz.passingScore ?? 80;
-    const score = Math.round((correctCount / questions.length) * 100);
-    const passed = score >= passingThreshold;
+    
+    // UC40: Check time limit
+    const now = new Date();
+    let score = Math.round((correctCount / questions.length) * 100);
+    let isTimeout = false;
+
+    if (startTime) {
+      const startedAt = new Date(startTime);
+      // fallback sequence: timeLimit -> timeLimitSeconds -> default 1800
+      const limit = quiz.timeLimit ?? quiz.timeLimitSeconds ?? 1800;
+      const elapsedSeconds = (now.getTime() - startedAt.getTime()) / 1000;
+      
+      // Allow 15 seconds buffer for network latency
+      if (elapsedSeconds > limit + 15) {
+        isTimeout = true;
+        score = 0; // automatically fail the quiz with 0 score
+      }
+    }
+
+    const passed = !isTimeout && score >= passingThreshold;
 
     const attempt = await QuizAttempt.create({
       quizId,
@@ -35,6 +58,7 @@ export class QuizAttemptsService {
       score,
       answers,
       passed,
+      startedAt: startTime ? new Date(startTime) : undefined,
     });
 
     let xpRewarded = 0;
@@ -80,6 +104,7 @@ export class QuizAttemptsService {
       passed,
       xpRewarded,
       passingScorePercent: passingThreshold,
+      isTimeout,
     };
   }
 }
