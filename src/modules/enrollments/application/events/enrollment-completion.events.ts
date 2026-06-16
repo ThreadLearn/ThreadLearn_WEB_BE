@@ -1,6 +1,7 @@
 export const ENROLLMENT_COMPLETION_EVENTS = {
   lessonCompleted: 'lesson.completed',
   courseCompleted: 'course.completed',
+  certificateEligible: 'course.certificate.eligible',
 } as const;
 
 export interface LessonCompletedEvent {
@@ -13,6 +14,7 @@ export interface LessonCompletedEvent {
   completedLessons: number;
   alreadyCompleted: boolean;
   courseCompleted: boolean;
+  enrollmentCompleted: boolean;
 }
 
 export interface CourseCompletedEvent {
@@ -21,6 +23,11 @@ export interface CourseCompletedEvent {
   progressPercent: number;
   totalLessons: number;
   completedLessons: number;
+}
+
+export interface CertificateEligibleEvent {
+  userId: string;
+  courseId: string;
 }
 
 export interface CompletionEffects {

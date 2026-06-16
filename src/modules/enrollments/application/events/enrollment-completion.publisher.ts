@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  CertificateEligibleEvent,
   CompletionEffects,
   CourseCompletedEvent,
   ENROLLMENT_COMPLETION_EVENTS,
@@ -12,20 +13,31 @@ export class EnrollmentCompletionPublisher {
   constructor(private readonly events: EventEmitter2) {}
 
   async publishLessonCompleted(event: LessonCompletedEvent): Promise<CompletionEffects> {
-    if (event.alreadyCompleted) return this.emptyEffects();
+    let lessonEffects = this.emptyEffects();
+    let courseEffects = this.emptyEffects();
 
-    const lessonEffects = this.mergeEffects(
-      await this.events.emitAsync(ENROLLMENT_COMPLETION_EVENTS.lessonCompleted, event),
-    );
-    if (!event.courseCompleted) return lessonEffects;
+    if (!event.alreadyCompleted) {
+      lessonEffects = this.mergeEffects(
+        await this.events.emitAsync(ENROLLMENT_COMPLETION_EVENTS.lessonCompleted, event),
+      );
 
-    const courseEffects = await this.publishCourseCompleted({
-      userId: event.userId,
-      courseId: event.courseId,
-      progressPercent: event.progressPercent,
-      totalLessons: event.totalLessons,
-      completedLessons: event.completedLessons,
-    });
+      if (event.courseCompleted) {
+        courseEffects = await this.publishCourseCompleted({
+          userId: event.userId,
+          courseId: event.courseId,
+          progressPercent: event.progressPercent,
+          totalLessons: event.totalLessons,
+          completedLessons: event.completedLessons,
+        });
+      }
+    }
+
+    if (event.enrollmentCompleted) {
+      await this.publishCertificateEligible({
+        userId: event.userId,
+        courseId: event.courseId,
+      });
+    }
 
     return {
       xpRewarded: lessonEffects.xpRewarded + courseEffects.xpRewarded,
@@ -37,6 +49,10 @@ export class EnrollmentCompletionPublisher {
     return this.mergeEffects(
       await this.events.emitAsync(ENROLLMENT_COMPLETION_EVENTS.courseCompleted, event),
     );
+  }
+
+  async publishCertificateEligible(event: CertificateEligibleEvent): Promise<void> {
+    await this.events.emitAsync(ENROLLMENT_COMPLETION_EVENTS.certificateEligible, event);
   }
 
   private mergeEffects(results: unknown[]): CompletionEffects {
