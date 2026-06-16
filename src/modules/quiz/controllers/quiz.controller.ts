@@ -130,4 +130,21 @@ export class QuizController {
       data: result,
     });
   }
+
+  // ─── Student: lấy lịch sử làm bài (UC43) ─────────────────
+  @Get('attempts/me')
+  async getMyAttempts(@CurrentUser() user: AuthenticatedUser) {
+    const attempts = await this.quizAttemptsService.getMyAttempts(user.id);
+    return ApiResponse.success({ message: 'Quiz attempts fetched successfully.', data: attempts });
+  }
+
+  // ─── Student: xem chi tiết 1 lượt làm bài (UC42) ──────────
+  @Get('attempts/:attemptId')
+  async getAttemptById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('attemptId') attemptId: string,
+  ) {
+    const attempt = await this.quizAttemptsService.getAttemptById(user.id, attemptId);
+    return ApiResponse.success({ message: 'Quiz attempt details fetched successfully.', data: attempt });
+  }
 }

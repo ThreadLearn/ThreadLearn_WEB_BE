@@ -1,8 +1,9 @@
+import mongoose from 'mongoose';
 import { QuizAttempt } from '../models/quiz-attempt.model';
 import { Quiz } from '../../quiz/models/quiz.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
 import { Notification } from '../../notifications/models/notification.model';
-import { NotFoundError } from '../../../common/custom-error';
+import { NotFoundError, BadRequestError } from '../../../common/custom-error';
 import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
 
 export class QuizAttemptsService {
@@ -31,6 +32,7 @@ export class QuizAttemptsService {
     });
 
     const passingThreshold = quiz.passingScorePercent ?? quiz.passingScore ?? 80;
+
     
     // UC40: Check time limit
     const now = new Date();
@@ -42,7 +44,7 @@ export class QuizAttemptsService {
       // fallback sequence: timeLimit -> timeLimitSeconds -> default 1800
       const limit = quiz.timeLimit ?? quiz.timeLimitSeconds ?? 1800;
       const elapsedSeconds = (now.getTime() - startedAt.getTime()) / 1000;
-      
+
       // Allow 15 seconds buffer for network latency
       if (elapsedSeconds > limit + 15) {
         isTimeout = true;
@@ -106,6 +108,32 @@ export class QuizAttemptsService {
       passingScorePercent: passingThreshold,
       isTimeout,
     };
+  }
+
+  // ─── UC42: Chi tiết kết quả một lượt làm bài ──────────────
+  async getAttemptById(userId: string, attemptId: string) {
+    if (!mongoose.isValidObjectId(userId)) {
+      throw new BadRequestError('Invalid user ID.');
+    }
+    if (!mongoose.isValidObjectId(attemptId)) {
+      throw new BadRequestError('Invalid attempt ID.');
+    }
+    const attempt = await QuizAttempt.findOne({ _id: attemptId, userId })
+      .populate('quizId');
+    if (!attempt) {
+      throw new NotFoundError('Quiz attempt not found.');
+    }
+    return attempt;
+  }
+
+  // ─── UC43: Lịch sử làm bài của học viên ───────────────────
+  async getMyAttempts(userId: string) {
+    if (!mongoose.isValidObjectId(userId)) {
+      throw new BadRequestError('Invalid user ID.');
+    }
+    return QuizAttempt.find({ userId })
+      .sort({ createdAt: -1 })
+      .populate('quizId', 'title description totalQuestions xpReward timeLimit passingScore');
   }
 }
 export default QuizAttemptsService;
