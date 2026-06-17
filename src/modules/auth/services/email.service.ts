@@ -29,24 +29,29 @@ export class EmailService {
       return;
     }
 
-    this.dispatch('Verification email', {
-      to: payload.email,
-      subject: 'Verify your ThreadLearn email',
-      text: [
-        `Hi ${payload.firstName},`,
-        '',
-        'Please verify your ThreadLearn email address using the link below:',
-        payload.verificationUrl,
-        '',
-        'This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.',
-      ].join('\n'),
-      html: `
-        <p>Hi ${this.escapeHtml(payload.firstName)},</p>
-        <p>Please verify your ThreadLearn email address using the link below:</p>
-        <p><a href="${this.escapeHtml(payload.verificationUrl)}">Verify your email</a></p>
-        <p>This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.</p>
-      `,
-    });
+    try {
+      await this.sendMail({
+        to: payload.email,
+        subject: 'Verify your ThreadLearn email',
+        text: [
+          `Hi ${payload.firstName},`,
+          '',
+          'Please verify your ThreadLearn email address using the link below:',
+          payload.verificationUrl,
+          '',
+          'This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.',
+        ].join('\n'),
+        html: `
+          <p>Hi ${this.escapeHtml(payload.firstName)},</p>
+          <p>Please verify your ThreadLearn email address using the link below:</p>
+          <p><a href="${this.escapeHtml(payload.verificationUrl)}">Verify your email</a></p>
+          <p>This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.</p>
+        `,
+      });
+      logger.info(`SMTP verification email sent to ${payload.email}`);
+    } catch (err) {
+      logger.error(`SMTP verification email failed for ${payload.email}: ${this.getSafeErrorMessage(err)}`);
+    }
   }
 
   static async sendPasswordResetEmail(payload: PasswordResetEmailPayload) {
@@ -55,24 +60,29 @@ export class EmailService {
       return;
     }
 
-    this.dispatch('Password reset email', {
-      to: payload.email,
-      subject: 'Reset your ThreadLearn password',
-      text: [
-        `Hi ${payload.firstName},`,
-        '',
-        'Use the link below to reset your ThreadLearn password:',
-        payload.resetUrl,
-        '',
-        'This link will expire soon. If you did not request a password reset, you can ignore this email.',
-      ].join('\n'),
-      html: `
-        <p>Hi ${this.escapeHtml(payload.firstName)},</p>
-        <p>Use the link below to reset your ThreadLearn password:</p>
-        <p><a href="${this.escapeHtml(payload.resetUrl)}">Reset your password</a></p>
-        <p>This link will expire soon. If you did not request a password reset, you can ignore this email.</p>
-      `,
-    });
+    try {
+      await this.sendMail({
+        to: payload.email,
+        subject: 'Reset your ThreadLearn password',
+        text: [
+          `Hi ${payload.firstName},`,
+          '',
+          'Use the link below to reset your ThreadLearn password:',
+          payload.resetUrl,
+          '',
+          'This link will expire soon. If you did not request a password reset, you can ignore this email.',
+        ].join('\n'),
+        html: `
+          <p>Hi ${this.escapeHtml(payload.firstName)},</p>
+          <p>Use the link below to reset your ThreadLearn password:</p>
+          <p><a href="${this.escapeHtml(payload.resetUrl)}">Reset your password</a></p>
+          <p>This link will expire soon. If you did not request a password reset, you can ignore this email.</p>
+        `,
+      });
+      logger.info(`SMTP reset password email sent to ${payload.email}`);
+    } catch (err) {
+      logger.error(`SMTP reset password email failed for ${payload.email}: ${this.getSafeErrorMessage(err)}`);
+    }
   }
 
   static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
@@ -104,7 +114,7 @@ export class EmailService {
   }
 
   private static hasSmtpConfig() {
-    return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS);
+    return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && this.getSmtpPassword() && env.MAIL_FROM_EMAIL);
   }
 
   /**
@@ -138,17 +148,30 @@ export class EmailService {
       secure: env.SMTP_SECURE,
       auth: {
         user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
+        pass: this.getSmtpPassword(),
       },
     });
 
     await transporter.sendMail({
       from: {
         name: env.MAIL_FROM_NAME,
-        address: env.MAIL_FROM_EMAIL || (env.SMTP_USER as string),
+        address: env.MAIL_FROM_EMAIL as string,
       },
       ...message,
     });
+  }
+
+  private static getSmtpPassword() {
+    return env.SMTP_PASS?.replace(/\s+/g, '');
+  }
+
+  private static getSafeErrorMessage(err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    const rawPassword = env.SMTP_PASS;
+    const normalizedPassword = this.getSmtpPassword();
+    return [rawPassword, normalizedPassword]
+      .filter((value): value is string => Boolean(value))
+      .reduce((safeMessage, password) => safeMessage.replaceAll(password, '[SMTP_PASS]'), message);
   }
 
   private static escapeHtml(value: string) {
