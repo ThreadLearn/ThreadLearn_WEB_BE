@@ -14,6 +14,7 @@ describe('enrollment completion event handlers', () => {
     completedLessons: 1,
     alreadyCompleted: false,
     courseCompleted: false,
+    enrollmentCompleted: false,
   };
 
   afterEach(() => {
@@ -52,15 +53,12 @@ describe('enrollment completion event handlers', () => {
     }));
   });
 
-  it('issues the certificate from the course completion event', async () => {
+  it('issues the certificate from the eligibility event', async () => {
     const issue = jest.spyOn(CertificatesService, 'issueCertificate').mockResolvedValue({} as never);
 
-    await new CertificatesHandler({ subscribe: jest.fn() }).onCourseCompleted({
+    await new CertificatesHandler({ subscribe: jest.fn() }).onCertificateEligible({
       userId: 'student-1',
       courseId: 'course-1',
-      progressPercent: 100,
-      totalLessons: 2,
-      completedLessons: 2,
     });
 
     expect(issue).toHaveBeenCalledWith('student-1', 'course-1');

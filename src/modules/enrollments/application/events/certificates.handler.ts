@@ -5,7 +5,7 @@ import {
 } from '../../../../shared/application/events/event-publisher.port';
 import { CertificatesService } from '../../../certificates/services/certificates.service';
 import {
-  CourseCompletedEvent,
+  CertificateEligibleEvent,
   ENROLLMENT_COMPLETION_EVENTS,
 } from './enrollment-completion.events';
 
@@ -17,13 +17,13 @@ export class CertificatesHandler implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.eventBus.subscribe<CourseCompletedEvent>(
-      ENROLLMENT_COMPLETION_EVENTS.courseCompleted,
-      this.onCourseCompleted.bind(this),
+    this.eventBus.subscribe<CertificateEligibleEvent>(
+      ENROLLMENT_COMPLETION_EVENTS.certificateEligible,
+      this.onCertificateEligible.bind(this),
     );
   }
 
-  async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
+  async onCertificateEligible(event: CertificateEligibleEvent): Promise<void> {
     await CertificatesService.issueCertificate(event.userId, event.courseId);
   }
 }
