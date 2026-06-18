@@ -24,7 +24,7 @@ import {
 @UseGuards(JwtAuthGuard)        // guard ở cấp class → không cần lặp ở mỗi method
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
-  constructor(private readonly quizService: QuizService) {}
+  constructor(private readonly quizService: QuizService) { }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
@@ -65,18 +65,6 @@ export class QuizController {
   ) {
     const quiz = await this.quizService.editQuestion(quizId, questionId, dto);
     return ApiResponse.success({ message: 'Question updated successfully.', data: quiz });
-  }
-
-  // ─── UC39: Admin xóa câu hỏi ─────────────────────────────
-  @Delete(':quizId/questions/:questionId')
-  @HttpCode(200)
-  @Roles('ADMIN')
-  async deleteQuestion(
-    @Param('quizId') quizId: string,
-    @Param('questionId') questionId: string,
-  ) {
-    const quiz = await this.quizService.deleteQuestion(quizId, questionId);
-    return ApiResponse.success({ message: 'Question deleted successfully.', data: quiz });
   }
 
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
