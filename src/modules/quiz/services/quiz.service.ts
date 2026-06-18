@@ -138,14 +138,31 @@ export class QuizService {
     this.assertObjectId(quizId, 'quiz');
     this.assertObjectId(questionId, 'question');
 
-    // Dùng $pull để xóa câu hỏi khỏi mảng questions
-    const quiz = await Quiz.findByIdAndUpdate(
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) throw new NotFoundError('Quiz not found.');
+
+    // Kiểm tra câu hỏi tồn tại
+    const questionExists = quiz.questions.some(
+      (q) => q._id?.toString() === questionId,
+    );
+    if (!questionExists) {
+      throw new NotFoundError('Question not found in this quiz.');
+    }
+
+    // Không cho phép xóa câu hỏi cuối cùng — quiz phải có ít nhất 1 câu
+    if (quiz.questions.length <= 1) {
+      throw new BadRequestError(
+        'Cannot delete the last question. A quiz must have at least 1 question.',
+      );
+    }
+
+    const updated = await Quiz.findByIdAndUpdate(
       quizId,
       { $pull: { questions: { _id: questionId } } },
       { new: true },
     );
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-    return quiz;
+
+    return updated;
   }
 
   // ════════════════════════════════════════════════════════════
