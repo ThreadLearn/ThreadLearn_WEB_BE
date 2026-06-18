@@ -149,4 +149,76 @@ describe('reported bug regressions', () => {
     expect(result.score).toBe(50);
     expect(result.passed).toBe(false);
   });
+
+  it('grades quiz answers within time limit successfully', async () => {
+    const quiz = {
+      _id: 'quiz',
+      passingScore: 50,
+      xpReward: 100,
+      questions: [
+        { _id: 'question-a', correctAnswerIndex: 1 },
+      ],
+      timeLimit: 600, // 10 minutes
+    };
+    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
+    jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
+
+    // 1 minute ago
+    const startTime = new Date(Date.now() - 60 * 1000).toISOString();
+    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+      'question-a': 1,
+    }, startTime);
+
+    expect(result.score).toBe(100);
+    expect(result.passed).toBe(true);
+    expect(result.isTimeout).toBe(false);
+  });
+
+  it('fails quiz attempt when time limit is exceeded', async () => {
+    const quiz = {
+      _id: 'quiz',
+      passingScore: 50,
+      questions: [
+        { _id: 'question-a', correctAnswerIndex: 1 },
+      ],
+      timeLimit: 600, // 10 minutes
+    };
+    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
+    jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
+
+    // 11 minutes ago (exceeded 10 mins + 15s buffer)
+    const startTime = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+      'question-a': 1,
+    }, startTime);
+
+    expect(result.score).toBe(0);
+    expect(result.passed).toBe(false);
+    expect(result.isTimeout).toBe(true);
+  });
+
+  it('retrieves user quiz attempts history successfully', async () => {
+    const mockAttempts = [{ _id: 'attempt-1', score: 100 }];
+    const populateMock = jest.fn().mockResolvedValue(mockAttempts);
+    const sortMock = jest.fn().mockReturnValue({ populate: populateMock });
+    jest.spyOn(QuizAttempt, 'find').mockReturnValue({ sort: sortMock } as never);
+
+    const result = await new QuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
+    expect(result).toEqual(mockAttempts);
+    expect(QuizAttempt.find).toHaveBeenCalledWith({ userId: '507f1f77bcf86cd799439011' });
+  });
+
+  it('retrieves specific user quiz attempt by id successfully', async () => {
+    const mockAttempt = { _id: 'attempt-1', userId: '507f1f77bcf86cd799439011', score: 100 };
+    const populateMock = jest.fn().mockResolvedValue(mockAttempt);
+    jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ populate: populateMock } as never);
+
+    const result = await new QuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
+    expect(result).toEqual(mockAttempt);
+    expect(QuizAttempt.findOne).toHaveBeenCalledWith({ _id: '507f1f77bcf86cd799439012', userId: '507f1f77bcf86cd799439011' });
+  });
 });
