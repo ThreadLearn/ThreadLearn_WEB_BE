@@ -16,7 +16,7 @@ import {
 } from '../validators/quiz.validator';
 
 /**
- * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC38).
+ * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC39).
  * Luồng học viên làm quiz nằm ở QuizAttemptsController.
  */
 @ApiTags('Quiz - Admin')

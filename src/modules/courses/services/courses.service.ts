@@ -115,6 +115,8 @@ export class CoursesService {
     const lessons = await Lesson.find({ courseId, status: { $ne: 'deleted' } })
       .sort({ orderIndex: 1 })
       .select('-contentMarkdown -content');
+    
+    
 
     return { course, sections, lessons };
   }
