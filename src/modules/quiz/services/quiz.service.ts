@@ -128,9 +128,7 @@ export class QuizService {
 
     return updated;
   }
-  // ════════════════════════════════════════════════════════════
-  //  UC39 — Delete Question (Admin)
-  // ════════════════════════════════════════════════════════════
+
 
   // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
   async deleteQuestion(quizId: string, questionId: string) {
