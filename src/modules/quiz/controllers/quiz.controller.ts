@@ -3,28 +3,28 @@ import {
   Param, Post, Put, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { QuizService } from '../services/quiz.service';   // ← THIẾU ở bản conflict, phải có
-import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.service';
+import { QuizService } from '../services/quiz.service';
 import {
-  createQuizSchema, quizSubmitSchema, CreateQuizDto,
-  updateQuizSchema, UpdateQuizDto, addQuestionSchema, QuestionDto,
-} from '../schemas/quiz.schema';
+  createQuizSchema, CreateQuizDto,
+  updateQuizSchema, UpdateQuizDto,
+  addQuestionSchema, QuestionDto,
+  updateQuestionSchema, UpdateQuestionDto,
+} from '../validators/quiz.validator';
 
-@ApiTags('Quiz')
+/**
+ * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC38).
+ * Luồng học viên làm quiz nằm ở QuizAttemptsController.
+ */
+@ApiTags('Quiz - Admin')
 @Controller('v1/quiz')
 @UseGuards(JwtAuthGuard)        // guard ở cấp class → không cần lặp ở mỗi method
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
-  constructor(
-    private readonly quizService: QuizService,
-    private readonly quizAttemptsService: QuizAttemptsService,
-  ) {}
+  constructor(private readonly quizService: QuizService) {}
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
@@ -55,11 +55,17 @@ export class QuizController {
     return ApiResponse.success({ message: 'Question added successfully.', data: quiz });
   }
 
-  // ─── UC38: Admin sửa câu hỏi (SẮP THÊM) ──────────────────
-  // @Put(':quizId/questions/:questionId') ...
-
-  // ─── UC39: Admin xóa câu hỏi (SẮP THÊM) ──────────────────
-  // @Delete(':quizId/questions/:questionId') ...
+  // ─── UC38: Admin sửa câu hỏi ──────────────────────────────
+  @Put(':quizId/questions/:questionId')
+  @Roles('ADMIN')
+  async editQuestion(
+    @Param('quizId') quizId: string,
+    @Param('questionId') questionId: string,
+    @Body(new ZodValidationPipe(updateQuestionSchema)) dto: UpdateQuestionDto,
+  ) {
+    const quiz = await this.quizService.editQuestion(quizId, questionId, dto);
+    return ApiResponse.success({ message: 'Question updated successfully.', data: quiz });
+  }
 
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
@@ -87,28 +93,5 @@ export class QuizController {
   async deleteQuiz(@Param('quizId') quizId: string) {
     await this.quizService.deleteQuiz(quizId);
     return ApiResponse.success({ message: 'Quiz deleted successfully.', data: null });
-  }
-
-  // ─── Student: lấy quiz theo lesson (UC40) ────────────────
-  @Get('lesson/:lessonId')
-  async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await this.quizService.getQuizByLesson(lessonId);
-    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: quiz });
-  }
-
-  // ─── Student: submit quiz (UC40/41) ──────────────────────
-  @Post('submit')
-  @HttpCode(200)
-  async submit(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body(new ZodValidationPipe(quizSubmitSchema)) body: { quizId: string; answers: Record<string, number> },
-  ) {
-    const result = await this.quizAttemptsService.submitAttempt(user.id, body.quizId, body.answers);
-    return ApiResponse.success({
-      message: result.passed
-        ? 'Congratulations! You passed the quiz successfully.'
-        : `Attempt recorded. You did not reach the ${result.passingScorePercent}% passing threshold yet.`,
-      data: result,
-    });
   }
 }
