@@ -114,13 +114,13 @@ gantt
 | UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
 | :--- | :--- | :---: | :--- |
 | **UC36** | Create Quiz (Admin) | ✅ Done | [quiz.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/services/quiz.service.ts) (`createQuiz()`) lưu Quiz thuộc Lesson kèm đáp án đúng. |
-| **UC37** | Add Question (Admin) | 🔶 Partial | Thêm câu hỏi trực tiếp khi tạo Quiz. Chưa có API riêng lẻ để push câu hỏi sử dụng toán tử `$push` của Mongoose. |
-| **UC38** | Edit Question (Admin) | ❌ Missing | Chưa có. Cần API sửa câu hỏi theo vị trí trong Quiz dựa vào toán tử `$set` có định vị phần tử của MongoDB. |
-| **UC39** | Delete Question (Admin) | ❌ Missing | Chưa có. Cần API xóa câu hỏi khỏi Quiz sử dụng toán tử `$pull`. |
-| **UC40** | Take Quiz (Student) | 🔶 Partial | Đã có `QuizAttemptsService.submitAttempt()`. Thiếu trường `timeLimit` trong model và logic so sánh thời gian làm bài. |
+| **UC37** | Add Question (Admin) | ✅ Done | [quiz.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/controllers/quiz.controller.ts) (`addQuestion`) thêm câu hỏi vào Quiz qua toán tử `$push`. |
+| **UC38** | Edit Question (Admin) | ✅ Done | [quiz.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/controllers/quiz.controller.ts) (`editQuestion`) sửa đổi câu hỏi bằng positional `$set`. |
+| **UC39** | Delete Question (Admin) | ✅ Done | [quiz.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz/controllers/quiz.controller.ts) (`deleteQuestion`) xóa câu hỏi khỏi Quiz sử dụng `$pull`. |
+| **UC40** | Take Quiz (Student) | ✅ Done | [quiz-attempts.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/controllers/quiz-attempts.controller.ts) (`getQuizByLesson` & `submit`) kèm kiểm tra giới hạn thời gian làm bài `timeLimitSeconds`. |
 | **UC41** | Grade Quiz (System) | ✅ Done | [quiz-attempts.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/services/quiz-attempts.service.ts) chấm điểm tự động và lưu lịch sử. |
-| **UC42** | View Quiz Result (Student) | ✅ Done | Kết quả chấm điểm (Score, Status Pass/Fail) được trả về ngay lập tức trong payload của API nộp bài. |
-| **UC43** | View Quiz Attempt History (Student) | ❌ Missing | Chưa có. Cần API GET `/api/v1/quiz/attempts` truy vấn từ `QuizAttempt.find({ userId })` giảm dần theo `createdAt`. |
+| **UC42** | View Quiz Result (Student) | ✅ Done | [quiz-attempts.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/controllers/quiz-attempts.controller.ts) (`getAttemptById`) lấy kết quả chi tiết của lượt làm bài. |
+| **UC43** | View Quiz Attempt History (Student) | ✅ Done | [quiz-attempts.controller.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/quiz-attempts/controllers/quiz-attempts.controller.ts) (`getMyAttempts`) lấy danh sách các lượt làm bài của học viên. |
 | **UC48** | Accumulate Experience Points - XP Engine (Student, XP System) | ✅ Done | Tự động cộng XP qua `gamification.service.ts` (`awardXP()`) khi pass Quiz (theo `xpReward`) hoặc hoàn thành khóa học (500 XP). |
 | **UC49** | View User Level (Student) | ✅ Done | Cấp độ tự thăng cấp theo công thức: `level = Math.floor(xp / 1000) + 1` và đẩy tin nhắn socket.io thăng cấp. |
 | **UC50** | View Leaderboard (Student, Admin) | ✅ Done | Bảng xếp hạng XP cực nhanh thông qua **Redis Sorted Set** kết hợp cơ chế DB Aggregation fallback. |

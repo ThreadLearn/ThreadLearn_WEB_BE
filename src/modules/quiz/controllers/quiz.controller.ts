@@ -16,7 +16,7 @@ import {
 } from '../validators/quiz.validator';
 
 /**
- * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC38).
+ * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC39).
  * Luồng học viên làm quiz nằm ở QuizAttemptsController.
  */
 @ApiTags('Quiz - Admin')
@@ -24,7 +24,7 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
-  constructor(private readonly quizService: QuizService) {}
+  constructor(private readonly quizService: QuizService) { }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
