@@ -1,21 +1,25 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  Patch,
   Post,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
 import { BadRequestError } from '../../../common/custom-error';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { saveUploadedFile } from '../../../configs/upload';
 import { UsersService } from '../services/users.service';
+import { updateProfileSchema } from '../validators/users.validator';
 
 @ApiTags('Users')
 @Controller('v1/users')
@@ -32,6 +36,24 @@ export class UsersController {
     return ApiResponse.success({
       message: 'Profile retrieved successfully.',
       data: profile,
+    });
+  }
+
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update the authenticated user profile.' })
+  async updateMyProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(updateProfileSchema))
+    body: { firstName?: string; lastName?: string; avatarUrl?: string }
+  ) {
+    if (!user) {
+      throw new BadRequestError('User context not found.');
+    }
+
+    const updatedProfile = await UsersService.updateProfile(user.id, body);
+    return ApiResponse.success({
+      message: 'Profile updated successfully.',
+      data: updatedProfile,
     });
   }
 

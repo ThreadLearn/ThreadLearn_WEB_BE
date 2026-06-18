@@ -65,19 +65,61 @@ export const quizSubmitSchema = z.object({
     .openapi({ example: '665f1b2c3d4e5f6a7b8c9d0e' }),
   answers: z.record(z.coerce.number())
     .openapi({ example: { '0': 1, '1': 2, '2': 0 } }),
+  startTime: z.string()
+    .datetime('Invalid startTime format. Must be an ISO-8601 datetime string.')
+    .optional()
+    .openapi({ example: '2026-06-17T02:00:00.000Z' }),
 }).openapi('QuizSubmitDto');
 
 // ─── Add Question Schema (UC37) ────────────────────────────
 export const addQuestionSchema = questionSchema.openapi('AddQuestionDto');
+
+// ─── Update Question Schema (UC38) ─────────────────────────
+// Cho phép Admin cập nhật 1 phần câu hỏi (partial update).
+// Nếu gửi cả options + correctAnswerIndex thì validate cross-field.
+export const updateQuestionSchema = z.object({
+  questionText: z.string()
+    .min(1, 'Question text is required.')
+    .optional()
+    .openapi({ example: 'Updated question text?' }),
+  options: z
+    .array(z.string().min(1, 'Option cannot be empty.'))
+    .min(2, 'At least 2 options are required.')
+    .max(6, 'Maximum 6 options allowed.')
+    .optional()
+    .openapi({ example: ['New Option A', 'New Option B', 'New Option C'] }),
+  correctAnswerIndex: z.number()
+    .int()
+    .min(0, 'Index must be >= 0')
+    .optional()
+    .openapi({ example: 1 }),
+}).refine(
+  (q) => {
+    // Nếu cả 2 đều được gửi → validate cross-field
+    if (q.options !== undefined && q.correctAnswerIndex !== undefined) {
+      return q.correctAnswerIndex < q.options.length;
+    }
+    return true;
+  },
+  { message: 'correctAnswerIndex must be less than options length.' }
+).refine(
+  (q) => {
+    // Phải gửi ít nhất 1 field để cập nhật
+    return q.questionText !== undefined || q.options !== undefined || q.correctAnswerIndex !== undefined;
+  },
+  { message: 'At least one field (questionText, options, correctAnswerIndex) must be provided.' }
+).openapi('UpdateQuestionDto');
 
 // ─── Đăng ký vào Swagger registry ─────────────────────────────
 registry.register('CreateQuizDto', createQuizSchema);
 registry.register('UpdateQuizDto', updateQuizSchema);
 registry.register('QuizSubmitDto', quizSubmitSchema);
 registry.register('AddQuestionDto', addQuestionSchema);
+registry.register('UpdateQuestionDto', updateQuestionSchema);
 
 // ─── Types ────────────────────────────────────────────────────
 export type CreateQuizDto = z.infer<typeof createQuizSchema>;
 export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
 export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
-export type QuestionDto   = z.infer<typeof questionSchema>;
+export type QuestionDto = z.infer<typeof questionSchema>;
+export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>;

@@ -1,13 +1,23 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../../common/api-handler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
+import { env } from '../../../configs/env';
 import { AuthService } from '../services/auth.service';
-import { loginSchema, refreshTokenSchema, registerSchema } from '../validators/auth.validator';
+import {
+  forgotPasswordSchema,
+  googleOAuthCallbackSchema,
+  loginSchema,
+  refreshTokenSchema,
+  registerSchema,
+  resendVerificationSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
+} from '../validators/auth.validator';
 
 @ApiTags('Auth')
 @Controller('v1/auth')
@@ -20,6 +30,87 @@ export class AuthController {
       data: result,
       statusCode: 201,
     });
+  }
+
+  @Post('verify-email')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify an email address with a verification token.' })
+  async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { token: string }) {
+    const result = await AuthService.verifyEmail(body.token);
+    return ApiResponse.success({
+      message: 'Email verified successfully.',
+      data: result,
+    });
+  }
+
+  @Post('resend-verification')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Resend the email verification link.' })
+  async resendVerification(@Body(new ZodValidationPipe(resendVerificationSchema)) body: { email: string }) {
+    await AuthService.resendVerification(body.email);
+    return ApiResponse.success({
+      message: 'Verification email sent successfully.',
+    });
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Request a password reset link.' })
+  async forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) body: { email: string }) {
+    await AuthService.forgotPassword(body.email);
+    return ApiResponse.success({
+      message: 'If the email exists, a password reset link has been sent.',
+    });
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Reset password with a password reset token.' })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordSchema))
+    body: { token: string; newPassword: string }
+  ) {
+    await AuthService.resetPassword(body.token, body.newPassword);
+    return ApiResponse.success({
+      message: 'Password reset successfully.',
+    });
+  }
+
+  @Get('google')
+  @ApiOperation({ summary: 'Start Google OAuth authentication.' })
+  async googleAuth(@Res() response: any) {
+    return response.redirect(AuthService.getGoogleAuthorizationUrl());
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback.' })
+  async googleCallback(
+    @Query(new ZodValidationPipe(googleOAuthCallbackSchema))
+    query: { code?: string; error?: string },
+    @Res() response: any
+  ) {
+    if (query.error) {
+      return this.redirectGoogleFailure(response, `Google OAuth failed: ${query.error}`);
+    }
+
+    if (!query.code) {
+      return this.redirectGoogleFailure(response, 'Google OAuth authorization code is required.');
+    }
+
+    try {
+      const result = await AuthService.loginWithGoogleCode(query.code);
+      const redirectUrl = new URL(
+        env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'
+      );
+      redirectUrl.searchParams.set('accessToken', result.accessToken);
+      redirectUrl.searchParams.set('refreshToken', result.refreshToken);
+      redirectUrl.searchParams.set('user', JSON.stringify(result.user));
+
+      return response.redirect(redirectUrl.toString());
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : 'Google OAuth failed.';
+      return this.redirectGoogleFailure(response, message);
+    }
   }
 
   @Post('login')
@@ -58,10 +149,17 @@ export class AuthController {
     if (!user) {
       throw new BadRequestError('User context missing from request.');
     }
+    const sessionUser = await AuthService.getSessionUser(user.id);
     return ApiResponse.success({
       message: 'User context retrieved successfully.',
-      data: { user },
+      data: { user: sessionUser },
     });
+  }
+
+  private redirectGoogleFailure(response: any, message: string) {
+    const redirectUrl = new URL(env.FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3000/login');
+    redirectUrl.searchParams.set('error', message);
+    return response.redirect(redirectUrl.toString());
   }
 }
 
