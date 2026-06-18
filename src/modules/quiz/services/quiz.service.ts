@@ -130,6 +130,25 @@ export class QuizService {
   }
 
   // ════════════════════════════════════════════════════════════
+  //  UC39 — Delete Question (Admin)
+  // ════════════════════════════════════════════════════════════
+
+  // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
+  async deleteQuestion(quizId: string, questionId: string) {
+    this.assertObjectId(quizId, 'quiz');
+    this.assertObjectId(questionId, 'question');
+
+    // Dùng $pull để xóa câu hỏi khỏi mảng questions
+    const quiz = await Quiz.findByIdAndUpdate(
+      quizId,
+      { $pull: { questions: { _id: questionId } } },
+      { new: true },
+    );
+    if (!quiz) throw new NotFoundError('Quiz not found.');
+    return quiz;
+  }
+
+  // ════════════════════════════════════════════════════════════
   //  Student
   // ════════════════════════════════════════════════════════════
 
