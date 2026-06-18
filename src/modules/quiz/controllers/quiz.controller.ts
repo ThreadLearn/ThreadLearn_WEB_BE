@@ -21,7 +21,7 @@ import {
  */
 @ApiTags('Quiz - Admin')
 @Controller('v1/quiz')
-@UseGuards(JwtAuthGuard)        // guard ở cấp class → không cần lặp ở mỗi method
+@UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
   constructor(private readonly quizService: QuizService) { }
