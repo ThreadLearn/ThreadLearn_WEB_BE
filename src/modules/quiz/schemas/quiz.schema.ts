@@ -118,8 +118,8 @@ registry.register('AddQuestionDto', addQuestionSchema);
 registry.register('UpdateQuestionDto', updateQuestionSchema);
 
 // ─── Types ────────────────────────────────────────────────────
-export type CreateQuizDto      = z.infer<typeof createQuizSchema>;
-export type UpdateQuizDto      = z.infer<typeof updateQuizSchema>;
-export type QuizSubmitDto      = z.infer<typeof quizSubmitSchema>;
-export type QuestionDto        = z.infer<typeof questionSchema>;
-export type UpdateQuestionDto  = z.infer<typeof updateQuestionSchema>;
+export type CreateQuizDto = z.infer<typeof createQuizSchema>;
+export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
+export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
+export type QuestionDto = z.infer<typeof questionSchema>;
+export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>;

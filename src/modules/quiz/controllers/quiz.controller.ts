@@ -25,7 +25,7 @@ export class QuizController {
   constructor(
     private readonly quizService: QuizService,
     private readonly quizAttemptsService: QuizAttemptsService,
-  ) {}
+  ) { }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
