@@ -11,11 +11,19 @@ export interface IQuiz extends Document {
   lessonId: mongoose.Types.ObjectId;
   title: string;
   description?: string;
+  // ── Điểm đạt (%) ──────────────────────────────────────────────
+  // `passingScorePercent` là field CHUẨN (DTO + seed ghi field này).
+  // `passingScore` là field tương thích cho luồng take-quiz; service
+  // đọc cả hai theo thứ tự: passingScorePercent ?? passingScore ?? 80.
+  // CHƯA gộp được vì bugfix-regression.spec.ts đang phụ thuộc `passingScore`.
   passingScorePercent: number;
-  timeLimitSeconds?: number;
-  xpReward: number;
-  timeLimit: number;
   passingScore: number;
+  // ── Giới hạn thời gian (giây) ─────────────────────────────────
+  // `timeLimitSeconds` là field CHUẨN; `timeLimit` là field tương thích.
+  // service đọc: timeLimit ?? timeLimitSeconds ?? 1800.
+  timeLimitSeconds?: number;
+  timeLimit: number;
+  xpReward: number;
   questions: IQuestion[];
   createdAt: Date;
   updatedAt: Date;

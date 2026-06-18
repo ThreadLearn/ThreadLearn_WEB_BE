@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
-import { QuizAttemptsModule } from '../quiz-attempts/quiz-attempts.module';
 import { QuizController } from './controllers/quiz.controller';
 import { QuizService } from './services/quiz.service';
 
+/**
+ * QuizModule — quản lý quiz & câu hỏi (Admin).
+ * Export QuizService để QuizAttemptsModule (luồng học viên) tái sử dụng.
+ * Không import QuizAttemptsModule nữa → tránh phụ thuộc vòng.
+ */
 @Module({
-  imports: [QuizAttemptsModule],
   controllers: [QuizController],
   providers: [QuizService],
   exports: [QuizService],

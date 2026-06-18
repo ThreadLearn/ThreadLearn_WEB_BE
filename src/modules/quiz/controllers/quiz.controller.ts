@@ -3,29 +3,28 @@ import {
   Param, Post, Put, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { QuizService } from '../services/quiz.service';   // ← THIẾU ở bản conflict, phải có
-import { QuizAttemptsService } from '../../quiz-attempts/services/quiz-attempts.service';
+import { QuizService } from '../services/quiz.service';
 import {
-  createQuizSchema, quizSubmitSchema, CreateQuizDto,
-  updateQuizSchema, UpdateQuizDto, addQuestionSchema, QuestionDto,
+  createQuizSchema, CreateQuizDto,
+  updateQuizSchema, UpdateQuizDto,
+  addQuestionSchema, QuestionDto,
   updateQuestionSchema, UpdateQuestionDto,
-} from '../schemas/quiz.schema';
+} from '../validators/quiz.validator';
 
-@ApiTags('Quiz')
+/**
+ * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC38).
+ * Luồng học viên làm quiz nằm ở QuizAttemptsController.
+ */
+@ApiTags('Quiz - Admin')
 @Controller('v1/quiz')
-@UseGuards(JwtAuthGuard)        // guard ở cấp class → không cần lặp ở mỗi method
+@UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
-  constructor(
-    private readonly quizService: QuizService,
-    private readonly quizAttemptsService: QuizAttemptsService,
-  ) { }
+  constructor(private readonly quizService: QuizService) {}
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
@@ -68,18 +67,6 @@ export class QuizController {
     return ApiResponse.success({ message: 'Question updated successfully.', data: quiz });
   }
 
-  // ─── UC39: Admin xóa câu hỏi ─────────────────────────────
-  @Delete(':quizId/questions/:questionId')
-  @HttpCode(200)
-  @Roles('ADMIN')
-  async deleteQuestion(
-    @Param('quizId') quizId: string,
-    @Param('questionId') questionId: string,
-  ) {
-    const quiz = await this.quizService.deleteQuestion(quizId, questionId);
-    return ApiResponse.success({ message: 'Question deleted successfully.', data: quiz });
-  }
-
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
   @Roles('ADMIN')
@@ -106,45 +93,5 @@ export class QuizController {
   async deleteQuiz(@Param('quizId') quizId: string) {
     await this.quizService.deleteQuiz(quizId);
     return ApiResponse.success({ message: 'Quiz deleted successfully.', data: null });
-  }
-
-  // ─── Student: lấy quiz theo lesson (UC40) ────────────────
-  @Get('lesson/:lessonId')
-  async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await this.quizService.getQuizByLesson(lessonId);
-    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: quiz });
-  }
-
-  // ─── Student: submit quiz (UC40/41) ──────────────────────
-  @Post('submit')
-  @HttpCode(200)
-  async submit(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body(new ZodValidationPipe(quizSubmitSchema)) body: { quizId: string; answers: Record<string, number>; startTime?: string },
-  ) {
-    const result = await this.quizAttemptsService.submitAttempt(user.id, body.quizId, body.answers, body.startTime);
-    return ApiResponse.success({
-      message: result.passed
-        ? 'Congratulations! You passed the quiz successfully.'
-        : `Attempt recorded. You did not reach the ${result.passingScorePercent}% passing threshold yet.`,
-      data: result,
-    });
-  }
-
-  // ─── Student: lấy lịch sử làm bài (UC43) ─────────────────
-  @Get('attempts/me')
-  async getMyAttempts(@CurrentUser() user: AuthenticatedUser) {
-    const attempts = await this.quizAttemptsService.getMyAttempts(user.id);
-    return ApiResponse.success({ message: 'Quiz attempts fetched successfully.', data: attempts });
-  }
-
-  // ─── Student: xem chi tiết 1 lượt làm bài (UC42) ──────────
-  @Get('attempts/:attemptId')
-  async getAttemptById(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('attemptId') attemptId: string,
-  ) {
-    const attempt = await this.quizAttemptsService.getAttemptById(user.id, attemptId);
-    return ApiResponse.success({ message: 'Quiz attempt details fetched successfully.', data: attempt });
   }
 }

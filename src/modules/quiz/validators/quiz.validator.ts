@@ -1,10 +1,17 @@
-// src/modules/quiz/schemas/quiz.schema.ts
+// src/modules/quiz/validators/quiz.validator.ts
+//
+// Zod validators + DTO types cho luồng ADMIN (UC36–UC39).
+//
+// Lưu ý kiến trúc: với Zod, một schema vừa là LUẬT VALIDATE (runtime) vừa là
+// nguồn để suy ra TYPE DTO (compile-time) qua z.infer — cùng một nguồn sự thật,
+// nên schema và DTO được đặt chung file (không tách vật lý để tránh thừa).
+// Theo convention của dự án: mỗi module 1 file `<module>.validator.ts`.
 
 import { z } from '../../../common/zod/z';
 import { registry } from '../../../common/zod/openapi.registry';
 
-// ─── Question Schema ───────────────────────────────────────────
-const questionSchema = z.object({
+// ─── Question (dùng chung cho create/update quiz & thao tác câu hỏi) ─
+export const questionSchema = z.object({
   questionText: z.string()
     .min(1, 'Question text is required.')
     .openapi({ example: 'What is a race condition?' }),
@@ -22,7 +29,7 @@ const questionSchema = z.object({
   { message: 'correctAnswerIndex must be less than options length.' }
 );
 
-// ─── Create Quiz Schema (Admin) ────────────────────────────────
+// ─── Create Quiz (UC36-1) ──────────────────────────────────────
 export const createQuizSchema = z.object({
   lessonId: z.string()
     .min(1, 'Lesson ID is required.')
@@ -44,9 +51,9 @@ export const createQuizSchema = z.object({
     .min(1, 'Quiz must have at least 1 question.'),
 }).openapi('CreateQuizDto');
 
-// ─── Update Quiz Schema (Admin) ────────────────────────────────
+// ─── Update Quiz (UC36-2) ──────────────────────────────────────
 // Schema riêng — KHÔNG dùng createQuizSchema.partial()
-// vì partial() cho phép questions: [] (mảng rỗng) pass validation
+// vì partial() cho phép questions: [] (mảng rỗng) pass validation.
 export const updateQuizSchema = z.object({
   title: z.string().min(1).max(255).optional()
     .openapi({ example: 'Updated Quiz Title' }),
@@ -58,23 +65,10 @@ export const updateQuizSchema = z.object({
   questions: z.array(questionSchema).min(1).optional(),
 }).openapi('UpdateQuizDto');
 
-// ─── Submit Quiz Schema (Student) ─────────────────────────────
-export const quizSubmitSchema = z.object({
-  quizId: z.string()
-    .min(1, 'Quiz ID is required.')
-    .openapi({ example: '665f1b2c3d4e5f6a7b8c9d0e' }),
-  answers: z.record(z.coerce.number())
-    .openapi({ example: { '0': 1, '1': 2, '2': 0 } }),
-  startTime: z.string()
-    .datetime('Invalid startTime format. Must be an ISO-8601 datetime string.')
-    .optional()
-    .openapi({ example: '2026-06-17T02:00:00.000Z' }),
-}).openapi('QuizSubmitDto');
-
-// ─── Add Question Schema (UC37) ────────────────────────────
+// ─── Add Question (UC37) ───────────────────────────────────────
 export const addQuestionSchema = questionSchema.openapi('AddQuestionDto');
 
-// ─── Update Question Schema (UC38) ─────────────────────────
+// ─── Update Question (UC38) ────────────────────────────────────
 // Cho phép Admin cập nhật 1 phần câu hỏi (partial update).
 // Nếu gửi cả options + correctAnswerIndex thì validate cross-field.
 export const updateQuestionSchema = z.object({
@@ -110,16 +104,15 @@ export const updateQuestionSchema = z.object({
   { message: 'At least one field (questionText, options, correctAnswerIndex) must be provided.' }
 ).openapi('UpdateQuestionDto');
 
-// ─── Đăng ký vào Swagger registry ─────────────────────────────
+// ─── Đăng ký Swagger registry ──────────────────────────────────
 registry.register('CreateQuizDto', createQuizSchema);
 registry.register('UpdateQuizDto', updateQuizSchema);
-registry.register('QuizSubmitDto', quizSubmitSchema);
 registry.register('AddQuestionDto', addQuestionSchema);
 registry.register('UpdateQuestionDto', updateQuestionSchema);
 
-// ─── Types ────────────────────────────────────────────────────
-export type CreateQuizDto = z.infer<typeof createQuizSchema>;
-export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
-export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
-export type QuestionDto = z.infer<typeof questionSchema>;
-export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>;
+// ─── DTO types (suy ra từ schema) ──────────────────────────────
+export type CreateQuizDto      = z.infer<typeof createQuizSchema>;
+export type UpdateQuizDto      = z.infer<typeof updateQuizSchema>;
+export type QuestionDto        = z.infer<typeof questionSchema>;
+export type UpdateQuestionDto  = z.infer<typeof updateQuestionSchema>;
+
