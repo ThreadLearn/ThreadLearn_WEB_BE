@@ -7,7 +7,7 @@ import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { QuizService } from '../../quiz/services/quiz.service';
+import { QuizService } from '../../quiz/application/services/quiz.facade';
 import { QuizAttemptsService } from '../services/quiz-attempts.service';
 import { quizSubmitSchema, QuizSubmitDto } from '../validators/quiz-attempt.validator';
 

@@ -1,14 +1,9 @@
-// src/modules/quiz/validators/quiz.validator.ts
+// src/modules/quiz/presentation/validators/quiz.validator.ts
 //
 // Zod validators + DTO types cho luồng ADMIN (UC36–UC39).
-//
-// Lưu ý kiến trúc: với Zod, một schema vừa là LUẬT VALIDATE (runtime) vừa là
-// nguồn để suy ra TYPE DTO (compile-time) qua z.infer — cùng một nguồn sự thật,
-// nên schema và DTO được đặt chung file (không tách vật lý để tránh thừa).
-// Theo convention của dự án: mỗi module 1 file `<module>.validator.ts`.
 
-import { z } from '../../../common/zod/z';
-import { registry } from '../../../common/zod/openapi.registry';
+import { z } from '../../../../common/zod/z';
+import { registry } from '../../../../common/zod/openapi.registry';
 
 // ─── Question (dùng chung cho create/update quiz & thao tác câu hỏi) ─
 export const questionSchema = z.object({
@@ -52,8 +47,6 @@ export const createQuizSchema = z.object({
 }).openapi('CreateQuizDto');
 
 // ─── Update Quiz (UC36-2) ──────────────────────────────────────
-// Schema riêng — KHÔNG dùng createQuizSchema.partial()
-// vì partial() cho phép questions: [] (mảng rỗng) pass validation.
 export const updateQuizSchema = z.object({
   title: z.string().min(1).max(255).optional()
     .openapi({ example: 'Updated Quiz Title' }),
@@ -69,8 +62,6 @@ export const updateQuizSchema = z.object({
 export const addQuestionSchema = questionSchema.openapi('AddQuestionDto');
 
 // ─── Update Question (UC38) ────────────────────────────────────
-// Cho phép Admin cập nhật 1 phần câu hỏi (partial update).
-// Nếu gửi cả options + correctAnswerIndex thì validate cross-field.
 export const updateQuestionSchema = z.object({
   questionText: z.string()
     .min(1, 'Question text is required.')
@@ -89,7 +80,6 @@ export const updateQuestionSchema = z.object({
     .openapi({ example: 1 }),
 }).refine(
   (q) => {
-    // Nếu cả 2 đều được gửi → validate cross-field
     if (q.options !== undefined && q.correctAnswerIndex !== undefined) {
       return q.correctAnswerIndex < q.options.length;
     }
@@ -98,7 +88,6 @@ export const updateQuestionSchema = z.object({
   { message: 'correctAnswerIndex must be less than options length.' }
 ).refine(
   (q) => {
-    // Phải gửi ít nhất 1 field để cập nhật
     return q.questionText !== undefined || q.options !== undefined || q.correctAnswerIndex !== undefined;
   },
   { message: 'At least one field (questionText, options, correctAnswerIndex) must be provided.' }
@@ -115,4 +104,3 @@ export type CreateQuizDto      = z.infer<typeof createQuizSchema>;
 export type UpdateQuizDto      = z.infer<typeof updateQuizSchema>;
 export type QuestionDto        = z.infer<typeof questionSchema>;
 export type UpdateQuestionDto  = z.infer<typeof updateQuestionSchema>;
-

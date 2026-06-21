@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { QuizController } from './controllers/quiz.controller';
-import { QuizService } from './services/quiz.service';
-import { QuizRepository } from './repositories/quiz.repository';
-import { CreateQuizUseCase } from './use-cases/create-quiz.use-case';
-import { AddQuestionUseCase } from './use-cases/add-question.use-case';
-import { EditQuestionUseCase } from './use-cases/edit-question.use-case';
-import { DeleteQuestionUseCase } from './use-cases/delete-question.use-case';
+import { QuizController } from './presentation/controller/quiz.controller';
+import { QuizService } from './application/services/quiz.facade';
+import { QuizRepository } from './infrastructure/persistence/repositories/mongo-quiz.repository';
+import { CreateQuizService } from './application/services/create-quiz.service';
+import { AddQuestionService } from './application/services/add-question.service';
+import { EditQuestionService } from './application/services/edit-question.service';
+import { DeleteQuestionService } from './application/services/delete-question.service';
 
 /**
  * QuizModule — quản lý quiz & câu hỏi (Admin).
@@ -16,10 +16,10 @@ import { DeleteQuestionUseCase } from './use-cases/delete-question.use-case';
   controllers: [QuizController],
   providers: [
     QuizService,
-    CreateQuizUseCase,
-    AddQuestionUseCase,
-    EditQuestionUseCase,
-    DeleteQuestionUseCase,
+    CreateQuizService,
+    AddQuestionService,
+    EditQuestionService,
+    DeleteQuestionService,
     {
       provide: 'IQuizRepository',
       useClass: QuizRepository,

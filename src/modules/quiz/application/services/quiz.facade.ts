@@ -1,25 +1,25 @@
-// src/modules/quiz/services/quiz.service.ts
+// src/modules/quiz/application/services/quiz.facade.ts
 
 import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
-import { Quiz } from '../models/quiz.model';
-import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../validators/quiz.validator';
-import { IQuizRepository } from '../repositories/quiz.repository.interface';
-import { CreateQuizUseCase } from '../use-cases/create-quiz.use-case';
-import { AddQuestionUseCase } from '../use-cases/add-question.use-case';
-import { EditQuestionUseCase } from '../use-cases/edit-question.use-case';
-import { DeleteQuestionUseCase } from '../use-cases/delete-question.use-case';
+import { Quiz } from '../../models/quiz.model';
+import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../../presentation/validators/quiz.validator';
+import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { CreateQuizService } from './create-quiz.service';
+import { AddQuestionService } from './add-question.service';
+import { EditQuestionService } from './edit-question.service';
+import { DeleteQuestionService } from './delete-question.service';
 
 @Injectable()
 export class QuizService {
   constructor(
     @Inject('IQuizRepository')
     private readonly quizRepository: IQuizRepository,
-    private readonly createQuizUseCase: CreateQuizUseCase,
-    private readonly addQuestionUseCase: AddQuestionUseCase,
-    private readonly editQuestionUseCase: EditQuestionUseCase,
-    private readonly deleteQuestionUseCase: DeleteQuestionUseCase,
+    private readonly createQuizService: CreateQuizService,
+    private readonly addQuestionService: AddQuestionService,
+    private readonly editQuestionService: EditQuestionService,
+    private readonly deleteQuestionService: DeleteQuestionService,
   ) {}
 
   // ════════════════════════════════════════════════════════════
@@ -28,7 +28,7 @@ export class QuizService {
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
   async createQuiz(dto: CreateQuizDto) {
-    return this.createQuizUseCase.execute(dto);
+    return this.createQuizService.execute(dto);
   }
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
@@ -70,7 +70,7 @@ export class QuizService {
 
   // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
   async addQuestion(quizId: string, question: QuestionDto) {
-    return this.addQuestionUseCase.execute(quizId, question);
+    return this.addQuestionService.execute(quizId, question);
   }
 
   // ════════════════════════════════════════════════════════════
@@ -83,12 +83,12 @@ export class QuizService {
     questionId: string,
     dto: UpdateQuestionDto,
   ) {
-    return this.editQuestionUseCase.execute(quizId, questionId, dto);
+    return this.editQuestionService.execute(quizId, questionId, dto);
   }
 
   // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
   async deleteQuestion(quizId: string, questionId: string) {
-    return this.deleteQuestionUseCase.execute(quizId, questionId);
+    return this.deleteQuestionService.execute(quizId, questionId);
   }
 
   //  Student
@@ -118,5 +118,3 @@ export class QuizService {
     };
   }
 }
-
-export default QuizService;

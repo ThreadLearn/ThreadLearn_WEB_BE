@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
-import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { QuestionDto } from '../validators/quiz.validator';
-import { IQuizRepository } from '../repositories/quiz.repository.interface';
+import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { QuestionDto } from '../../presentation/validators/quiz.validator';
+import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
 @Injectable()
-export class AddQuestionUseCase {
+export class AddQuestionService {
   constructor(
     @Inject('IQuizRepository')
     private readonly quizRepository: IQuizRepository,
