@@ -13,13 +13,14 @@ export class AwardXpService {
     private readonly userStatsRepository: IUserStatsRepository,
   ) {}
 
-  async execute(userId: string, xpAmount: number) {
+  async execute(userId: string, xpAmount: number, quizzesCompletedDelta = 0) {
     const stats = await this.userStatsRepository.findByUserId(userId);
     if (!stats) {
       throw new NotFoundError('User stats profile not found.');
     }
 
     stats.xp += xpAmount;
+    stats.quizzesCompleted = (stats.quizzesCompleted ?? 0) + quizzesCompletedDelta;
     stats.level = Math.floor(stats.xp / 1000) + 1; // Level formula: 1 level per 1000 XP
     stats.lastActiveDate = new Date();
     await this.userStatsRepository.save(stats);

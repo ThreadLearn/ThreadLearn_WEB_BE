@@ -15,8 +15,8 @@ export class GamificationService {
     GamificationService.instance = this;
   }
 
-  static async awardXP(userId: string, xpAmount: number) {
-    return GamificationService.instance.awardXP(userId, xpAmount);
+  static async awardXP(userId: string, xpAmount: number, quizzesCompletedDelta = 0) {
+    return GamificationService.instance.awardXP(userId, xpAmount, quizzesCompletedDelta);
   }
 
   static async updateStreak(userId: string) {
@@ -28,8 +28,8 @@ export class GamificationService {
   }
 
   // Instance methods
-  async awardXP(userId: string, xpAmount: number) {
-    return this.awardXpService.execute(userId, xpAmount);
+  async awardXP(userId: string, xpAmount: number, quizzesCompletedDelta = 0) {
+    return this.awardXpService.execute(userId, xpAmount, quizzesCompletedDelta);
   }
 
   async updateStreak(userId: string) {
