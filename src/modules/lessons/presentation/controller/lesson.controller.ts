@@ -31,6 +31,7 @@ import {
   SetLockDto,
   UpdateLessonDto,
   createLessonSchema,
+  lessonIdParamSchema,
   setLockSchema,
   updateLessonSchema,
 } from '../../application/dto/lesson.dto';
@@ -92,7 +93,7 @@ export class LessonController {
   }
 
   @Get(':id')
-  async getById(@Param('id') id: string, @Req() req: RequestWithUser) {
+  async getById(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string, @Req() req: RequestWithUser) {
     const lesson = await this.getForViewer.execute(id, getOptionalUser(req));
     return ApiResponse.success({
       message: 'Lesson content retrieved successfully.',
@@ -101,7 +102,7 @@ export class LessonController {
   }
 
   @Get(':id/access-check')
-  async accessCheck(@Param('id') id: string, @Req() req: RequestWithUser) {
+  async accessCheck(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string, @Req() req: RequestWithUser) {
     const result = await this.checkAccess.execute(id, getOptionalUser(req));
     return ApiResponse.success({ message: 'Access checked.', data: result });
   }
@@ -110,7 +111,7 @@ export class LessonController {
   @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
-  async listVersions(@Param('id') id: string) {
+  async listVersions(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string) {
     const versions = await this.listVersionsSvc.execute(id);
     return ApiResponse.success({
       message: 'Versions fetched.',
@@ -139,7 +140,7 @@ export class LessonController {
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
   async update(
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(updateLessonSchema)) body: UpdateLessonDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -152,7 +153,7 @@ export class LessonController {
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
   async lock(
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(setLockSchema)) body: SetLockDto,
   ) {
     const lesson = await this.setLockSvc.execute(id, body?.locked ?? true);
@@ -166,7 +167,7 @@ export class LessonController {
   @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('BearerAuth')
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string) {
     const result = await this.softDeleteSvc.execute(id);
     return ApiResponse.success({ message: 'Lesson deleted.', data: result });
   }
@@ -177,7 +178,10 @@ export class LessonController {
   @UseInterceptors(FileInterceptor('attachment'))
   @ApiBearerAuth('BearerAuth')
   @ApiConsumes('multipart/form-data')
-  async uploadAttachment(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+  async uploadAttachment(
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     try {
       if (!file) throw new BadRequestError('No attachment file provided in FormData.');
       const fileUrl = await saveUploadedFile(file, 'attachments');

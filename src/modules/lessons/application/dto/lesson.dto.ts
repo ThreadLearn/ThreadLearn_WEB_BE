@@ -3,6 +3,7 @@ import { z } from '../../../../common/zod/z';
 export const lessonTypeSchema = z.enum(['article', 'video', 'coding', 'quiz', 'assignment', 'mixed']);
 
 export const objectIdSchema = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid id.');
+export const lessonIdParamSchema = objectIdSchema;
 
 const codeSnippetSchema = z.object({
   language: z.string(),
@@ -11,8 +12,8 @@ const codeSnippetSchema = z.object({
 });
 
 export const createLessonSchema = z.object({
-  courseId: z.string().min(1, 'courseId is required.'),
-  sectionId: z.string().optional(),
+  courseId: objectIdSchema,
+  sectionId: objectIdSchema.optional(),
   title: z.string().min(1, 'title is required.'),
   description: z.string().optional(),
   contentMarkdown: z.string().optional(),
