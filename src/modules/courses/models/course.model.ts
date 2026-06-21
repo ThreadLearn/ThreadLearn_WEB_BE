@@ -32,7 +32,9 @@ export interface ICourse extends Document {
   updatedAt: Date;
 
   // legacy compatibility
+  /** @deprecated Use `thumbnailUrl`; kept until FE migrates. */
   coverImage?: string;
+  /** @deprecated Use `status`; kept until FE migrates. */
   isPublished?: boolean;
 }
 

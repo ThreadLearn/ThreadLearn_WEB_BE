@@ -25,8 +25,11 @@ export interface ILesson extends Document {
   updatedAt: Date;
 
   // legacy compat with original schema
+  /** @deprecated Use `contentMarkdown`; kept until FE migrates. */
   content?: string;
+  /** @deprecated Use `attachments`; kept until FE migrates. */
   attachmentUrl?: string;
+  /** @deprecated Use `orderIndex`; kept until FE migrates. */
   order?: number;
 }
 
