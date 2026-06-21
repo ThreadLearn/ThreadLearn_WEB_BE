@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundError } from '../../../../common/custom-error';
 import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
+import { calculateLevel } from '../../domain/level-calculator';
 
 /**
  * UC48: Accumulate Experience Points - XP Engine (Student, XP System)
@@ -21,7 +22,7 @@ export class AwardXpService {
 
     stats.xp += xpAmount;
     stats.quizzesCompleted = (stats.quizzesCompleted ?? 0) + quizzesCompletedDelta;
-    stats.level = Math.floor(stats.xp / 1000) + 1; // Level formula: 1 level per 1000 XP
+    stats.level = calculateLevel(stats.xp);
     stats.lastActiveDate = new Date();
     await this.userStatsRepository.save(stats);
 

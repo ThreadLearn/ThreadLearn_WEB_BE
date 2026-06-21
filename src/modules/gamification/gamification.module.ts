@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { GamificationController } from './presentation/controller/gamification.controller';
-import { GamificationService } from './application/services/gamification.facade';
 import { AwardXpService } from './application/services/award-xp.service';
 import { UpdateStreakService } from './application/services/update-streak.service';
 import { GetStatsService } from './application/services/get-stats.service';
@@ -9,7 +8,6 @@ import { UserStatsRepository } from './infrastructure/persistence/repositories/m
 @Module({
   controllers: [GamificationController],
   providers: [
-    GamificationService,
     AwardXpService,
     UpdateStreakService,
     GetStatsService,
@@ -18,6 +16,10 @@ import { UserStatsRepository } from './infrastructure/persistence/repositories/m
       useClass: UserStatsRepository,
     },
   ],
-  exports: [GamificationService],
+  exports: [
+    AwardXpService,
+    UpdateStreakService,
+    GetStatsService,
+  ],
 })
 export class GamificationModule {}

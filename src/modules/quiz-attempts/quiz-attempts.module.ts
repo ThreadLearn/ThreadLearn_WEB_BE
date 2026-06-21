@@ -8,7 +8,6 @@ import { GetAttemptService } from './application/services/get-attempt.service';
 import { GetMyAttemptsService } from './application/services/get-my-attempts.service';
 import { QuizGradingService } from './domain/services/quiz-grading.service';
 import { DomainEventPublisher } from './domain/events/domain-event.publisher';
-import { GamificationEventHandler } from './application/event-handlers/gamification.event-handler';
 import { NotificationEventHandler } from './application/event-handlers/notification.event-handler';
 import { LeaderboardEventHandler } from './application/event-handlers/leaderboard.event-handler';
 import { QuizAttemptRepository } from './infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
@@ -29,7 +28,6 @@ import { QuizAttemptRepository } from './infrastructure/persistence/repositories
     GetMyAttemptsService,
     QuizGradingService,
     DomainEventPublisher,
-    GamificationEventHandler,
     NotificationEventHandler,
     LeaderboardEventHandler,
     {

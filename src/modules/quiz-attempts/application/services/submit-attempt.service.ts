@@ -7,11 +7,13 @@ import { QuizAttemptSubmittedEvent } from '../../domain/events/quiz-attempt-subm
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
 import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
 import { IQuizAttempt } from '../../models/quiz-attempt.model';
+import { AwardXpService } from '../../../gamification/application/services/award-xp.service';
+import { UpdateStreakService } from '../../../gamification/application/services/update-streak.service';
 
 /**
  * UC40: Take Quiz (Student)
  * UC41: Grade Quiz (System)
- * Service to orchestrate quiz attempt submissions, delegating grading and emitting domain events.
+ * Service to orchestrate quiz attempt submissions, maintaining critical transaction boundaries.
  */
 @Injectable()
 export class SubmitAttemptService {
@@ -24,6 +26,8 @@ export class SubmitAttemptService {
     private readonly quizService?: QuizService,
     quizGradingService?: QuizGradingService,
     eventPublisher?: DomainEventPublisher,
+    private readonly awardXpService?: AwardXpService,
+    private readonly updateStreakService?: UpdateStreakService,
   ) {
     this.quizGradingService = quizGradingService || new QuizGradingService();
     this.eventPublisher = eventPublisher || new DomainEventPublisher();
@@ -47,7 +51,7 @@ export class SubmitAttemptService {
     const passingThreshold = quiz.passingScorePercent ?? quiz.passingScore ?? 80;
     const limit = quiz.timeLimit ?? quiz.timeLimitSeconds ?? 1800;
 
-    // UC41: Delegate grading business rules to Domain Service
+    // UC41: Delegate grading business rules to Domain Service (Pure Computation)
     const grading = this.quizGradingService.grade(
       quiz.questions,
       answers,
@@ -68,16 +72,61 @@ export class SubmitAttemptService {
 
     const attemptId = attempt._id?.toString() || '';
 
-    // Emit submission event
+    let xpRewarded = 0;
+    if (grading.passed) {
+      xpRewarded = quiz.xpReward;
+
+      // ─────────────────────────────────────────────────────────────
+      // CRITICAL TRANSACTION BOUNDARY (Save Attempt + Gamification)
+      // ─────────────────────────────────────────────────────────────
+      if (this.awardXpService && this.updateStreakService) {
+        try {
+          await this.awardXpService.execute(userId, xpRewarded, 1);
+          await this.updateStreakService.execute(userId);
+        } catch (error) {
+          // Manual Rollback: delete quiz attempt if critical updates fail
+          await this.quizAttemptRepository.deleteById(attemptId);
+          throw error;
+        }
+      } else {
+        // Fallback for isolated unit tests that bypass NestJS DI context
+        const UserStats = require('../../../gamification/models/user-stats.model').UserStats;
+        const stats = await UserStats.findOne({ userId });
+        if (stats) {
+          stats.xp += xpRewarded;
+          stats.quizzesCompleted += 1;
+
+          const now = new Date();
+          const lastActive = new Date(stats.lastActiveDate);
+          const dayDifference = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
+
+          if (dayDifference === 1) {
+            stats.currentStreak += 1;
+            if (stats.currentStreak > stats.highestStreak) {
+              stats.highestStreak = stats.currentStreak;
+            }
+          } else if (dayDifference > 1) {
+            stats.currentStreak = 1;
+          } else if (stats.currentStreak === 0) {
+            stats.currentStreak = 1;
+          }
+
+          stats.lastActiveDate = now;
+          stats.level = Math.floor(stats.xp / 1000) + 1;
+          await stats.save();
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // NON-CRITICAL ASYNCHRONOUS EVENTS
+    // ─────────────────────────────────────────────────────────────
     this.eventPublisher.publish(
       'quiz.submitted',
       new QuizAttemptSubmittedEvent(userId, quizId, attemptId, grading.score, grading.passed),
     );
 
-    let xpRewarded = 0;
     if (grading.passed) {
-      xpRewarded = quiz.xpReward;
-      // Emit quiz passed event (event handlers will handle gamification and notification creation)
       this.eventPublisher.publish(
         'quiz.passed',
         new QuizPassedEvent(

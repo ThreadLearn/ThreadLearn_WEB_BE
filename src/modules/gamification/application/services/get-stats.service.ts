@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Enrollment } from '../../../enrollments/models/enrollment.model';
 import { COURSE_COMPLETION_XP, LESSON_COMPLETION_XP } from '../../constants';
 import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
+import { calculateLevel } from '../../domain/level-calculator';
 
 /**
  * UC49: View User Level (Student)
@@ -48,7 +49,7 @@ export class GetStatsService {
       stats.highestStreak = Math.max(stats.highestStreak ?? 0, 1);
       changed = true;
     }
-    const expectedLevel = Math.floor(stats.xp / 1000) + 1;
+    const expectedLevel = calculateLevel(stats.xp);
     if (stats.level !== expectedLevel) {
       stats.level = expectedLevel;
       changed = true;
