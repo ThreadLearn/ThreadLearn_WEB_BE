@@ -1,27 +1,28 @@
 // src/modules/quiz/services/quiz.service.ts
 
+import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
 import { Quiz } from '../models/quiz.model';
-import { Lesson } from '@/database/models';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
 import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../validators/quiz.validator';
+import { IQuizRepository } from '../repositories/quiz.repository.interface';
+import { CreateQuizUseCase } from '../use-cases/create-quiz.use-case';
 
+@Injectable()
 export class QuizService {
+  constructor(
+    @Inject('IQuizRepository')
+    private readonly quizRepository: IQuizRepository,
+    private readonly createQuizUseCase: CreateQuizUseCase,
+  ) {}
+
   // ════════════════════════════════════════════════════════════
   //  UC36 — Admin Quiz CRUD
   // ════════════════════════════════════════════════════════════
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
   async createQuiz(dto: CreateQuizDto) {
-    this.assertObjectId(dto.lessonId, 'lesson');
-
-    const lesson = await Lesson.findById(dto.lessonId);
-    if (!lesson) throw new NotFoundError('Lesson not found.');
-
-    const existing = await Quiz.findOne({ lessonId: dto.lessonId });
-    if (existing) throw new BadRequestError('Quiz already exists for this lesson.');
-
-    return await Quiz.create(dto);
+    return this.createQuizUseCase.execute(dto);
   }
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
@@ -129,7 +130,6 @@ export class QuizService {
     return updated;
   }
 
-
   // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
   async deleteQuestion(quizId: string, questionId: string) {
     this.assertObjectId(quizId, 'quiz');
@@ -161,6 +161,7 @@ export class QuizService {
 
     return updated;
   }
+
   //  Student
   // ════════════════════════════════════════════════════════════
 

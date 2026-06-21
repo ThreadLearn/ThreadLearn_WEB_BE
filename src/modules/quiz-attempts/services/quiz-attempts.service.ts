@@ -33,7 +33,6 @@ export class QuizAttemptsService {
 
     const passingThreshold = quiz.passingScorePercent ?? quiz.passingScore ?? 80;
 
-    
     // UC40: Check time limit
     const now = new Date();
     let score = Math.round((correctCount / questions.length) * 100);
