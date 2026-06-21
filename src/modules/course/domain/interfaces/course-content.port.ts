@@ -13,6 +13,8 @@ export interface ICourseContentPort {
   getContent(courseId: string): Promise<CourseContentSnapshot>;
   /** Đếm số lesson đang active — phục vụ rule publish của CourseEntity. */
   countActiveLessons(courseId: string): Promise<number>;
+  /** Đếm lại lesson active và ghi vào `course.totalLessons`. Trả về số đếm mới. */
+  refreshLessonCount(courseId: string): Promise<number>;
 }
 
 /** DI token cho `ICourseContentPort`. */

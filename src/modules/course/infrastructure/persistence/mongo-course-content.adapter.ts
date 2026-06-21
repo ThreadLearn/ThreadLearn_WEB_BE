@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Course } from '../../../courses/models/course.model';
 import { Lesson } from '../../../lessons/models/lesson.model';
 import { Section } from '../../../courses/models/section.model';
 import {
@@ -24,5 +25,11 @@ export class MongoCourseContentAdapter implements ICourseContentPort {
 
   async countActiveLessons(courseId: string): Promise<number> {
     return Lesson.countDocuments({ courseId, status: 'active' });
+  }
+
+  async refreshLessonCount(courseId: string): Promise<number> {
+    const total = await Lesson.countDocuments({ courseId, status: 'active' });
+    await Course.findByIdAndUpdate(courseId, { totalLessons: total });
+    return total;
   }
 }
