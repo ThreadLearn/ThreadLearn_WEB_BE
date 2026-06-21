@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Enrollment } from '../../../enrollments/models/enrollment.model';
 import { COURSE_COMPLETION_XP, LESSON_COMPLETION_XP } from '../../constants';
-import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
+import { IUserStatsRepository } from '../../domain/ports/user-stats.repository.interface';
 import { calculateLevel } from '../../domain/level-calculator';
 
 /**

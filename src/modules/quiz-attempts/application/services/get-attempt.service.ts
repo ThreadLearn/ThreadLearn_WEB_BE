@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
-import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
+import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.repository.interface';
 
 /**
  * UC42: View Quiz Result (Student)

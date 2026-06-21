@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
-import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { IQuizRepository } from '../../domain/ports/quiz.repository.interface';
 
 /**
  * UC39: Delete Question (Admin)

@@ -3,7 +3,7 @@ import { isValidObjectId } from 'mongoose';
 import { Lesson } from '@/database/models';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { CreateQuizDto } from '../../presentation/validators/quiz.validator';
-import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { IQuizRepository } from '../../domain/ports/quiz.repository.interface';
 
 /**
  * UC36: CRUD Quiz (Admin)
