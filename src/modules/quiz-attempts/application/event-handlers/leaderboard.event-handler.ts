@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DomainEventPublisher } from '../../domain/events/domain-event.publisher';
-import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
 import { LeaderboardService } from '../../../leaderboard/services/leaderboard.service';
 
 /**
@@ -12,7 +11,7 @@ export class LeaderboardEventHandler implements OnModuleInit {
   constructor(private readonly eventPublisher: DomainEventPublisher) {}
 
   onModuleInit() {
-    this.eventPublisher.subscribe('quiz.passed', async (event: QuizPassedEvent) => {
+    this.eventPublisher.subscribe('quiz.passed', async () => {
       await LeaderboardService.invalidateCache();
     });
   }
