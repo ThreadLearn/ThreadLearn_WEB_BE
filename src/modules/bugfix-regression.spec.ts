@@ -10,7 +10,7 @@ import { Note } from './notes/models/note.model';
 import { NotesService } from './notes/services/notes.service';
 import { Notification } from './notifications/models/notification.model';
 import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
-import { QuizAttemptsService } from './quiz-attempts/services/quiz-attempts.service';
+import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
 import { Quiz } from './quiz/models/quiz.model';
 
 describe('reported bug regressions', () => {

@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { QuizModule } from '../quiz/quiz.module';
-import { QuizAttemptsController } from './controllers/quiz-attempts.controller';
-import { QuizAttemptsService } from './services/quiz-attempts.service';
+import { QuizAttemptsController } from './presentation/controller/quiz-attempts.controller';
+import { QuizAttemptsService } from './application/services/quiz-attempts.facade';
+import { SubmitAttemptService } from './application/services/submit-attempt.service';
+import { GetAttemptService } from './application/services/get-attempt.service';
+import { GetMyAttemptsService } from './application/services/get-my-attempts.service';
+import { QuizAttemptRepository } from './infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
 
 /**
  * QuizAttemptsModule — luồng học viên làm quiz.
@@ -10,7 +14,16 @@ import { QuizAttemptsService } from './services/quiz-attempts.service';
 @Module({
   imports: [QuizModule],
   controllers: [QuizAttemptsController],
-  providers: [QuizAttemptsService],
+  providers: [
+    QuizAttemptsService,
+    SubmitAttemptService,
+    GetAttemptService,
+    GetMyAttemptsService,
+    {
+      provide: 'IQuizAttemptRepository',
+      useClass: QuizAttemptRepository,
+    },
+  ],
   exports: [QuizAttemptsService],
 })
 export class QuizAttemptsModule {}

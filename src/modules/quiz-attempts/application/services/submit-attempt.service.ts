@@ -1,13 +1,20 @@
-import mongoose from 'mongoose';
-import { QuizAttempt } from '../models/quiz-attempt.model';
-import { Quiz } from '../../quiz/models/quiz.model';
-import { UserStats } from '../../gamification/models/user-stats.model';
-import { Notification } from '../../notifications/models/notification.model';
-import { NotFoundError, BadRequestError } from '../../../common/custom-error';
-import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
+import { Inject, Injectable } from '@nestjs/common';
+import { Quiz } from '../../../quiz/models/quiz.model';
+import { UserStats } from '../../../gamification/models/user-stats.model';
+import { Notification } from '../../../notifications/models/notification.model';
+import { NotFoundError } from '../../../../common/custom-error';
+import { LeaderboardService } from '../../../leaderboard/services/leaderboard.service';
+import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
+import { IQuizAttempt } from '../../models/quiz-attempt.model';
 
-export class QuizAttemptsService {
-  async submitAttempt(
+@Injectable()
+export class SubmitAttemptService {
+  constructor(
+    @Inject('IQuizAttemptRepository')
+    private readonly quizAttemptRepository: IQuizAttemptRepository,
+  ) {}
+
+  async execute(
     userId: string,
     quizId: string,
     answers: Record<string, number>,
@@ -53,14 +60,14 @@ export class QuizAttemptsService {
 
     const passed = !isTimeout && score >= passingThreshold;
 
-    const attempt = await QuizAttempt.create({
-      quizId,
-      userId,
+    const attempt = await this.quizAttemptRepository.create({
+      quizId: quizId as any,
+      userId: userId as any,
       score,
       answers,
       passed,
       startedAt: startTime ? new Date(startTime) : undefined,
-    });
+    } as Partial<IQuizAttempt>);
 
     let xpRewarded = 0;
     if (passed) {
@@ -108,31 +115,4 @@ export class QuizAttemptsService {
       isTimeout,
     };
   }
-
-  // ─── UC42: Chi tiết kết quả một lượt làm bài ──────────────
-  async getAttemptById(userId: string, attemptId: string) {
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new BadRequestError('Invalid user ID.');
-    }
-    if (!mongoose.isValidObjectId(attemptId)) {
-      throw new BadRequestError('Invalid attempt ID.');
-    }
-    const attempt = await QuizAttempt.findOne({ _id: attemptId, userId })
-      .populate('quizId');
-    if (!attempt) {
-      throw new NotFoundError('Quiz attempt not found.');
-    }
-    return attempt;
-  }
-
-  // ─── UC43: Lịch sử làm bài của học viên ───────────────────
-  async getMyAttempts(userId: string) {
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new BadRequestError('Invalid user ID.');
-    }
-    return QuizAttempt.find({ userId })
-      .sort({ createdAt: -1 })
-      .populate('quizId', 'title description totalQuestions xpReward timeLimit passingScore');
-  }
 }
-export default QuizAttemptsService;

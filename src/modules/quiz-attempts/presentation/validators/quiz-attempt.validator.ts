@@ -1,9 +1,9 @@
-// src/modules/quiz-attempts/validators/quiz-attempt.validator.ts
+// src/modules/quiz-attempts/presentation/validators/quiz-attempt.validator.ts
 //
 // Zod validator + DTO type cho luồng HỌC VIÊN nộp bài quiz (UC40/UC41).
 
-import { z } from '../../../common/zod/z';
-import { registry } from '../../../common/zod/openapi.registry';
+import { z } from '../../../../common/zod/z';
+import { registry } from '../../../../common/zod/openapi.registry';
 
 // ─── Submit Quiz (Student) ─────────────────────────────────────
 export const quizSubmitSchema = z.object({
