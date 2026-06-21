@@ -5,7 +5,7 @@ import { isValidObjectId } from 'mongoose';
 import { Quiz } from '../../models/quiz.model';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../../presentation/validators/quiz.validator';
-import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { IQuizRepository } from '../../domain/ports/quiz.repository.interface';
 import { CreateQuizService } from './create-quiz.service';
 import { AddQuestionService } from './add-question.service';
 import { EditQuestionService } from './edit-question.service';

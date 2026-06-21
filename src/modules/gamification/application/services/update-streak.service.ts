@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
+import { IUserStatsRepository } from '../../domain/ports/user-stats.repository.interface';
 
 /**
  * Streak tracking service helper for Gamification Module.

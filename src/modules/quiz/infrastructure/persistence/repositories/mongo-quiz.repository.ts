@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IQuiz, Quiz } from '../../../models/quiz.model';
 import { CreateQuizDto, QuestionDto } from '../../../presentation/validators/quiz.validator';
-import { IQuizRepository } from '../../../domain/interfaces/quiz.repository';
+import { IQuizRepository } from '../../../domain/ports/quiz.repository.interface';
 
 @Injectable()
 export class QuizRepository implements IQuizRepository {

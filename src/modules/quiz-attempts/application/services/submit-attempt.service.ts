@@ -5,7 +5,7 @@ import { QuizGradingService } from '../../domain/services/quiz-grading.service';
 import { DomainEventPublisher } from '../../domain/events/domain-event.publisher';
 import { QuizAttemptSubmittedEvent } from '../../domain/events/quiz-attempt-submitted.event';
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
-import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
+import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.repository.interface';
 import { IQuizAttempt } from '../../models/quiz-attempt.model';
 import { AwardXpService } from '../../../gamification/application/services/award-xp.service';
 import { UpdateStreakService } from '../../../gamification/application/services/update-streak.service';

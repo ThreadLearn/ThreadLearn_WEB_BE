@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IUserStats, UserStats } from '../../../models/user-stats.model';
-import { IUserStatsRepository } from '../../../domain/interfaces/user-stats.repository';
+import { IUserStatsRepository } from '../../../domain/ports/user-stats.repository.interface';
 
 @Injectable()
 export class UserStatsRepository implements IUserStatsRepository {
