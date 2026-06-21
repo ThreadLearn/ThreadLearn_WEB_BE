@@ -1,5 +1,5 @@
 import { IQuiz } from '../models/quiz.model';
-import { CreateQuizDto } from '../schemas/quiz.schema';
+import { CreateQuizDto } from '../validators/quiz.validator';
 
 export interface IQuizRepository {
   findById(id: string): Promise<IQuiz | null>;

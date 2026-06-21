@@ -1,14 +1,33 @@
 import { Enrollment } from '../models/enrollment.model';
+import { LessonProgress } from '../models/lesson-progress.model';
 import { Course } from '../../courses/models/course.model';
 import { Lesson } from '../../lessons/models/lesson.model';
 import { UserStats } from '../../gamification/models/user-stats.model';
-import { BadRequestError, NotFoundError } from '../../../common/custom-error';
+import { User } from '../../auth/models/user.model';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+import { NotificationsService } from '../../notifications/services/notifications.service';
+import { CertificatesService } from '../../certificates/services/certificates.service';
+import {
+  COURSE_COMPLETION_XP,
+  LESSON_COMPLETION_XP,
+} from '../../gamification/constants';
+import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
 
 export class EnrollmentsService {
   static async enrollInCourse(userId: string, courseId: string) {
     const course = await Course.findById(courseId);
-    if (!course) {
+    if (!course || ['deleted', 'hidden', 'archived'].includes(course.status)) {
       throw new NotFoundError('Course not found.');
+    }
+    if (course.status !== 'published') {
+      throw new ForbiddenError('COURSE_ACCESS_DENIED');
+    }
+    if (course.isPremium) {
+      const user = await User.findById(userId).select('planType subscriptionExpiresAt');
+      const isPremium =
+        user?.planType === 'PREMIUM' &&
+        (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now());
+      if (!isPremium) throw new ForbiddenError('COURSE_PREMIUM_REQUIRED');
     }
 
     const existing = await Enrollment.findOne({ userId, courseId });
@@ -16,14 +35,169 @@ export class EnrollmentsService {
       throw new BadRequestError('User is already enrolled in this course.');
     }
 
+    const missingPrerequisites: string[] = [];
+    for (const prerequisiteId of course.prerequisites ?? []) {
+      const prerequisiteEnrollment = await Enrollment.findOne({
+        userId,
+        courseId: prerequisiteId,
+      });
+      if (!prerequisiteEnrollment || prerequisiteEnrollment.progress < course.prerequisiteThreshold) {
+        missingPrerequisites.push(prerequisiteId.toString());
+      }
+    }
+    if (missingPrerequisites.length) {
+      throw new ForbiddenError(`COURSE_PREREQUISITE_REQUIRED:${missingPrerequisites.join(',')}`);
+    }
+
+    const totalLessons = await Lesson.countDocuments({
+      courseId,
+      status: { $nin: ['deleted', 'hidden'] },
+    });
+
     const enrollment = await Enrollment.create({
       userId,
       courseId,
       progress: 0,
+      progressPercent: 0,
+      completedLessons: [],
+      totalLessons,
       completed: false,
+      lastAccessedAt: new Date(),
+    });
+
+    await Course.findByIdAndUpdate(courseId, { $inc: { totalEnrollments: 1 } });
+
+    await NotificationsService.sendNotification({
+      userId,
+      title: 'Enrolled in course',
+      message: `Bạn đã tham gia khoá học "${course.title}".`,
+      type: 'COURSE_ENROLLED',
+      metadata: { courseId },
+      link: `/courses/${courseId}`,
     });
 
     return enrollment;
+  }
+
+  static async listMyEnrollments(userId: string) {
+    const enrollments = await Enrollment.find({ userId })
+      .populate('courseId', 'title slug thumbnailUrl level language status isPremium totalLessons')
+      .sort({ updatedAt: -1 });
+    return enrollments.filter((enrollment) => enrollment.courseId);
+  }
+
+  static async getMyResume(userId: string) {
+    const enrollment = await Enrollment.findOne({ userId, completed: false })
+      .sort({ lastAccessedAt: -1, updatedAt: -1 })
+      .populate('courseId', 'title slug thumbnailUrl level language status isPremium totalLessons')
+      .lean();
+    return enrollment;
+  }
+
+  static async getMyCourseEnrollment(userId: string, courseId: string) {
+    return Enrollment.findOne({ userId, courseId });
+  }
+
+  static async markLessonComplete(userId: string, lessonId: string) {
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson || lesson.status === 'deleted') throw new NotFoundError('Lesson not found.');
+    if (lesson.status === 'locked' || lesson.isLocked) throw new ForbiddenError('Lesson is locked.');
+
+    const enrollment = await Enrollment.findOne({ userId, courseId: lesson.courseId });
+    if (!enrollment) throw new ForbiddenError('You must enroll before completing this lesson.');
+
+    const alreadyCompleted = enrollment.completedLessons.some((id) => id.toString() === lesson.id);
+    if (!alreadyCompleted) {
+      enrollment.completedLessons.push(lesson._id);
+    }
+
+    await LessonProgress.findOneAndUpdate(
+      { userId, lessonId: lesson._id },
+      {
+        $set: {
+          courseId: lesson.courseId,
+          isCompleted: true,
+          completedAt: new Date(),
+          lastAccessedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    enrollment.lastLessonId = lesson._id;
+    enrollment.lastAccessedAt = new Date();
+
+    const totalLessons = await Lesson.countDocuments({
+      courseId: lesson.courseId,
+      status: { $nin: ['deleted', 'hidden'] },
+    });
+    const completedLessons = enrollment.completedLessons.length;
+    enrollment.progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    enrollment.progressPercent = enrollment.progress;
+    enrollment.totalLessons = totalLessons;
+
+    const courseJustCompleted = enrollment.progress >= 100 && !enrollment.completed;
+    if (courseJustCompleted) {
+      enrollment.completed = true;
+      enrollment.completedAt = new Date();
+      await CertificatesService.issueCertificate(userId, lesson.courseId.toString());
+      await NotificationsService.sendNotification({
+        userId,
+        title: 'Course completed 🏆',
+        message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
+        type: 'COURSE_COMPLETED',
+        metadata: { courseId: lesson.courseId.toString() },
+        link: `/courses/${lesson.courseId.toString()}`,
+      });
+    } else if (!alreadyCompleted) {
+      await NotificationsService.sendNotification({
+        userId,
+        title: 'Lesson completed',
+        message: `Bạn đã hoàn thành bài "${lesson.title}". Progress: ${enrollment.progress}%.`,
+        type: 'LESSON_COMPLETED',
+        metadata: { lessonId: lesson.id, courseId: lesson.courseId.toString() },
+        link: `/lessons/${lesson.id}`,
+      });
+    }
+
+    await enrollment.save();
+
+    let xpRewarded = 0;
+    let stats = null;
+    if (!alreadyCompleted) {
+      xpRewarded =
+        LESSON_COMPLETION_XP + (courseJustCompleted ? COURSE_COMPLETION_XP : 0);
+      stats = await UserStats.findOneAndUpdate(
+        { userId },
+        {
+          $inc: {
+            xp: xpRewarded,
+            totalLessonsCompleted: 1,
+            coursesCompleted: courseJustCompleted ? 1 : 0,
+          },
+          $set: { lastActiveDate: new Date() },
+          $setOnInsert: { userId },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      stats.level = Math.floor(stats.xp / 1000) + 1;
+      if (stats.currentStreak < 1) stats.currentStreak = 1;
+      if (stats.highestStreak < stats.currentStreak) {
+        stats.highestStreak = stats.currentStreak;
+      }
+      await stats.save();
+      await LeaderboardService.invalidateCache();
+    }
+
+    return {
+      enrollment,
+      totalLessons,
+      completedLessons,
+      progressPercent: enrollment.progress,
+      courseCompleted: enrollment.completed,
+      xpRewarded,
+      stats,
+    };
   }
 
   static async updateLessonProgress(userId: string, courseId: string, completedLessonsCount: number) {

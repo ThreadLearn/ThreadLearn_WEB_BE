@@ -1,0 +1,101 @@
+import {
+  Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiResponse } from '../../../common/api-response';
+import { BadRequestError } from '../../../common/custom-error';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
+import type { AuthenticatedUser } from '../../../common/api-handler';
+import { CommentService } from '../services/comment.service';
+import {
+  commentIdParamSchema,
+  createCommentSchema,
+  listCommentsQuerySchema,
+  updateCommentSchema,
+} from '../validators/comment.validator';
+
+@ApiTags('Comments')
+@Controller('v1/comments')
+export class CommentController {
+  @Get()
+  @ApiOperation({ summary: 'UC29 — list comments by target.' })
+  async listComments(
+    @Query(new ZodValidationPipe(listCommentsQuerySchema))
+    query: { targetType: 'COURSE' | 'LESSON'; targetId: string; page: number; limit: number },
+  ) {
+    const result = await CommentService.listComments(
+      query.targetType, query.targetId, query.page, query.limit,
+    );
+    return ApiResponse.success({
+      message: 'Comments fetched.',
+      data:    result.data,
+      meta:    { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    });
+  }
+
+  @Get(':commentId/replies')
+  @ApiOperation({ summary: 'UC30 — list replies of a comment.' })
+  async listReplies(@Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
+    const replies = await CommentService.listReplies(commentId);
+    return ApiResponse.success({ message: 'Replies fetched.', data: replies });
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard) @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC29 / UC30 — create comment or reply.' })
+  async createComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createCommentSchema))
+    body: { targetType: 'COURSE' | 'LESSON'; targetId: string; content: string; parentId?: string; mentionUserIds?: string[] },
+  ) {
+    if (!user) throw new BadRequestError('User context required.');
+    const data = await CommentService.createComment(user.id, user.role, body);
+    return ApiResponse.success({ message: 'Comment created.', data, statusCode: 201 });
+  }
+
+  @Post(':commentId/replies')
+  @UseGuards(JwtAuthGuard) @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC30 - reply to a comment.' })
+  async reply(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+    @Body(new ZodValidationPipe(updateCommentSchema)) body: { content: string },
+  ) {
+    if (!user) throw new BadRequestError('User context required.');
+    const parent = await CommentService.getCommentOrThrow(commentId);
+    const data = await CommentService.createComment(user.id, user.role, {
+      targetType: parent.targetType,
+      targetId: String(parent.targetId),
+      content: body.content,
+      parentId: commentId,
+    });
+    return ApiResponse.success({ message: 'Reply created.', data, statusCode: 201 });
+  }
+
+  @Patch(':commentId')
+  @UseGuards(JwtAuthGuard) @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC31 — edit own comment (Admin override).' })
+  async updateComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+    @Body(new ZodValidationPipe(updateCommentSchema)) body: { content: string },
+  ) {
+    if (!user) throw new BadRequestError('User context required.');
+    const data = await CommentService.updateComment(user.id, user.role, commentId, body.content);
+    return ApiResponse.success({ message: 'Comment updated.', data });
+  }
+
+  @Delete(':commentId')
+  @UseGuards(JwtAuthGuard) @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC32 — soft delete comment.' })
+  async deleteComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+  ) {
+    if (!user) throw new BadRequestError('User context required.');
+    await CommentService.deleteComment(user.id, user.role, commentId);
+    return ApiResponse.success({ message: 'Comment deleted.' });
+  }
+}

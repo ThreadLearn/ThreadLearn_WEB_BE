@@ -27,6 +27,31 @@ export class NotificationsController {
     });
   }
 
+  @Get('unread-count')
+  async unreadCount(@CurrentUser() user: AuthenticatedUser) {
+    const count = await NotificationsService.unreadCount(user.id);
+    return ApiResponse.success({ message: 'Unread count fetched.', data: { count } });
+  }
+
+  @Patch('read-all')
+  async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
+    const result = await NotificationsService.markAllAsRead(user.id);
+    return ApiResponse.success({
+      message: 'Notifications marked as read.',
+      data: result,
+    });
+  }
+
+  @Get('me')
+  async getMine(@CurrentUser() user: AuthenticatedUser, @Query('unread') unread?: string) {
+    return this.getNotificationsForUser(user, unread);
+  }
+
+  @Patch(':id/read')
+  async markAsReadAlias(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.markAsRead(user, id);
+  }
+
   @Patch(':id')
   async markAsRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const notification = await NotificationsService.markAsRead(id, user.id);

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IQuiz, Quiz } from '../models/quiz.model';
-import { CreateQuizDto } from '../schemas/quiz.schema';
+import { CreateQuizDto } from '../validators/quiz.validator';
 import { IQuizRepository } from './quiz.repository.interface';
 
 @Injectable()

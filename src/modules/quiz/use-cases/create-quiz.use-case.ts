@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
 import { Lesson } from '@/database/models';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { CreateQuizDto } from '../schemas/quiz.schema';
+import { CreateQuizDto } from '../validators/quiz.validator';
 import { IQuizRepository } from '../repositories/quiz.repository.interface';
 
 @Injectable()
