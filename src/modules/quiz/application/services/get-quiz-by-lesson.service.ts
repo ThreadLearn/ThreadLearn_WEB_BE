@@ -4,21 +4,19 @@ import { Quiz } from '../../domain/entities/quiz.entity';
 import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
 /**
- * UC39: Admin xóa 1 câu hỏi khỏi quiz.
+ * Student: Lấy quiz theo lessonId.
  */
 @Injectable()
-export class DeleteQuestionService {
+export class GetQuizByLessonService {
   constructor(
     @Inject(QUIZ_REPOSITORY) private readonly quizRepo: IQuizRepository,
   ) {}
 
-  async execute(quizId: string, questionId: string): Promise<Quiz> {
-    const quiz = await this.quizRepo.findById(quizId);
+  async execute(lessonId: string): Promise<Quiz> {
+    const quiz = await this.quizRepo.findByLessonId(lessonId);
     if (!quiz) {
-      throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
+      throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found for this lesson.');
     }
-
-    quiz.removeQuestion(questionId); // business rule ở entity (check min 1 question)
-    return this.quizRepo.update(quiz);
+    return quiz;
   }
 }

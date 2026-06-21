@@ -1,120 +1,77 @@
-// src/modules/quiz/application/services/quiz.facade.ts
-
 import { Inject, Injectable } from '@nestjs/common';
-import { isValidObjectId } from 'mongoose';
-import { Quiz } from '../../models/quiz.model';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
-import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../../presentation/validators/quiz.validator';
-import { IQuizRepository } from '../../domain/ports/quiz.repository.interface';
+import { Quiz } from '../../domain/entities/quiz.entity';
+import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { CreateQuizInput, UpdateQuizInput, QuestionInput, UpdateQuestionInput } from '../dto/quiz.dto';
 import { CreateQuizService } from './create-quiz.service';
+import { UpdateQuizService } from './update-quiz.service';
+import { GetQuizService } from './get-quiz.service';
+import { DeleteQuizService } from './delete-quiz.service';
+import { ListQuizzesService } from './list-quizzes.service';
 import { AddQuestionService } from './add-question.service';
 import { EditQuestionService } from './edit-question.service';
 import { DeleteQuestionService } from './delete-question.service';
+import { GetQuizByLessonService } from './get-quiz-by-lesson.service';
 
+/**
+ * QuizService — facade mỏng delegate qua service per-UC.
+ * GIỮ export cho quiz-attempts backward-compat (sẽ cắt dây ở B2).
+ */
 @Injectable()
 export class QuizService {
   constructor(
-    @Inject('IQuizRepository')
-    private readonly quizRepository: IQuizRepository,
     private readonly createQuizService: CreateQuizService,
+    private readonly updateQuizService: UpdateQuizService,
+    private readonly getQuizService: GetQuizService,
+    private readonly deleteQuizService: DeleteQuizService,
+    private readonly listQuizzesService: ListQuizzesService,
     private readonly addQuestionService: AddQuestionService,
     private readonly editQuestionService: EditQuestionService,
     private readonly deleteQuestionService: DeleteQuestionService,
+    private readonly getQuizByLessonService: GetQuizByLessonService,
   ) {}
 
-  // ════════════════════════════════════════════════════════════
-  //  UC36 — Admin Quiz CRUD
-  // ════════════════════════════════════════════════════════════
-
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
-  async createQuiz(dto: CreateQuizDto) {
+  async createQuiz(dto: CreateQuizInput): Promise<Quiz> {
     return this.createQuizService.execute(dto);
   }
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
-  async updateQuiz(quizId: string, dto: UpdateQuizDto) {
-    this.assertObjectId(quizId, 'quiz');
-    const quiz = await Quiz.findByIdAndUpdate(
-      quizId,
-      { $set: dto }, // dùng $set tránh ghi đè toàn bộ document
-      { new: true, runValidators: true }
-    );
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-    return quiz;
+  async updateQuiz(quizId: string, dto: UpdateQuizInput): Promise<Quiz> {
+    return this.updateQuizService.execute(quizId, dto);
   }
 
   // ─── UC36-3: Xem chi tiết quiz ─────────────────────────────
-  async getQuizById(quizId: string) {
-    this.assertObjectId(quizId, 'quiz');
-    const quiz = await Quiz.findById(quizId).lean();
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-    return quiz;
+  async getQuizById(quizId: string): Promise<Quiz> {
+    return this.getQuizService.execute(quizId);
   }
 
   // ─── UC36-4: Xóa quiz ──────────────────────────────────────
-  async deleteQuiz(quizId: string) {
-    this.assertObjectId(quizId, 'quiz');
-    const quiz = await Quiz.findByIdAndDelete(quizId).lean();
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-    return quiz;
+  async deleteQuiz(quizId: string): Promise<Quiz> {
+    return this.deleteQuizService.execute(quizId);
   }
 
   // ─── UC36-5: Xem danh sách quiz ────────────────────────────
-  async getAllQuizzes() {
-    return await Quiz.find().lean();
+  async getAllQuizzes(): Promise<Quiz[]> {
+    return this.listQuizzesService.execute();
   }
 
-  // ════════════════════════════════════════════════════════════
-  //  UC37 — Add Question (Admin)
-  // ════════════════════════════════════════════════════════════
-
-  // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
-  async addQuestion(quizId: string, question: QuestionDto) {
+  // ─── UC37: Thêm câu hỏi ───────────────────────────────────
+  async addQuestion(quizId: string, question: QuestionInput): Promise<Quiz> {
     return this.addQuestionService.execute(quizId, question);
   }
 
-  // ════════════════════════════════════════════════════════════
-  //  UC38 — Edit Question (Admin)
-  // ════════════════════════════════════════════════════════════
-
-  // ─── UC38: Cập nhật 1 câu hỏi trong quiz ───────────────────
-  async editQuestion(
-    quizId: string,
-    questionId: string,
-    dto: UpdateQuestionDto,
-  ) {
+  // ─── UC38: Sửa câu hỏi ────────────────────────────────────
+  async editQuestion(quizId: string, questionId: string, dto: UpdateQuestionInput): Promise<Quiz> {
     return this.editQuestionService.execute(quizId, questionId, dto);
   }
 
-  // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
-  async deleteQuestion(quizId: string, questionId: string) {
+  // ─── UC39: Xóa câu hỏi ────────────────────────────────────
+  async deleteQuestion(quizId: string, questionId: string): Promise<Quiz> {
     return this.deleteQuestionService.execute(quizId, questionId);
   }
 
-  //  Student
-  // ════════════════════════════════════════════════════════════
-
-  // ─── Lấy quiz theo lesson (ẩn correctAnswerIndex khỏi student) ─
-  async getQuizByLesson(lessonId: string) {
-    this.assertObjectId(lessonId, 'lesson');
-    const quiz = await Quiz.findOne({ lessonId }).lean();
-    if (!quiz) throw new NotFoundError('Quiz not found for this lesson.');
-    return this.toStudentQuiz(quiz);
-  }
-
-  // ─── Helpers ───────────────────────────────────────────────
-  private assertObjectId(id: string, resource: string) {
-    if (!isValidObjectId(id)) {
-      throw new BadRequestError(`Invalid ${resource} id.`);
-    }
-  }
-
-  private toStudentQuiz(quiz: any) {
-    return {
-      ...quiz,
-      questions: quiz.questions.map(
-        ({ correctAnswerIndex: _answer, ...question }: any) => question
-      ),
-    };
+  // ─── Student: Lấy quiz theo lesson ─────────────────────────
+  async getQuizByLesson(lessonId: string): Promise<Quiz> {
+    return this.getQuizByLessonService.execute(lessonId);
   }
 }
