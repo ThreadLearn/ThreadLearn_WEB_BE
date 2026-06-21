@@ -33,6 +33,8 @@ export interface ILearningAccess {
   assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
   assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
   assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void>;
+  /** Best-effort: ghi cursor resume (lastLessonId/lastAccessedAt) khi học viên mở bài. */
+  touchLessonCursor(userId: string, courseId: string, lessonId: string): Promise<void>;
 }
 
 export const LEARNING_ACCESS = Symbol('LEARNING_ACCESS');

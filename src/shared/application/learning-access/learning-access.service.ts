@@ -112,4 +112,8 @@ export class LearningAccessService implements ILearningAccess {
     const enrolled = await this.data.isEnrolled(viewer.id, courseId);
     if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
   }
+
+  async touchLessonCursor(userId: string, courseId: string, lessonId: string): Promise<void> {
+    await this.data.touchCursor(userId, courseId, lessonId);
+  }
 }

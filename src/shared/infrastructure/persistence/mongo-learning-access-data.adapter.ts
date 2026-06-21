@@ -53,4 +53,18 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
       (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now())
     );
   }
+
+  async touchCursor(userId: string, courseId: string, lessonId: string): Promise<void> {
+    if (
+      !mongoose.isValidObjectId(userId) ||
+      !mongoose.isValidObjectId(courseId) ||
+      !mongoose.isValidObjectId(lessonId)
+    ) {
+      return;
+    }
+    await Enrollment.updateOne(
+      { userId, courseId },
+      { $set: { lastLessonId: lessonId, lastAccessedAt: new Date() } },
+    );
+  }
 }
