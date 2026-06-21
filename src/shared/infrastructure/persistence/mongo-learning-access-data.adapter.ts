@@ -24,7 +24,7 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
       status: lesson.status,
       isPreview: !!lesson.isPreview,
       isLocked: !!lesson.isLocked,
-      title: lesson.title,
+      title: String(lesson.title ?? ''),
     };
   }
 

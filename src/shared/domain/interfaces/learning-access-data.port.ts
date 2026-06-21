@@ -4,7 +4,7 @@ export interface LessonAccessSnapshot {
   status: string;
   isPreview: boolean;
   isLocked: boolean;
-  title?: string;
+  title: string;
 }
 
 export interface CourseAccessSnapshot {
