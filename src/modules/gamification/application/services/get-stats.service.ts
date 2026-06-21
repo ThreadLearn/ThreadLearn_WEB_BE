@@ -3,6 +3,10 @@ import { Enrollment } from '../../../enrollments/models/enrollment.model';
 import { COURSE_COMPLETION_XP, LESSON_COMPLETION_XP } from '../../constants';
 import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
 
+/**
+ * UC49: View User Level (Student)
+ * Service to fetch, synchronize and calculate user's level based on courses and lessons completed.
+ */
 @Injectable()
 export class GetStatsService {
   constructor(

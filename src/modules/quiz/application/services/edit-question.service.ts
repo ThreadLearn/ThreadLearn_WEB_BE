@@ -4,6 +4,10 @@ import { BadRequestError, NotFoundError } from '../../../../common/custom-error'
 import { UpdateQuestionDto } from '../../presentation/validators/quiz.validator';
 import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
+/**
+ * UC38: Edit Question (Admin)
+ * Service to modify text, options or correct answer of a question in a quiz.
+ */
 @Injectable()
 export class EditQuestionService {
   constructor(

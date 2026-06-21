@@ -7,6 +7,11 @@ import { LeaderboardService } from '../../../leaderboard/services/leaderboard.se
 import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
 import { IQuizAttempt } from '../../models/quiz-attempt.model';
 
+/**
+ * UC40: Take Quiz (Student)
+ * UC41: Grade Quiz (System)
+ * Service to process student's quiz submissions, verify limits, grade correctness, award XP and record result.
+ */
 @Injectable()
 export class SubmitAttemptService {
   constructor(

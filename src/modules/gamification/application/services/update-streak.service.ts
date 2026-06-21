@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { IUserStatsRepository } from '../../domain/interfaces/user-stats.repository';
 
+/**
+ * Streak tracking service helper for Gamification Module.
+ * Recalculates and updates the user's daily activity login streak.
+ */
 @Injectable()
 export class UpdateStreakService {
   constructor(

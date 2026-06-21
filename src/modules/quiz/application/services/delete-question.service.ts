@@ -3,6 +3,10 @@ import { isValidObjectId } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
+/**
+ * UC39: Delete Question (Admin)
+ * Service to delete a question from a quiz. Ensures at least 1 question remains.
+ */
 @Injectable()
 export class DeleteQuestionService {
   constructor(
