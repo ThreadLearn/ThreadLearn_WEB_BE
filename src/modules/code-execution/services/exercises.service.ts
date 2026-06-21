@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import { Exercise } from '../models/exercise.model';
 import { CodeExecutionService } from './code-execution.service';
-import { LessonsService } from '../../lessons/services/lessons.service';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 
 export interface ExerciseUpsertPayload {
   lessonId: string;
@@ -81,7 +81,7 @@ export class ExercisesService {
     const exercise = await ExercisesService.getById(exerciseId);
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
 
-    await LessonsService.assertLessonAccess(exercise.lessonId.toString(), {
+    await LearningAccessService.assertLessonAccess(exercise.lessonId.toString(), {
       id: userId,
       role: 'STUDENT',
     });

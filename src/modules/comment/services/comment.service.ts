@@ -2,10 +2,10 @@ import mongoose from 'mongoose';
 import { Comment, CommentTargetType } from '../models/comment.model';
 import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
-import { LessonsService } from '../../lessons/services/lessons.service';
 import { Lesson } from '../../lessons/models/lesson.model';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 
 interface CreateCommentInput {
   targetType: CommentTargetType;
@@ -194,7 +194,7 @@ export class CommentService {
       const enrolled = await Enrollment.findOne({ userId, courseId: targetId });
       if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
     } else {
-      await LessonsService.assertLessonAccess(targetId, { id: userId, role: userRole });
+      await LearningAccessService.assertLessonAccess(targetId, { id: userId, role: userRole });
     }
   }
 }

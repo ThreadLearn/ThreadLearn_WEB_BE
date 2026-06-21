@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { Bookmark, BookmarkTargetType } from '../models/bookmark.model';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LessonsService } from '../../lessons/services/lessons.service';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 
 interface ToggleInput {
   targetType:    BookmarkTargetType;
@@ -22,7 +22,7 @@ export class BookmarkService {
       throw new BadRequestError('Invalid targetId format.');
     }
     if (dto.targetType === 'LESSON') {
-      await LessonsService.assertLessonAccess(dto.targetId, { id: userId, role: 'STUDENT' }, { allowPreview: true });
+      await LearningAccessService.assertLessonAccess(dto.targetId, { id: userId, role: 'STUDENT' }, { allowPreview: true });
     }
     const existing = await Bookmark.findOneAndDelete({
       userId,

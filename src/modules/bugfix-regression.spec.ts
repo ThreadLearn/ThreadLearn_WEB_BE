@@ -5,13 +5,13 @@ import { Course } from './courses/models/course.model';
 import { Enrollment } from './enrollments/models/enrollment.model';
 import { EnrollmentsService } from './enrollments/services/enrollments.service';
 import { UserStats } from './gamification/models/user-stats.model';
-import { LessonsService } from './lessons/services/lessons.service';
 import { Note } from './notes/models/note.model';
 import { NotesService } from './notes/services/notes.service';
 import { Notification } from './notifications/models/notification.model';
 import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
 import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
 import { Quiz } from './quiz/models/quiz.model';
+import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 
 describe('reported bug regressions', () => {
   afterEach(() => {
@@ -22,7 +22,7 @@ describe('reported bug regressions', () => {
     jest.spyOn(CodeExecution, 'countDocuments').mockResolvedValue(0);
     const accessError = new Error('stop after access check');
     const accessSpy = jest
-      .spyOn(LessonsService, 'assertLessonAccess')
+      .spyOn(LearningAccessService, 'assertLessonAccess')
       .mockRejectedValue(accessError);
 
     await expect(
@@ -91,7 +91,7 @@ describe('reported bug regressions', () => {
 
   it('returns only the most recently updated note for a lesson', async () => {
     const latest = { _id: 'latest-note', noteText: 'Current note' };
-    jest.spyOn(LessonsService, 'assertLessonAccess').mockResolvedValue({} as never);
+    jest.spyOn(LearningAccessService, 'assertLessonAccess').mockResolvedValue({} as never);
     const sort = jest.fn().mockResolvedValue(latest);
     jest.spyOn(Note, 'findOne').mockReturnValue({ sort } as never);
 

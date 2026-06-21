@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LessonsService } from '../../lessons/services/lessons.service';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { Note } from '../models/note.model';
 
 export class NotesService {
   private static async assertLessonAccess(userId: string, lessonId: string) {
-    return LessonsService.assertLessonAccess(lessonId, { id: userId, role: 'STUDENT' });
+    return LearningAccessService.assertLessonAccess(lessonId, { id: userId, role: 'STUDENT' });
   }
 
   static async listByLesson(userId: string, lessonId: string) {

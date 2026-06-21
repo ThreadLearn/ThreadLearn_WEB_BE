@@ -2,7 +2,7 @@ import vm from 'vm';
 import { env } from '../../../configs/env';
 import { logger } from '../../../configs/logger';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LessonsService } from '../../lessons/services/lessons.service';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { CodeExecution } from '../models/code-execution.model';
 
 type ExecutionResult = {
@@ -227,7 +227,7 @@ export class CodeExecutionService {
     let courseId = payload.courseId;
 
     if (payload.lessonId) {
-      const lesson = await LessonsService.assertLessonAccess(payload.lessonId, {
+      const lesson = await LearningAccessService.assertLessonAccess(payload.lessonId, {
         id: userId,
         role: userRole,
       }, { allowPreview: true });

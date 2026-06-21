@@ -1,8 +1,8 @@
 import { AIHistory } from '../models/ai-history.model';
 import { User } from '../../auth/models/user.model';
 import { Course } from '../../courses/models/course.model';
-import { LessonsService } from '../../lessons/services/lessons.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 
 export interface AIRecommendationPayload {
   courseId?: string;
@@ -36,7 +36,7 @@ export class AIService {
     let lessonTitle = '';
     let courseId = normalized.courseId;
     if (normalized.lessonId) {
-      const lesson = await LessonsService.assertLessonAccess(normalized.lessonId, {
+      const lesson = await LearningAccessService.assertLessonAccess(normalized.lessonId, {
         id: userId,
         role: 'STUDENT',
       });
