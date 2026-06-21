@@ -1,19 +1,25 @@
-// src/modules/quiz/services/quiz.service.ts
+// src/modules/quiz/application/services/quiz.facade.ts
 
 import { Inject, Injectable } from '@nestjs/common';
 import { isValidObjectId } from 'mongoose';
-import { Quiz } from '../models/quiz.model';
-import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../validators/quiz.validator';
-import { IQuizRepository } from '../repositories/quiz.repository.interface';
-import { CreateQuizUseCase } from '../use-cases/create-quiz.use-case';
+import { Quiz } from '../../models/quiz.model';
+import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { CreateQuizDto, QuestionDto, UpdateQuestionDto, UpdateQuizDto } from '../../presentation/validators/quiz.validator';
+import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import { CreateQuizService } from './create-quiz.service';
+import { AddQuestionService } from './add-question.service';
+import { EditQuestionService } from './edit-question.service';
+import { DeleteQuestionService } from './delete-question.service';
 
 @Injectable()
 export class QuizService {
   constructor(
     @Inject('IQuizRepository')
     private readonly quizRepository: IQuizRepository,
-    private readonly createQuizUseCase: CreateQuizUseCase,
+    private readonly createQuizService: CreateQuizService,
+    private readonly addQuestionService: AddQuestionService,
+    private readonly editQuestionService: EditQuestionService,
+    private readonly deleteQuestionService: DeleteQuestionService,
   ) {}
 
   // ════════════════════════════════════════════════════════════
@@ -22,7 +28,7 @@ export class QuizService {
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
   async createQuiz(dto: CreateQuizDto) {
-    return this.createQuizUseCase.execute(dto);
+    return this.createQuizService.execute(dto);
   }
 
   // ─── UC36-2: Cập nhật quiz ─────────────────────────────────
@@ -64,14 +70,7 @@ export class QuizService {
 
   // ─── UC37: Thêm 1 câu hỏi vào quiz đã tồn tại ──────────────
   async addQuestion(quizId: string, question: QuestionDto) {
-    this.assertObjectId(quizId, 'quiz');
-    const quiz = await Quiz.findByIdAndUpdate(
-      quizId,
-      { $push: { questions: question } },
-      { new: true, runValidators: true }
-    );
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-    return quiz;
+    return this.addQuestionService.execute(quizId, question);
   }
 
   // ════════════════════════════════════════════════════════════
@@ -84,82 +83,12 @@ export class QuizService {
     questionId: string,
     dto: UpdateQuestionDto,
   ) {
-    this.assertObjectId(quizId, 'quiz');
-    this.assertObjectId(questionId, 'question');
-
-    // Tìm quiz và câu hỏi trước khi cập nhật
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-
-    const question = quiz.questions.find(
-      (q) => q._id?.toString() === questionId,
-    );
-    if (!question) {
-      throw new NotFoundError('Question not found in this quiz.');
-    }
-
-    // Cross-field validation: kiểm tra correctAnswerIndex hợp lệ
-    // với mảng options mới (hoặc hiện tại nếu không đổi)
-    const finalOptions = dto.options ?? question.options;
-    const finalIndex = dto.correctAnswerIndex ?? question.correctAnswerIndex;
-
-    if (finalIndex >= finalOptions.length) {
-      throw new BadRequestError(
-        `correctAnswerIndex (${finalIndex}) must be less than options length (${finalOptions.length}).`,
-      );
-    }
-
-    // Build MongoDB $set cho positional operator
-    const setFields: Record<string, unknown> = {};
-    if (dto.questionText !== undefined) {
-      setFields['questions.$.questionText'] = dto.questionText;
-    }
-    if (dto.options !== undefined) {
-      setFields['questions.$.options'] = dto.options;
-    }
-    if (dto.correctAnswerIndex !== undefined) {
-      setFields['questions.$.correctAnswerIndex'] = dto.correctAnswerIndex;
-    }
-
-    const updated = await Quiz.findOneAndUpdate(
-      { _id: quizId, 'questions._id': questionId },
-      { $set: setFields },
-      { new: true, runValidators: true },
-    );
-
-    return updated;
+    return this.editQuestionService.execute(quizId, questionId, dto);
   }
 
   // ─── UC39: Xóa 1 câu hỏi khỏi quiz ────────────────────────
   async deleteQuestion(quizId: string, questionId: string) {
-    this.assertObjectId(quizId, 'quiz');
-    this.assertObjectId(questionId, 'question');
-
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz) throw new NotFoundError('Quiz not found.');
-
-    // Kiểm tra câu hỏi tồn tại
-    const questionExists = quiz.questions.some(
-      (q) => q._id?.toString() === questionId,
-    );
-    if (!questionExists) {
-      throw new NotFoundError('Question not found in this quiz.');
-    }
-
-    // Không cho phép xóa câu hỏi cuối cùng — quiz phải có ít nhất 1 câu
-    if (quiz.questions.length <= 1) {
-      throw new BadRequestError(
-        'Cannot delete the last question. A quiz must have at least 1 question.',
-      );
-    }
-
-    const updated = await Quiz.findByIdAndUpdate(
-      quizId,
-      { $pull: { questions: { _id: questionId } } },
-      { new: true },
-    );
-
-    return updated;
+    return this.deleteQuestionService.execute(quizId, questionId);
   }
 
   //  Student
@@ -189,5 +118,3 @@ export class QuizService {
     };
   }
 }
-
-export default QuizService;

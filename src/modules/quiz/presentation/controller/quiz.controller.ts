@@ -3,11 +3,11 @@ import {
   Param, Post, Put, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ApiResponse } from '../../../common/api-response';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { QuizService } from '../services/quiz.service';
+import { ApiResponse } from '../../../../common/api-response';
+import { Roles } from '../../../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
+import { QuizService } from '../../application/services/quiz.facade';
 import {
   createQuizSchema, CreateQuizDto,
   updateQuizSchema, UpdateQuizDto,
