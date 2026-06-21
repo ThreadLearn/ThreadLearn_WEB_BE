@@ -19,13 +19,15 @@ import {
 @ApiTags('Comments')
 @Controller('v1/comments')
 export class CommentController {
+  constructor(private readonly comments: CommentService) {}
+
   @Get()
   @ApiOperation({ summary: 'UC29 — list comments by target.' })
   async listComments(
     @Query(new ZodValidationPipe(listCommentsQuerySchema))
     query: { targetType: 'COURSE' | 'LESSON'; targetId: string; page: number; limit: number },
   ) {
-    const result = await CommentService.listComments(
+    const result = await this.comments.listComments(
       query.targetType, query.targetId, query.page, query.limit,
     );
     return ApiResponse.success({
@@ -38,7 +40,7 @@ export class CommentController {
   @Get(':commentId/replies')
   @ApiOperation({ summary: 'UC30 — list replies of a comment.' })
   async listReplies(@Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
-    const replies = await CommentService.listReplies(commentId);
+    const replies = await this.comments.listReplies(commentId);
     return ApiResponse.success({ message: 'Replies fetched.', data: replies });
   }
 
@@ -51,7 +53,7 @@ export class CommentController {
     body: { targetType: 'COURSE' | 'LESSON'; targetId: string; content: string; parentId?: string; mentionUserIds?: string[] },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const data = await CommentService.createComment(user.id, user.role, body);
+    const data = await this.comments.createComment(user.id, user.role, body);
     return ApiResponse.success({ message: 'Comment created.', data, statusCode: 201 });
   }
 
@@ -64,8 +66,8 @@ export class CommentController {
     @Body(new ZodValidationPipe(updateCommentSchema)) body: { content: string },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const parent = await CommentService.getCommentOrThrow(commentId);
-    const data = await CommentService.createComment(user.id, user.role, {
+    const parent = await this.comments.getCommentOrThrow(commentId);
+    const data = await this.comments.createComment(user.id, user.role, {
       targetType: parent.targetType,
       targetId: String(parent.targetId),
       content: body.content,
@@ -83,7 +85,7 @@ export class CommentController {
     @Body(new ZodValidationPipe(updateCommentSchema)) body: { content: string },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const data = await CommentService.updateComment(user.id, user.role, commentId, body.content);
+    const data = await this.comments.updateComment(user.id, user.role, commentId, body.content);
     return ApiResponse.success({ message: 'Comment updated.', data });
   }
 
@@ -95,7 +97,7 @@ export class CommentController {
     @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    await CommentService.deleteComment(user.id, user.role, commentId);
+    await this.comments.deleteComment(user.id, user.role, commentId);
     return ApiResponse.success({ message: 'Comment deleted.' });
   }
 }

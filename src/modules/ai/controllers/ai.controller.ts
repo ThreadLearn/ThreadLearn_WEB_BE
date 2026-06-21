@@ -26,12 +26,14 @@ const feedbackSchema = z.object({
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class AIController {
+  constructor(private readonly ai: AIService) {}
+
   @Post('recommend')
   async recommend(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(aiRecSchema)) body: z.infer<typeof aiRecSchema>
   ) {
-    const recommendation = await AIService.requestRecommendation(user.id, body);
+    const recommendation = await this.ai.requestRecommendation(user.id, body);
     return ApiResponse.success({
       message: 'AI recommendation generated successfully.',
       data: recommendation,
@@ -48,13 +50,13 @@ export class AIController {
 
   @Get('history')
   async history(@CurrentUser() user: AuthenticatedUser) {
-    const histories = await AIService.getHistoryLogs(user.id);
+    const histories = await this.ai.getHistoryLogs(user.id);
     return ApiResponse.success({ message: 'AI history fetched successfully.', data: histories });
   }
 
   @Get('history/:id')
   async historyDetail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const history = await AIService.getHistoryById(user.id, id);
+    const history = await this.ai.getHistoryById(user.id, id);
     return ApiResponse.success({ message: 'AI history fetched successfully.', data: history });
   }
 
@@ -69,7 +71,7 @@ export class AIController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(feedbackSchema)) body: z.infer<typeof feedbackSchema>
   ) {
-    const updated = await AIService.updateFeedback(user.id, id, body.feedbackRating);
+    const updated = await this.ai.updateFeedback(user.id, id, body.feedbackRating);
     return ApiResponse.success({ message: 'AI feedback saved.', data: updated });
   }
 

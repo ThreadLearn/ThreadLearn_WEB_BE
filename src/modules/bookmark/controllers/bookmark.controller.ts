@@ -17,6 +17,8 @@ import {
 @Controller('v1/bookmarks')
 @UseGuards(JwtAuthGuard) @ApiBearerAuth('BearerAuth')
 export class BookmarkController {
+  constructor(private readonly bookmarks: BookmarkService) {}
+
   @Post()
   @ApiOperation({ summary: 'Compatibility alias for UC34 bookmark toggle.' })
   async toggleAlias(
@@ -38,7 +40,7 @@ export class BookmarkController {
     const targetType = body.targetType ?? 'LESSON';
     const targetId = body.targetId ?? body.lessonId;
     if (!targetId) throw new BadRequestError('targetId is required.');
-    const data = await BookmarkService.toggleBookmark(user.id, {
+    const data = await this.bookmarks.toggleBookmark(user.id, {
       targetType,
       targetId,
       title: body.title ?? 'Untitled',
@@ -70,7 +72,7 @@ export class BookmarkController {
     body: { targetType: 'COURSE' | 'LESSON'; targetId: string; title: string; thumbnailUrl?: string },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const data = await BookmarkService.toggleBookmark(user.id, body);
+    const data = await this.bookmarks.toggleBookmark(user.id, body);
     return ApiResponse.success({ message: 'Bookmark toggled.', data });
   }
 
@@ -82,7 +84,7 @@ export class BookmarkController {
     query: { page: number; limit: number; targetType?: 'COURSE' | 'LESSON' },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const result = await BookmarkService.listMyBookmarks(user.id, query.page, query.limit, query.targetType);
+    const result = await this.bookmarks.listMyBookmarks(user.id, query.page, query.limit, query.targetType);
     return ApiResponse.success({
       message: 'Bookmarks fetched.',
       data:    result.data,
@@ -111,7 +113,7 @@ export class BookmarkController {
     query: { targetType: 'COURSE' | 'LESSON'; targetId: string },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const bookmarked = await BookmarkService.isBookmarked(user.id, query.targetType, query.targetId);
+    const bookmarked = await this.bookmarks.isBookmarked(user.id, query.targetType, query.targetId);
     return ApiResponse.success({ message: 'Check complete.', data: { bookmarked } });
   }
 
@@ -122,14 +124,14 @@ export class BookmarkController {
     @Body() body: { title?: string; thumbnailUrl?: string; anchorText?: string; position?: number; note?: string; folder?: string; tags?: string[] },
   ) {
     if (!user) throw new BadRequestError('User context required.');
-    const bookmark = await BookmarkService.updateBookmark(user.id, id, body);
+    const bookmark = await this.bookmarks.updateBookmark(user.id, id, body);
     return ApiResponse.success({ message: 'Bookmark updated.', data: bookmark });
   }
 
   @Delete(':id')
   async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     if (!user) throw new BadRequestError('User context required.');
-    const result = await BookmarkService.removeBookmark(user.id, id);
+    const result = await this.bookmarks.removeBookmark(user.id, id);
     return ApiResponse.success({ message: 'Bookmark deleted.', data: result });
   }
 }
