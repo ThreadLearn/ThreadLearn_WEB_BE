@@ -2,16 +2,10 @@ import { Enrollment } from '../models/enrollment.model';
 import { LessonProgress } from '../models/lesson-progress.model';
 import { Course } from '../../courses/models/course.model';
 import { Lesson } from '../../lessons/models/lesson.model';
-import { UserStats } from '../../gamification/models/user-stats.model';
 import { User } from '../../auth/models/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CertificatesService } from '../../certificates/services/certificates.service';
-import {
-  COURSE_COMPLETION_XP,
-  LESSON_COMPLETION_XP,
-} from '../../gamification/constants';
-import { LeaderboardService } from '../../leaderboard/services/leaderboard.service';
+import { EnrollmentCompletionPublisher } from '../application/events/enrollment-completion.publisher';
 
 export class EnrollmentsService {
   static async enrollInCourse(userId: string, courseId: string) {
@@ -121,7 +115,7 @@ export class EnrollmentsService {
           lastAccessedAt: new Date(),
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
     enrollment.lastLessonId = lesson._id;
@@ -140,54 +134,21 @@ export class EnrollmentsService {
     if (courseJustCompleted) {
       enrollment.completed = true;
       enrollment.completedAt = new Date();
-      await CertificatesService.issueCertificate(userId, lesson.courseId.toString());
-      await NotificationsService.sendNotification({
-        userId,
-        title: 'Course completed 🏆',
-        message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
-        type: 'COURSE_COMPLETED',
-        metadata: { courseId: lesson.courseId.toString() },
-        link: `/courses/${lesson.courseId.toString()}`,
-      });
-    } else if (!alreadyCompleted) {
-      await NotificationsService.sendNotification({
-        userId,
-        title: 'Lesson completed',
-        message: `Bạn đã hoàn thành bài "${lesson.title}". Progress: ${enrollment.progress}%.`,
-        type: 'LESSON_COMPLETED',
-        metadata: { lessonId: lesson.id, courseId: lesson.courseId.toString() },
-        link: `/lessons/${lesson.id}`,
-      });
     }
 
     await enrollment.save();
 
-    let xpRewarded = 0;
-    let stats = null;
-    if (!alreadyCompleted) {
-      xpRewarded =
-        LESSON_COMPLETION_XP + (courseJustCompleted ? COURSE_COMPLETION_XP : 0);
-      stats = await UserStats.findOneAndUpdate(
-        { userId },
-        {
-          $inc: {
-            xp: xpRewarded,
-            totalLessonsCompleted: 1,
-            coursesCompleted: courseJustCompleted ? 1 : 0,
-          },
-          $set: { lastActiveDate: new Date() },
-          $setOnInsert: { userId },
-        },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-      stats.level = Math.floor(stats.xp / 1000) + 1;
-      if (stats.currentStreak < 1) stats.currentStreak = 1;
-      if (stats.highestStreak < stats.currentStreak) {
-        stats.highestStreak = stats.currentStreak;
-      }
-      await stats.save();
-      await LeaderboardService.invalidateCache();
-    }
+    const effects = await EnrollmentCompletionPublisher.publishLessonCompleted({
+      userId,
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      courseId: lesson.courseId.toString(),
+      progressPercent: enrollment.progress,
+      totalLessons,
+      completedLessons,
+      alreadyCompleted,
+      courseCompleted: courseJustCompleted,
+    });
 
     return {
       enrollment,
@@ -195,8 +156,8 @@ export class EnrollmentsService {
       completedLessons,
       progressPercent: enrollment.progress,
       courseCompleted: enrollment.completed,
-      xpRewarded,
-      stats,
+      xpRewarded: effects.xpRewarded,
+      stats: effects.stats,
     };
   }
 
@@ -212,10 +173,10 @@ export class EnrollmentsService {
     }
 
     const progressPercentage = Math.min(100, Math.max(0, (completedLessonsCount / totalLessons) * 100));
-    
+
     const wasCompleted = enrollment.completed;
     enrollment.progress = progressPercentage;
-    
+
     if (progressPercentage === 100) {
       enrollment.completed = true;
     }
@@ -223,20 +184,23 @@ export class EnrollmentsService {
     await enrollment.save();
 
     let xpRewarded = 0;
+    let stats = null;
     if (enrollment.completed && !wasCompleted) {
-      xpRewarded = 500;
-      const stats = await UserStats.findOne({ userId });
-      if (stats) {
-        stats.xp += xpRewarded;
-        stats.coursesCompleted += 1;
-        stats.level = Math.floor(stats.xp / 1000) + 1;
-        await stats.save();
-      }
+      const effects = await EnrollmentCompletionPublisher.publishCourseCompleted({
+        userId,
+        courseId,
+        progressPercent: enrollment.progress,
+        totalLessons,
+        completedLessons: completedLessonsCount,
+      });
+      xpRewarded = effects.xpRewarded;
+      stats = effects.stats;
     }
 
     return {
       enrollment,
       xpRewarded,
+      stats,
     };
   }
 }
