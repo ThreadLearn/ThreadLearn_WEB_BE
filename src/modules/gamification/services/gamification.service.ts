@@ -60,5 +60,8 @@ export class GamificationService {
     }
     return stats;
   }
+  async awardQuizCompletion(userId: string, xpReward: number) {
+  // toàn bộ logic xp + streak + level + lastActiveDate ở đây
+}
 }
 export default GamificationService;

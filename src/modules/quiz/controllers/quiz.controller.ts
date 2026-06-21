@@ -16,7 +16,7 @@ import { createQuizSchema, quizSubmitSchema, CreateQuizDto } from '../schemas/qu
 @ApiTags('Quiz')
 @Controller('v1/quiz')
 export class QuizController {
-  constructor() {}
+  constructor(private readonly quizService: QuizService) {}
 
   // ✅ UC36 — Admin tạo quiz
   @Post()
@@ -27,7 +27,7 @@ export class QuizController {
   async createQuiz(
     @Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto
   ) {
-    const quiz = await QuizService.createQuiz(dto);
+    const quiz = await this.quizService.createQuiz(dto);
     return ApiResponse.success({
       message: 'Quiz created successfully.',
       data: quiz,
@@ -43,7 +43,7 @@ export class QuizController {
     @Param('quizId') quizId: string,
     @Body(new ZodValidationPipe(createQuizSchema.partial())) dto: Partial<CreateQuizDto>
   ) {
-    const quiz = await QuizService.updateQuiz(quizId, dto);
+    const quiz = await this.quizService.updateQuiz(quizId, dto);
     return ApiResponse.success({ 
       message: 'Quiz updated successfully.', 
       data: quiz 
@@ -55,7 +55,7 @@ export class QuizController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('BearerAuth')
   async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await QuizService.getQuizByLesson(lessonId);
+    const quiz = await this.quizService.getQuizByLesson(lessonId);
     return ApiResponse.success({ data: quiz });
   }
 
