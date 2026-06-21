@@ -9,14 +9,12 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import jwt from 'jsonwebtoken';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
 import { BadRequestError } from '../../../../common/custom-error';
@@ -24,7 +22,6 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { env } from '../../../../configs/env';
 import { saveUploadedFile } from '../../../../configs/upload';
 import {
   CreateLessonDto,
@@ -46,23 +43,6 @@ import { UpdateLessonAttachmentService } from '../../application/services/update
 import { UpdateLessonService } from '../../application/services/update-lesson.service';
 import { LessonPresenter } from '../response/lesson.presenter';
 import { LessonVersionPresenter } from '../response/lesson-version.presenter';
-
-interface RequestWithUser {
-  user?: AuthenticatedUser;
-  headers?: Record<string, string | undefined>;
-}
-
-/** Optional user khi route không gắn guard (route công khai có thể đọc preview/enrolled). */
-const getOptionalUser = (req: RequestWithUser): AuthenticatedUser | undefined => {
-  if (req.user) return req.user;
-  const authHeader = req.headers?.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return undefined;
-  try {
-    return jwt.verify(authHeader.split(' ')[1], env.JWT_ACCESS_SECRET) as AuthenticatedUser;
-  } catch {
-    return undefined;
-  }
-};
 
 /** Controller MỎNG — chỉ các route Lesson sở hữu. (Nested comment/bookmark/note ở bridge controller.) */
 @ApiTags('Lessons')
@@ -93,8 +73,11 @@ export class LessonController {
   }
 
   @Get(':id')
-  async getById(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string, @Req() req: RequestWithUser) {
-    const lesson = await this.getForViewer.execute(id, getOptionalUser(req));
+  async getById(
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const lesson = await this.getForViewer.execute(id, user);
     return ApiResponse.success({
       message: 'Lesson content retrieved successfully.',
       data: LessonPresenter.toResponse(lesson),
@@ -102,8 +85,11 @@ export class LessonController {
   }
 
   @Get(':id/access-check')
-  async accessCheck(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string, @Req() req: RequestWithUser) {
-    const result = await this.checkAccess.execute(id, getOptionalUser(req));
+  async accessCheck(
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const result = await this.checkAccess.execute(id, user);
     return ApiResponse.success({ message: 'Access checked.', data: result });
   }
 

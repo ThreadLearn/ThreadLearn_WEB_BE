@@ -30,7 +30,9 @@ export interface CourseResponse {
   createdAt?: Date;
   updatedAt?: Date;
   // legacy mirrors (FE cũ vẫn đọc) — suy ra từ nguồn sự thật
+  /** @deprecated Use `status === 'published'`; kept until FE migrates. */
   isPublished: boolean;
+  /** @deprecated Use `thumbnailUrl`; kept until FE migrates. */
   coverImage?: string;
 }
 
