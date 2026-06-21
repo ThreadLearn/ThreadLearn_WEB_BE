@@ -18,6 +18,8 @@ export interface ILearningAccessData {
   findCourse(courseId: string): Promise<CourseAccessSnapshot | null>;
   isEnrolled(userId: string, courseId: string): Promise<boolean>;
   hasActivePremium(userId: string): Promise<boolean>;
+  /** Best-effort: cập nhật cursor resume của enrollment (lastLessonId/lastAccessedAt). */
+  touchCursor(userId: string, courseId: string, lessonId: string): Promise<void>;
 }
 
 export const LEARNING_ACCESS_DATA = Symbol('LEARNING_ACCESS_DATA');

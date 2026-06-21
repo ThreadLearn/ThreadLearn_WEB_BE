@@ -101,3 +101,40 @@ export class CommentController {
     return ApiResponse.success({ message: 'Comment deleted.' });
   }
 }
+
+@ApiTags('Lessons')
+@Controller('v1/lessons')
+export class LessonCommentsController {
+  constructor(private readonly comments: CommentService) {}
+
+  @Get(':id/comments')
+  async lessonComments(
+    @Param('id') id: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ) {
+    const result = await this.comments.listComments('LESSON', id, Number(page), Number(limit));
+    return ApiResponse.success({
+      message: 'Comments fetched.',
+      data: result.data,
+      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    });
+  }
+
+  @Post(':id/comments')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async createLessonComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { content: string; parentId?: string },
+  ) {
+    const comment = await this.comments.createComment(user.id, user.role, {
+      targetType: 'LESSON',
+      targetId: id,
+      content: body.content,
+      parentId: body.parentId,
+    });
+    return ApiResponse.success({ message: 'Comment created.', data: comment, statusCode: 201 });
+  }
+}

@@ -87,6 +87,7 @@ describe('reported bug regressions', () => {
       }),
       isEnrolled,
       hasActivePremium: jest.fn().mockResolvedValue(false),
+      touchCursor: jest.fn().mockResolvedValue(undefined),
     });
 
     await expect(

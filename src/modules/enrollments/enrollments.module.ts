@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
-import { EnrollmentsController, StudentMeController } from './controllers/enrollments.controller';
+import {
+  EnrollmentsController,
+  LessonCompletionController,
+  StudentMeController,
+} from './controllers/enrollments.controller';
 import { EnrollmentsService } from './services/enrollments.service';
 
 @Module({
-  controllers: [EnrollmentsController, StudentMeController],
+  controllers: [EnrollmentsController, StudentMeController, LessonCompletionController],
   providers: [EnrollmentsService],
   exports: [EnrollmentsService],
 })

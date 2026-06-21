@@ -45,6 +45,18 @@ export class EnrollmentsController {
   }
 }
 
+@ApiTags('Lessons')
+@Controller('v1/lessons')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('BearerAuth')
+export class LessonCompletionController {
+  @Post(':id/complete')
+  async complete(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const result = await EnrollmentsService.markLessonComplete(user.id, id);
+    return ApiResponse.success({ message: 'Lesson marked as complete.', data: result });
+  }
+}
+
 @ApiTags('Student Progress')
 @Controller('v1/students/me')
 @UseGuards(JwtAuthGuard)

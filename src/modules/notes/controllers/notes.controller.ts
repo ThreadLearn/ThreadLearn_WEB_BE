@@ -50,3 +50,31 @@ export class NotesController {
     return ApiResponse.success({ message: 'Note deleted.', data: result });
   }
 }
+
+@ApiTags('Lessons')
+@Controller('v1/lessons')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('BearerAuth')
+export class LessonNotesController {
+  constructor(private readonly notes: NotesService) {}
+
+  @Get(':id/notes/me')
+  async myLessonNotes(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const notes = await this.notes.listByLesson(user.id, id);
+    return ApiResponse.success({ message: 'Notes fetched.', data: notes });
+  }
+
+  @Post(':id/notes')
+  async upsertLessonNote(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { noteText?: string; content?: string; codeSnippet?: string },
+  ) {
+    const note = await this.notes.upsert(user.id, {
+      lessonId: id,
+      noteText: body.noteText ?? body.content ?? '',
+      codeSnippet: body.codeSnippet,
+    });
+    return ApiResponse.success({ message: 'Note saved.', data: note });
+  }
+}

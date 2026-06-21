@@ -135,3 +135,38 @@ export class BookmarkController {
     return ApiResponse.success({ message: 'Bookmark deleted.', data: result });
   }
 }
+
+@ApiTags('Lessons')
+@Controller('v1/lessons')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('BearerAuth')
+export class LessonBookmarksController {
+  constructor(private readonly bookmarks: BookmarkService) {}
+
+  @Post(':id/bookmarks')
+  async createLessonBookmark(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      title?: string;
+      anchorText?: string;
+      position?: number;
+      note?: string;
+      folder?: string;
+      tags?: string[];
+    },
+  ) {
+    const bookmark = await this.bookmarks.toggleBookmark(user.id, {
+      targetType: 'LESSON',
+      targetId: id,
+      title: body.title ?? 'Lesson bookmark',
+      anchorText: body.anchorText,
+      position: body.position,
+      note: body.note,
+      folder: body.folder,
+      tags: body.tags,
+    });
+    return ApiResponse.success({ message: 'Bookmark toggled.', data: bookmark });
+  }
+}
