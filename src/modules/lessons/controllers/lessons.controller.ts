@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -30,6 +31,7 @@ import { CommentService } from '../../comment/services/comment.service';
 import { NotesService } from '../../notes/services/notes.service';
 import { LessonsService } from '../services/lessons.service';
 import type { AuthenticatedUser } from '../../../common/api-handler';
+import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 interface RequestWithUser {
   user?: AuthenticatedUser;
@@ -50,6 +52,8 @@ const getOptionalUser = (req: RequestWithUser): AuthenticatedUser | undefined =>
 @ApiTags('Lessons')
 @Controller('v1/lessons')
 export class LessonsController {
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+
   @Get()
   async listLessons(@Query('courseId') courseId: string) {
     const lessons = await LessonsService.listByCourse(courseId);
@@ -64,7 +68,7 @@ export class LessonsController {
 
   @Get(':id')
   async getLessonById(@Param('id') id: string, @Req() req: RequestWithUser) {
-    const lesson = await LessonsService.getLessonForViewer(id, getOptionalUser(req));
+    const lesson = await LessonsService.getLessonForViewer(id, getOptionalUser(req), this.learningAccess);
     return ApiResponse.success({
       message: 'Lesson content retrieved successfully.',
       data: lesson,
@@ -73,7 +77,7 @@ export class LessonsController {
 
   @Get(':id/access-check')
   async accessCheck(@Param('id') id: string, @Req() req: RequestWithUser) {
-    const result = await LessonsService.checkAccess(id, getOptionalUser(req));
+    const result = await LessonsService.checkAccess(id, getOptionalUser(req), this.learningAccess);
     return ApiResponse.success({ message: 'Access checked.', data: result });
   }
 
@@ -95,12 +99,17 @@ export class LessonsController {
     @Param('id') id: string,
     @Body() body: { content: string; parentId?: string }
   ) {
-    const comment = await CommentService.createComment(user.id, user.role, {
-      targetType: 'LESSON',
-      targetId: id,
-      content: body.content,
-      parentId: body.parentId,
-    });
+    const comment = await CommentService.createComment(
+      user.id,
+      user.role,
+      {
+        targetType: 'LESSON',
+        targetId: id,
+        content: body.content,
+        parentId: body.parentId,
+      },
+      this.learningAccess,
+    );
     return ApiResponse.success({ message: 'Comment created.', data: comment, statusCode: 201 });
   }
 
@@ -112,16 +121,20 @@ export class LessonsController {
     @Param('id') id: string,
     @Body() body: { title?: string; anchorText?: string; position?: number; note?: string; folder?: string; tags?: string[] }
   ) {
-    const bookmark = await BookmarkService.toggleBookmark(user.id, {
-      targetType: 'LESSON',
-      targetId: id,
-      title: body.title ?? 'Lesson bookmark',
-      anchorText: body.anchorText,
-      position: body.position,
-      note: body.note,
-      folder: body.folder,
-      tags: body.tags,
-    });
+    const bookmark = await BookmarkService.toggleBookmark(
+      user.id,
+      {
+        targetType: 'LESSON',
+        targetId: id,
+        title: body.title ?? 'Lesson bookmark',
+        anchorText: body.anchorText,
+        position: body.position,
+        note: body.note,
+        folder: body.folder,
+        tags: body.tags,
+      },
+      this.learningAccess,
+    );
     return ApiResponse.success({ message: 'Bookmark toggled.', data: bookmark });
   }
 
@@ -129,7 +142,7 @@ export class LessonsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('BearerAuth')
   async myLessonNotes(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const notes = await NotesService.listByLesson(user.id, id);
+    const notes = await NotesService.listByLesson(user.id, id, this.learningAccess);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
 
@@ -141,11 +154,15 @@ export class LessonsController {
     @Param('id') id: string,
     @Body() body: { noteText?: string; content?: string; codeSnippet?: string }
   ) {
-    const note = await NotesService.upsert(user.id, {
-      lessonId: id,
-      noteText: body.noteText ?? body.content ?? '',
-      codeSnippet: body.codeSnippet,
-    });
+    const note = await NotesService.upsert(
+      user.id,
+      {
+        lessonId: id,
+        noteText: body.noteText ?? body.content ?? '',
+        codeSnippet: body.codeSnippet,
+      },
+      this.learningAccess,
+    );
     return ApiResponse.success({ message: 'Note saved.', data: note });
   }
 

@@ -187,7 +187,7 @@ export class CourseEntity {
   ensureViewableBy(viewerRole?: string): void {
     if (viewerRole === 'ADMIN') return;
     if (isPubliclyVisible(this.props.status)) return;
-    // hidden/archived: cho phép (học viên đã enroll); kiểm tra enrollment sẽ thêm khi có LearningAccessService.
+    // hidden/archived: enrolled students are handled by learning access policy.
     if (this.props.status === 'hidden' || this.props.status === 'archived') return;
     throw DomainError.notFound(ErrorCode.COURSE_NOT_FOUND, 'Course not found.');
   }

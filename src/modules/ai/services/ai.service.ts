@@ -3,7 +3,6 @@ import { AIHistory } from '../models/ai-history.model';
 import { User } from '../../auth/models/user.model';
 import { Course } from '../../courses/models/course.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 export interface AIRecommendationPayload {
@@ -43,7 +42,7 @@ export class AIService {
   static async requestRecommendation(
     userId: string,
     payload: AIRecommendationPayload | string,
-    accessPort: AIAccess = LearningAccessService,
+    accessPort: AIAccess,
   ) {
     const normalized: AIRecommendationPayload =
       typeof payload === 'string' ? { courseId: payload } : payload;

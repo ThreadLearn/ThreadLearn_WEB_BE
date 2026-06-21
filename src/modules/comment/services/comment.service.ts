@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import { Comment, CommentTargetType } from '../models/comment.model';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 interface CreateCommentInput {
@@ -119,7 +118,7 @@ export class CommentService {
     userId: string,
     userRole: 'STUDENT' | 'ADMIN',
     input: CreateCommentInput,
-    accessPort: CommentAccess = LearningAccessService,
+    accessPort: CommentAccess,
   ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId), accessPort);
 
@@ -210,7 +209,7 @@ export class CommentService {
     userRole: 'STUDENT' | 'ADMIN',
     targetType: CommentTargetType,
     targetId: string,
-    accessPort: CommentAccess = LearningAccessService,
+    accessPort: CommentAccess,
   ): Promise<{ courseId?: string }> {
     if (!mongoose.isValidObjectId(targetId)) {
       throw new NotFoundError(targetType === 'COURSE' ? 'Course not found.' : 'Lesson not found.');

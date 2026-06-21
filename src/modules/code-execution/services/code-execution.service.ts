@@ -3,7 +3,6 @@ import vm from 'vm';
 import { env } from '../../../configs/env';
 import { logger } from '../../../configs/logger';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 import { CodeExecution } from '../models/code-execution.model';
 
@@ -220,7 +219,7 @@ export class CodeExecutionService {
     userId: string,
     payload: CodeSubmitPayload,
     userRole: 'STUDENT' | 'ADMIN' = 'STUDENT',
-    accessPort: CodeExecutionAccess = LearningAccessService,
+    accessPort: CodeExecutionAccess,
   ) {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');

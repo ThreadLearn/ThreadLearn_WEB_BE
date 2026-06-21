@@ -1,4 +1,4 @@
-import type { ILesson } from '../../../modules/lessons/models/lesson.model';
+import type { LessonAccessSnapshot } from './learning-access-data.port';
 
 export type LearningAccessReason =
   | 'ADMIN'
@@ -29,9 +29,9 @@ export interface ILearningAccess {
     lessonId: string,
     viewer: LearningAccessViewer,
     options?: AssertLearningAccessOptions,
-  ): Promise<ILesson>;
-  assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson>;
-  assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson>;
+  ): Promise<LessonAccessSnapshot>;
+  assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
+  assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
   assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void>;
 }
 

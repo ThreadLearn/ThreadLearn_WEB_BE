@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import mongoose from 'mongoose';
+import { Inject, Injectable } from '@nestjs/common';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
-import { User } from '../../../modules/auth/models/user.model';
-import { Course } from '../../../modules/courses/models/course.model';
-import { Enrollment } from '../../../modules/enrollments/models/enrollment.model';
-import { ILesson, Lesson } from '../../../modules/lessons/models/lesson.model';
+import {
+  ILearningAccessData,
+  LEARNING_ACCESS_DATA,
+  LessonAccessSnapshot,
+} from '../../domain/interfaces/learning-access-data.port';
 import {
   AssertLearningAccessOptions,
   ILearningAccess,
@@ -12,42 +12,21 @@ import {
   LearningAccessViewer,
 } from '../../domain/interfaces/learning-access.port';
 
+const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
+
+const isObjectId = (value: string) => OBJECT_ID_PATTERN.test(value);
+
 @Injectable()
 export class LearningAccessService implements ILearningAccess {
+  constructor(@Inject(LEARNING_ACCESS_DATA) private readonly data: ILearningAccessData) {}
+
   async checkLessonAccess(
     lessonId: string,
     viewer?: LearningAccessViewer,
   ): Promise<LearningAccessResult> {
-    return LearningAccessService.checkLessonAccess(lessonId, viewer);
-  }
-
-  async assertLessonAccess(
-    lessonId: string,
-    viewer: LearningAccessViewer,
-    options: AssertLearningAccessOptions = {},
-  ): Promise<ILesson> {
-    return LearningAccessService.assertLessonAccess(lessonId, viewer, options);
-  }
-
-  async assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson> {
-    return LearningAccessService.assertLessonViewAccess(lessonId, viewer);
-  }
-
-  async assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson> {
-    return LearningAccessService.assertLessonInteractionAccess(lessonId, viewer);
-  }
-
-  async assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void> {
-    return LearningAccessService.assertCourseInteractionAccess(courseId, viewer);
-  }
-
-  static async checkLessonAccess(
-    lessonId: string,
-    viewer?: LearningAccessViewer,
-  ): Promise<LearningAccessResult> {
-    if (!mongoose.isValidObjectId(lessonId)) throw new BadRequestError('Invalid lesson id.');
-    const lesson = await Lesson.findById(lessonId);
-    if (!lesson || lesson.status === 'deleted') {
+    if (!isObjectId(lessonId)) throw new BadRequestError('Invalid lesson id.');
+    const lesson = await this.data.findLesson(lessonId);
+    if (!lesson) {
       return { canView: false, reason: 'LESSON_NOT_FOUND' };
     }
     if (viewer?.role === 'ADMIN') return { canView: true, reason: 'ADMIN' };
@@ -62,65 +41,62 @@ export class LearningAccessService implements ILearningAccess {
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
 
-    const course = await Course.findById(lesson.courseId).select('status isPremium');
-    if (!course || course.status === 'deleted') {
+    const course = await this.data.findCourse(lesson.courseId);
+    if (!course) {
       return { canView: false, reason: 'LESSON_NOT_FOUND' };
     }
     if (course.status !== 'published') {
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
-    if (course.isPremium && !(await this.hasActivePremium(viewer.id))) {
+    if (course.isPremium && !(await this.data.hasActivePremium(viewer.id))) {
       return { canView: false, reason: 'PREMIUM_REQUIRED' };
     }
 
-    const enrolled = await Enrollment.findOne({
-      userId: viewer.id,
-      courseId: lesson.courseId,
-    }).select('_id');
+    const enrolled = await this.data.isEnrolled(viewer.id, lesson.courseId);
     if (!enrolled) {
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
     return { canView: true, reason: 'ENROLLED' };
   }
 
-  static async assertLessonAccess(
+  async assertLessonAccess(
     lessonId: string,
     viewer: LearningAccessViewer,
     options: AssertLearningAccessOptions = {},
-  ): Promise<ILesson> {
-    const access = await LearningAccessService.checkLessonAccess(lessonId, viewer);
+  ): Promise<LessonAccessSnapshot> {
+    const access = await this.checkLessonAccess(lessonId, viewer);
     if (!access.canView || (!options.allowPreview && access.reason === 'PREVIEW')) {
       if (access.reason === 'LESSON_NOT_FOUND') throw new NotFoundError('Lesson not found.');
       if (access.reason === 'LESSON_LOCKED') throw new ForbiddenError('Lesson is locked.');
       throw new ForbiddenError('You must enroll before using this lesson feature.');
     }
 
-    const lesson = await Lesson.findById(lessonId);
-    if (!lesson || lesson.status === 'deleted') throw new NotFoundError('Lesson not found.');
+    const lesson = await this.data.findLesson(lessonId);
+    if (!lesson) throw new NotFoundError('Lesson not found.');
     return lesson;
   }
 
-  static async assertLessonViewAccess(
+  async assertLessonViewAccess(
     lessonId: string,
     viewer: LearningAccessViewer,
-  ): Promise<ILesson> {
-    return LearningAccessService.assertLessonAccess(lessonId, viewer, { allowPreview: true });
+  ): Promise<LessonAccessSnapshot> {
+    return this.assertLessonAccess(lessonId, viewer, { allowPreview: true });
   }
 
-  static async assertLessonInteractionAccess(
+  async assertLessonInteractionAccess(
     lessonId: string,
     viewer: LearningAccessViewer,
-  ): Promise<ILesson> {
-    return LearningAccessService.assertLessonAccess(lessonId, viewer, { allowPreview: false });
+  ): Promise<LessonAccessSnapshot> {
+    return this.assertLessonAccess(lessonId, viewer, { allowPreview: false });
   }
 
-  static async assertCourseInteractionAccess(
+  async assertCourseInteractionAccess(
     courseId: string,
     viewer: LearningAccessViewer,
   ): Promise<void> {
-    if (!mongoose.isValidObjectId(courseId)) throw new NotFoundError('Course not found.');
-    const course = await Course.findById(courseId).select('status isPremium');
-    if (!course || course.status === 'deleted') throw new NotFoundError('Course not found.');
+    if (!isObjectId(courseId)) throw new NotFoundError('Course not found.');
+    const course = await this.data.findCourse(courseId);
+    if (!course) throw new NotFoundError('Course not found.');
     if (viewer.role === 'ADMIN') return;
 
     if (course.status !== 'published') {
@@ -129,19 +105,11 @@ export class LearningAccessService implements ILearningAccess {
     if (!viewer.id) {
       throw new ForbiddenError('You must enroll to comment on this course.');
     }
-    if (course.isPremium && !(await LearningAccessService.hasActivePremium(viewer.id))) {
+    if (course.isPremium && !(await this.data.hasActivePremium(viewer.id))) {
       throw new ForbiddenError('You need an active premium plan to comment on this course.');
     }
 
-    const enrolled = await Enrollment.findOne({ userId: viewer.id, courseId }).select('_id');
+    const enrolled = await this.data.isEnrolled(viewer.id, courseId);
     if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
-  }
-
-  static async hasActivePremium(userId: string): Promise<boolean> {
-    const user = await User.findById(userId).select('planType subscriptionExpiresAt');
-    return (
-      user?.planType === 'PREMIUM' &&
-      (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now())
-    );
   }
 }

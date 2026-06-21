@@ -1,9 +1,11 @@
 import { ValueObject } from './value-object';
-import mongoose from 'mongoose';
+import { randomBytes } from 'crypto';
 
 interface UniqueIdProps {
   value: string;
 }
+
+const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
 export class UniqueId extends ValueObject<UniqueIdProps> {
   private constructor(props: UniqueIdProps) {
@@ -15,14 +17,14 @@ export class UniqueId extends ValueObject<UniqueIdProps> {
   }
 
   public static create(id?: string): UniqueId {
-    const value = id && mongoose.isValidObjectId(id)
+    const value = id && OBJECT_ID_PATTERN.test(id)
       ? id
-      : new mongoose.Types.ObjectId().toString();
+      : randomBytes(12).toString('hex');
     return new UniqueId({ value });
   }
 
   public static from(id: string): UniqueId {
-    if (!mongoose.isValidObjectId(id)) {
+    if (!OBJECT_ID_PATTERN.test(id)) {
       throw new Error(`Invalid ObjectId format: ${id}`);
     }
     return new UniqueId({ value: id });
