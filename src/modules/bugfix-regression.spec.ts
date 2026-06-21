@@ -13,6 +13,11 @@ import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
 import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
 import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
+import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
+import { CertificatesService } from './certificates/services/certificates.service';
+import { GamificationRewardsService } from './gamification/services/gamification-rewards.service';
+import { LeaderboardService } from './leaderboard/services/leaderboard.service';
+import { NotificationsService } from './notifications/services/notifications.service';
 
 describe('reported bug regressions', () => {
   afterEach(() => {
@@ -129,6 +134,32 @@ describe('reported bug regressions', () => {
       )
     ).resolves.toEqual([latest]);
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
+  });
+
+  it('handles course.completed with certificate and XP side effects', async () => {
+    const certificateSpy = jest
+      .spyOn(CertificatesService, 'issueCertificate')
+      .mockResolvedValue({ _id: 'certificate' } as never);
+    jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
+    const rewardSpy = jest
+      .spyOn(GamificationRewardsService, 'awardCourseCompletion')
+      .mockResolvedValue({ xpRewarded: 500, stats: { xp: 500 } as never });
+    jest.spyOn(LeaderboardService, 'invalidateCache').mockResolvedValue(undefined);
+
+    const result = await EnrollmentCompletionPublisher.publishCourseCompleted({
+      userId: '507f1f77bcf86cd799439011',
+      courseId: '507f1f77bcf86cd799439012',
+      progressPercent: 100,
+      totalLessons: 1,
+      completedLessons: 1,
+    });
+
+    expect(certificateSpy).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439012',
+    );
+    expect(rewardSpy).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
+    expect(result).toEqual({ xpRewarded: 500, stats: { xp: 500 } });
   });
 
   it('grades quiz answers by question id', async () => {
