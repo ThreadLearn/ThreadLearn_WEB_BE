@@ -36,7 +36,7 @@ export class AIService {
     let lessonTitle = '';
     let courseId = normalized.courseId;
     if (normalized.lessonId) {
-      const lesson = await LearningAccessService.assertLessonAccess(normalized.lessonId, {
+      const lesson = await LearningAccessService.assertLessonInteractionAccess(normalized.lessonId, {
         id: userId,
         role: 'STUDENT',
       });

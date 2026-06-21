@@ -191,10 +191,13 @@ export class CommentService {
       if (course.status !== 'published') {
         throw new ForbiddenError('Comments are disabled on this course.');
       }
+      if (course.isPremium && !(await LearningAccessService.hasActivePremium(userId))) {
+        throw new ForbiddenError('You need an active premium plan to comment on this course.');
+      }
       const enrolled = await Enrollment.findOne({ userId, courseId: targetId });
       if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
     } else {
-      await LearningAccessService.assertLessonAccess(targetId, { id: userId, role: userRole });
+      await LearningAccessService.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
     }
   }
 }

@@ -27,6 +27,14 @@ export class LearningAccessService implements ILearningAccess {
     return LearningAccessService.assertLessonAccess(lessonId, viewer, options);
   }
 
+  async assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson> {
+    return LearningAccessService.assertLessonViewAccess(lessonId, viewer);
+  }
+
+  async assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson> {
+    return LearningAccessService.assertLessonInteractionAccess(lessonId, viewer);
+  }
+
   static async checkLessonAccess(
     lessonId: string,
     viewer?: LearningAccessViewer,
@@ -84,6 +92,20 @@ export class LearningAccessService implements ILearningAccess {
     const lesson = await Lesson.findById(lessonId);
     if (!lesson || lesson.status === 'deleted') throw new NotFoundError('Lesson not found.');
     return lesson;
+  }
+
+  static async assertLessonViewAccess(
+    lessonId: string,
+    viewer: LearningAccessViewer,
+  ): Promise<ILesson> {
+    return LearningAccessService.assertLessonAccess(lessonId, viewer, { allowPreview: true });
+  }
+
+  static async assertLessonInteractionAccess(
+    lessonId: string,
+    viewer: LearningAccessViewer,
+  ): Promise<ILesson> {
+    return LearningAccessService.assertLessonAccess(lessonId, viewer, { allowPreview: false });
   }
 
   static async hasActivePremium(userId: string): Promise<boolean> {

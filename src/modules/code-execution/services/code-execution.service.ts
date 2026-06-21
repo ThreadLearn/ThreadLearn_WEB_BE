@@ -227,10 +227,10 @@ export class CodeExecutionService {
     let courseId = payload.courseId;
 
     if (payload.lessonId) {
-      const lesson = await LearningAccessService.assertLessonAccess(payload.lessonId, {
+      const lesson = await LearningAccessService.assertLessonViewAccess(payload.lessonId, {
         id: userId,
         role: userRole,
-      }, { allowPreview: true });
+      });
       courseId = courseId ?? lesson.courseId.toString();
     }
 

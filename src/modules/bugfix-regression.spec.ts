@@ -1,5 +1,6 @@
 import { CodeExecution } from './code-execution/models/code-execution.model';
 import { CodeExecutionService } from './code-execution/services/code-execution.service';
+import { CommentService } from './comment/services/comment.service';
 import { User } from './auth/models/user.model';
 import { Course } from './courses/models/course.model';
 import { Enrollment } from './enrollments/models/enrollment.model';
@@ -22,7 +23,7 @@ describe('reported bug regressions', () => {
     jest.spyOn(CodeExecution, 'countDocuments').mockResolvedValue(0);
     const accessError = new Error('stop after access check');
     const accessSpy = jest
-      .spyOn(LearningAccessService, 'assertLessonAccess')
+      .spyOn(LearningAccessService, 'assertLessonViewAccess')
       .mockRejectedValue(accessError);
 
     await expect(
@@ -39,8 +40,7 @@ describe('reported bug regressions', () => {
 
     expect(accessSpy).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439012',
-      { id: '507f1f77bcf86cd799439011', role: 'ADMIN' },
-      { allowPreview: true }
+      { id: '507f1f77bcf86cd799439011', role: 'ADMIN' }
     );
   });
 
@@ -77,6 +77,32 @@ describe('reported bug regressions', () => {
     });
   });
 
+  it('blocks course comments on premium courses for free students', async () => {
+    jest.spyOn(Course, 'findById').mockResolvedValue({
+      _id: '507f1f77bcf86cd799439012',
+      status: 'published',
+      isPremium: true,
+    } as never);
+    const select = jest.fn().mockResolvedValue({
+      planType: 'FREE',
+      subscriptionExpiresAt: undefined,
+    });
+    jest.spyOn(User, 'findById').mockReturnValue({ select } as never);
+    const enrollmentSpy = jest.spyOn(Enrollment, 'findOne').mockResolvedValue({ _id: 'enrollment' } as never);
+
+    await expect(
+      CommentService.createComment('507f1f77bcf86cd799439011', 'STUDENT', {
+        targetType: 'COURSE',
+        targetId: '507f1f77bcf86cd799439012',
+        content: 'premium course comment',
+      }),
+    ).rejects.toMatchObject({
+      message: 'You need an active premium plan to comment on this course.',
+      statusCode: 403,
+    });
+    expect(enrollmentSpy).not.toHaveBeenCalled();
+  });
+
   it('filters enrollments whose populated course no longer exists', async () => {
     const validEnrollment = { _id: 'valid', courseId: { _id: 'course' } };
     const orphanEnrollment = { _id: 'orphan', courseId: null };
@@ -91,7 +117,7 @@ describe('reported bug regressions', () => {
 
   it('returns only the most recently updated note for a lesson', async () => {
     const latest = { _id: 'latest-note', noteText: 'Current note' };
-    jest.spyOn(LearningAccessService, 'assertLessonAccess').mockResolvedValue({} as never);
+    jest.spyOn(LearningAccessService, 'assertLessonInteractionAccess').mockResolvedValue({} as never);
     const sort = jest.fn().mockResolvedValue(latest);
     jest.spyOn(Note, 'findOne').mockReturnValue({ sort } as never);
 

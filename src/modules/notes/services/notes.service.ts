@@ -5,7 +5,7 @@ import { Note } from '../models/note.model';
 
 export class NotesService {
   private static async assertLessonAccess(userId: string, lessonId: string) {
-    return LearningAccessService.assertLessonAccess(lessonId, { id: userId, role: 'STUDENT' });
+    return LearningAccessService.assertLessonInteractionAccess(lessonId, { id: userId, role: 'STUDENT' });
   }
 
   static async listByLesson(userId: string, lessonId: string) {

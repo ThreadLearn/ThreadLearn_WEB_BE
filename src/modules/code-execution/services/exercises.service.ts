@@ -81,7 +81,7 @@ export class ExercisesService {
     const exercise = await ExercisesService.getById(exerciseId);
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
 
-    await LearningAccessService.assertLessonAccess(exercise.lessonId.toString(), {
+    await LearningAccessService.assertLessonInteractionAccess(exercise.lessonId.toString(), {
       id: userId,
       role: 'STUDENT',
     });

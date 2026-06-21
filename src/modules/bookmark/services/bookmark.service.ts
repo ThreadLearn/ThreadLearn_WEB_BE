@@ -22,7 +22,7 @@ export class BookmarkService {
       throw new BadRequestError('Invalid targetId format.');
     }
     if (dto.targetType === 'LESSON') {
-      await LearningAccessService.assertLessonAccess(dto.targetId, { id: userId, role: 'STUDENT' }, { allowPreview: true });
+      await LearningAccessService.assertLessonViewAccess(dto.targetId, { id: userId, role: 'STUDENT' });
     }
     const existing = await Bookmark.findOneAndDelete({
       userId,
