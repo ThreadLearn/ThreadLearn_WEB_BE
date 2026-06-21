@@ -4,8 +4,8 @@ import { LessonVersion } from '../models/lesson-version.model';
 import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
 import { CoursesService } from '../../courses/services/courses.service';
-import { User } from '../../auth/models/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
+import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 
 export interface LessonCreatePayload {
   courseId: string;
@@ -36,7 +36,7 @@ export class LessonsService {
 
   static async getLessonForViewer(lessonId: string, viewer?: { id?: string; role?: string }) {
     const lesson = await LessonsService.getLesson(lessonId);
-    const access = await LessonsService.checkAccess(lessonId, viewer);
+    const access = await LearningAccessService.checkLessonAccess(lessonId, viewer);
     if (!access.canView) {
       if (access.reason === 'LESSON_NOT_FOUND') throw new NotFoundError('Lesson not found.');
       if (access.reason === 'LESSON_LOCKED') throw new ForbiddenError('Lesson is locked.');
@@ -61,13 +61,7 @@ export class LessonsService {
     viewer: { id?: string; role?: string },
     options: { allowPreview?: boolean } = {}
   ) {
-    const access = await LessonsService.checkAccess(lessonId, viewer);
-    if (!access.canView || (!options.allowPreview && access.reason === 'PREVIEW')) {
-      if (access.reason === 'LESSON_NOT_FOUND') throw new NotFoundError('Lesson not found.');
-      if (access.reason === 'LESSON_LOCKED') throw new ForbiddenError('Lesson is locked.');
-      throw new ForbiddenError('You must enroll before using this lesson feature.');
-    }
-    return LessonsService.getLesson(lessonId);
+    return LearningAccessService.assertLessonAccess(lessonId, viewer, options);
   }
 
   static async listByCourse(courseId: string) {
@@ -244,46 +238,7 @@ export class LessonsService {
   }
 
   static async checkAccess(lessonId: string, viewer?: { id?: string; role?: string }) {
-    if (!mongoose.isValidObjectId(lessonId)) throw new BadRequestError('Invalid lesson id.');
-    const lesson = await Lesson.findById(lessonId);
-    if (!lesson || lesson.status === 'deleted') {
-      return { canView: false, reason: 'LESSON_NOT_FOUND' as const };
-    }
-    if (viewer?.role === 'ADMIN') return { canView: true, reason: 'ADMIN' as const };
-
-    if (lesson.status === 'locked' || lesson.isLocked) {
-      if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' as const };
-      return { canView: false, reason: 'LESSON_LOCKED' as const };
-    }
-    if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' as const };
-
-    if (!viewer?.id) {
-      return { canView: false, reason: 'NOT_ENROLLED' as const };
-    }
-
-    const course = await Course.findById(lesson.courseId).select('status isPremium');
-    if (!course || course.status === 'deleted') {
-      return { canView: false, reason: 'LESSON_NOT_FOUND' as const };
-    }
-    if (course.status !== 'published') {
-      return { canView: false, reason: 'NOT_ENROLLED' as const };
-    }
-    if (course.isPremium) {
-      const user = await User.findById(viewer.id).select('planType subscriptionExpiresAt');
-      const isPremium =
-        user?.planType === 'PREMIUM' &&
-        (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now());
-      if (!isPremium) return { canView: false, reason: 'PREMIUM_REQUIRED' as const };
-    }
-
-    const enrolled = await Enrollment.findOne({
-      userId: viewer.id,
-      courseId: lesson.courseId,
-    }).select('_id');
-    if (!enrolled) {
-      return { canView: false, reason: 'NOT_ENROLLED' as const };
-    }
-    return { canView: true, reason: 'ENROLLED' as const };
+    return LearningAccessService.checkLessonAccess(lessonId, viewer);
   }
 }
 export default LessonsService;
