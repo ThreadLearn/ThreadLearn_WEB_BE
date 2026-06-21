@@ -397,16 +397,46 @@ Module `notifications` hiện còn layout legacy (`controllers/`, `services/`, `
 - [ ] Theo §7 Phase 3: nhân 4 tầng + nhận nested-route về module mình (path giữ nguyên).
 - [ ] Mọi access-control qua `@Inject(LEARNING_ACCESS)` `ILearningAccess`; gỡ hết import `LessonsService`/`lessons/models/*`.
 
-### DEV4 — Quiz / Quiz-Attempts / Gamification (chỉnh về chuẩn này)
+### DEV4 — Quiz / Quiz-Attempts / Gamification / Leaderboard / Subscription
 
-(Chỉ rename/di chuyển + làm sạch purity — KHÔNG đổi hành vi.)
+> **Phạm vi:** UC36–43 (Quiz + làm bài + chấm + lịch sử), UC48–50 (XP / Level / Leaderboard), UC51–52 (Plan / Purchase).
+> **Quy trình chi tiết + thứ tự + prompt giao AI:** xem [`DEV4_WORKFLOW.md`](./DEV4_WORKFLOW.md).
+> **Thứ tự bắt buộc (theo dependency, không nhảy cóc):**
+> `quiz → quiz-attempts → gamification → leaderboard → subscription`.
+> 1 module/lần, build xanh + §6 grep sạch rồi mới sang module kế.
+
+**B1 · quiz (UC36–39) — refactor, KHÔNG đổi hành vi.** Đây là nợ §1.3.
 
 - [ ] `domain/ports/*.repository.interface.ts` → `domain/interfaces/*.repository.ts`.
 - [ ] Token chuỗi `'IQuizRepository'` → Symbol `export const QUIZ_REPOSITORY = Symbol('QUIZ_REPOSITORY')` (+ sửa `@Inject`).
 - [ ] Port bỏ import Mongoose `IQuiz` + DTO `presentation/` → dùng Entity/type domain thuần.
-- [ ] Facade/service bỏ gọi `Quiz.findBy*` trực tiếp → đi qua repository.
-- [ ] Thêm `infrastructure/mapper/` (doc↔entity) nếu chưa có; repository trả Entity.
-- [ ] Giữ `domain/services` (domain service), `domain/events`, `application/events` (handler) — đã đúng tinh thần.
+- [ ] `quiz.facade.ts` bỏ gọi `Quiz.findBy*` trực tiếp → đi qua repository.
+- [ ] Thêm `infrastructure/mapper/quiz.mapper.ts` (doc↔entity); repository trả Entity. Giữ `quiz.aggregate.ts`/`question.entity.ts`, chỉ làm sạch import.
+
+**B2 · quiz-attempts (UC40–43) — refactor purity.** Đã có events/domain-service/handler đúng tinh thần.
+
+- [ ] `domain/ports/` → `domain/interfaces/`; token chuỗi → Symbol. Thêm `infrastructure/mapper/quiz-attempt.mapper.ts`; repo trả Entity.
+- [ ] UC41 Grade: chấm trong `domain/services/quiz-grading.service.ts` (thuần, KHÔNG I/O) → use-case emit `quiz.passed`/`quiz-attempt.submitted`. KHÔNG gọi thẳng XP/leaderboard/notification.
+- [ ] Đọc câu hỏi/đáp án để chấm QUA PORT `quiz` đã `exports`; CẤM import `quiz/models/*`.
+
+**B3 · gamification (UC48–49) — refactor về 4 tầng.**
+
+- [ ] Tạo `domain/entities/user-stats.entity.ts` (XP/level/streak = method). `level-calculator.ts` → `domain/services/` (thuần).
+- [ ] `models/` + `domain/ports/` + `services/` phẳng → chuẩn §1.1; thêm mapper + presenter; Symbol token.
+- [ ] UC48 XP là side-effect: `AwardXpService` CHỈ gọi từ `application/events/*.handler.ts` nghe `quiz.passed`/`lesson.completed`. CẤM use-case khác gọi thẳng.
+
+**B4 · leaderboard (UC50) — REBUILD từ legacy phẳng.**
+
+- [ ] Dựng đủ 4 tầng theo `course`. Ranking thuần ở `domain/services/` (KHÔNG I/O).
+- [ ] Đọc XP/stats QUA PORT `gamification` đã `exports`; CẤM import `gamification/models/*`. Cập nhật bảng = `LeaderboardHandler` nghe event.
+
+**B5 · subscription (UC51–52) — GREENFIELD theo `course` (không có legacy mirror).**
+
+- [ ] `modules/subscription/` đủ 4 tầng. Entity `Plan` (UC51) + `Subscription`/`Purchase` (UC52).
+- [ ] UC51 Admin CRUD plan: `@Roles('ADMIN')` đủ trên route ghi; DTO Zod đầy đủ.
+- [ ] UC52 Purchase: cổng thanh toán qua port `IPaymentGateway` (domain) + adapter (infrastructure) — domain KHÔNG biết SDK. Kích hoạt quyền = handler nghe `payment.succeeded`.
+
+> **Cách giao việc:** dùng Prompt #1 (§4 DEV4_WORKFLOW) cho model code, Prompt #2 (§5) cho model KHÁC nghiệm thu. Một bước chỉ chốt khi model nghiệm thu trả PASS toàn bộ + §6 grep rỗng.
 
 ### Kernel (Phase 1–2, lead + cả nhóm review)
 

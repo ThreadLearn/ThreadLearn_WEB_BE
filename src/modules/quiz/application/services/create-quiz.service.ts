@@ -1,36 +1,38 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { isValidObjectId } from 'mongoose';
-import { Lesson } from '@/database/models';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
-import { CreateQuizDto } from '../../presentation/validators/quiz.validator';
-import { IQuizRepository } from '../../domain/ports/quiz.repository.interface';
+import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
+import { Quiz } from '../../domain/entities/quiz.entity';
+import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
+import {
+  LESSON_READ_PORT,
+  ILessonReadPort,
+} from '../../../lessons/domain/interfaces/lesson-read.port';
+import { CreateQuizInput } from '../dto/quiz.dto';
 
 /**
- * UC36: CRUD Quiz (Admin)
- * Service to create a new quiz for a lesson.
+ * UC36-1: Admin tạo quiz cho một lesson.
  */
 @Injectable()
 export class CreateQuizService {
   constructor(
-    @Inject('IQuizRepository')
-    private readonly quizRepository: IQuizRepository,
+    @Inject(QUIZ_REPOSITORY) private readonly quizRepo: IQuizRepository,
+    @Inject(LESSON_READ_PORT) private readonly lessonRead: ILessonReadPort,
   ) {}
 
-  async execute(dto: CreateQuizDto) {
-    if (!isValidObjectId(dto.lessonId)) {
-      throw new BadRequestError('Invalid lesson id.');
-    }
-
-    const lesson = await Lesson.findById(dto.lessonId);
+  async execute(input: CreateQuizInput): Promise<Quiz> {
+    // Check lesson tồn tại qua port
+    const lesson = await this.lessonRead.getForCompletion(input.lessonId);
     if (!lesson) {
-      throw new NotFoundError('Lesson not found.');
+      throw DomainError.notFound(ErrorCode.LESSON_NOT_FOUND, 'Lesson not found.');
     }
 
-    const existing = await this.quizRepository.findByLessonId(dto.lessonId);
+    // Check quiz chưa tồn tại cho lesson
+    const existing = await this.quizRepo.findByLessonId(input.lessonId);
     if (existing) {
-      throw new BadRequestError('Quiz already exists for this lesson.');
+      throw DomainError.conflict(ErrorCode.QUIZ_ALREADY_EXISTS, 'Quiz already exists for this lesson.');
     }
 
-    return this.quizRepository.create(dto);
+    // Domain factory xử lý validation + tạo entity
+    const quiz = Quiz.createNew(input);
+    return this.quizRepo.create(quiz);
   }
 }

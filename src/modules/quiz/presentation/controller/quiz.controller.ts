@@ -7,7 +7,16 @@ import { ApiResponse } from '../../../../common/api-response';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { QuizService } from '../../application/services/quiz.facade';
+import { CreateQuizService } from '../../application/services/create-quiz.service';
+import { UpdateQuizService } from '../../application/services/update-quiz.service';
+import { GetQuizService } from '../../application/services/get-quiz.service';
+import { DeleteQuizService } from '../../application/services/delete-quiz.service';
+import { ListQuizzesService } from '../../application/services/list-quizzes.service';
+import { AddQuestionService } from '../../application/services/add-question.service';
+import { EditQuestionService } from '../../application/services/edit-question.service';
+import { DeleteQuestionService } from '../../application/services/delete-question.service';
+import { GetQuizByLessonService } from '../../application/services/get-quiz-by-lesson.service';
+import { QuizPresenter } from '../response/quiz.presenter';
 import {
   createQuizSchema, CreateQuizDto,
   updateQuizSchema, UpdateQuizDto,
@@ -24,74 +33,84 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class QuizController {
-  constructor(private readonly quizService: QuizService) { }
+  constructor(
+    private readonly createQuiz: CreateQuizService,
+    private readonly updateQuiz: UpdateQuizService,
+    private readonly getQuiz: GetQuizService,
+    private readonly deleteQuiz: DeleteQuizService,
+    private readonly listQuizzes: ListQuizzesService,
+    private readonly addQuestion: AddQuestionService,
+    private readonly editQuestion: EditQuestionService,
+    private readonly deleteQuestion: DeleteQuestionService,
+    private readonly getQuizByLesson: GetQuizByLessonService,
+  ) {}
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
   @HttpCode(201)
   @Roles('ADMIN')
-  async createQuiz(@Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto) {
-    const quiz = await this.quizService.createQuiz(dto);
-    return ApiResponse.success({ message: 'Quiz created successfully.', data: quiz, statusCode: 201 });
+  async create(@Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto) {
+    const quiz = await this.createQuiz.execute(dto);
+    return ApiResponse.success({ message: 'Quiz created successfully.', data: QuizPresenter.toResponse(quiz), statusCode: 201 });
   }
 
   // ─── UC36-5: Admin xem danh sách quiz ────────────────────
   @Get()
   @Roles('ADMIN')
-  async listQuizzes() {
-    const quizzes = await this.quizService.getAllQuizzes();
-    return ApiResponse.success({ message: 'Quizzes fetched successfully.', data: quizzes });
+  async list() {
+    const quizzes = await this.listQuizzes.execute();
+    return ApiResponse.success({ message: 'Quizzes fetched successfully.', data: QuizPresenter.toList(quizzes) });
   }
 
   // ─── UC37: Admin thêm câu hỏi ────────────────────────────
   @Post(':quizId/questions')
   @HttpCode(201)
   @Roles('ADMIN')
-  async addQuestion(
+  async addQuestionToQuiz(
     @Param('quizId') quizId: string,
     @Body(new ZodValidationPipe(addQuestionSchema)) question: QuestionDto,
   ) {
-    const quiz = await this.quizService.addQuestion(quizId, question);
-    return ApiResponse.success({ message: 'Question added successfully.', data: quiz });
+    const quiz = await this.addQuestion.execute(quizId, question);
+    return ApiResponse.success({ message: 'Question added successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC38: Admin sửa câu hỏi ──────────────────────────────
   @Put(':quizId/questions/:questionId')
   @Roles('ADMIN')
-  async editQuestion(
+  async editQuestionInQuiz(
     @Param('quizId') quizId: string,
     @Param('questionId') questionId: string,
     @Body(new ZodValidationPipe(updateQuestionSchema)) dto: UpdateQuestionDto,
   ) {
-    const quiz = await this.quizService.editQuestion(quizId, questionId, dto);
-    return ApiResponse.success({ message: 'Question updated successfully.', data: quiz });
+    const quiz = await this.editQuestion.execute(quizId, questionId, dto);
+    return ApiResponse.success({ message: 'Question updated successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
   @Roles('ADMIN')
-  async getQuizById(@Param('quizId') quizId: string) {
-    const quiz = await this.quizService.getQuizById(quizId);
-    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: quiz });
+  async getById(@Param('quizId') quizId: string) {
+    const quiz = await this.getQuiz.execute(quizId);
+    return ApiResponse.success({ message: 'Quiz fetched successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-2: Admin cập nhật quiz ─────────────────────────
   @Put(':quizId')
   @Roles('ADMIN')
-  async updateQuiz(
+  async update(
     @Param('quizId') quizId: string,
     @Body(new ZodValidationPipe(updateQuizSchema)) dto: UpdateQuizDto,
   ) {
-    const quiz = await this.quizService.updateQuiz(quizId, dto);
-    return ApiResponse.success({ message: 'Quiz updated successfully.', data: quiz });
+    const quiz = await this.updateQuiz.execute(quizId, dto);
+    return ApiResponse.success({ message: 'Quiz updated successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-4: Admin xóa quiz ──────────────────────────────
   @Delete(':quizId')
   @HttpCode(200)
   @Roles('ADMIN')
-  async deleteQuiz(@Param('quizId') quizId: string) {
-    await this.quizService.deleteQuiz(quizId);
+  async remove(@Param('quizId') quizId: string) {
+    await this.deleteQuiz.execute(quizId);
     return ApiResponse.success({ message: 'Quiz deleted successfully.', data: null });
   }
 }

@@ -2,24 +2,21 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
 import { Quiz } from '../../domain/entities/quiz.entity';
 import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
-import { QuestionInput } from '../dto/quiz.dto';
 
 /**
- * UC37: Admin thêm 1 câu hỏi vào quiz đã tồn tại.
+ * UC36-3: Admin xem chi tiết quiz.
  */
 @Injectable()
-export class AddQuestionService {
+export class GetQuizService {
   constructor(
     @Inject(QUIZ_REPOSITORY) private readonly quizRepo: IQuizRepository,
   ) {}
 
-  async execute(quizId: string, input: QuestionInput): Promise<Quiz> {
+  async execute(quizId: string): Promise<Quiz> {
     const quiz = await this.quizRepo.findById(quizId);
     if (!quiz) {
       throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
     }
-
-    quiz.addQuestion(input); // business rule ở entity
-    return this.quizRepo.update(quiz);
+    return quiz;
   }
 }
