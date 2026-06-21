@@ -3,6 +3,9 @@ import { QuizController } from './controllers/quiz.controller';
 import { QuizService } from './services/quiz.service';
 import { QuizRepository } from './repositories/quiz.repository';
 import { CreateQuizUseCase } from './use-cases/create-quiz.use-case';
+import { AddQuestionUseCase } from './use-cases/add-question.use-case';
+import { EditQuestionUseCase } from './use-cases/edit-question.use-case';
+import { DeleteQuestionUseCase } from './use-cases/delete-question.use-case';
 
 /**
  * QuizModule — quản lý quiz & câu hỏi (Admin).
@@ -14,6 +17,9 @@ import { CreateQuizUseCase } from './use-cases/create-quiz.use-case';
   providers: [
     QuizService,
     CreateQuizUseCase,
+    AddQuestionUseCase,
+    EditQuestionUseCase,
+    DeleteQuestionUseCase,
     {
       provide: 'IQuizRepository',
       useClass: QuizRepository,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IQuiz, Quiz } from '../models/quiz.model';
-import { CreateQuizDto } from '../validators/quiz.validator';
+import { CreateQuizDto, QuestionDto } from '../validators/quiz.validator';
 import { IQuizRepository } from './quiz.repository.interface';
 
 @Injectable()
@@ -14,7 +14,6 @@ export class QuizRepository implements IQuizRepository {
   }
 
   async create(dto: CreateQuizDto): Promise<IQuiz> {
-    // Standard Mongoose model instantiation and saving
     return Quiz.create(dto);
   }
 
@@ -24,5 +23,33 @@ export class QuizRepository implements IQuizRepository {
 
   async delete(id: string): Promise<IQuiz | null> {
     return Quiz.findByIdAndDelete(id).exec();
+  }
+
+  async addQuestion(quizId: string, question: QuestionDto): Promise<IQuiz | null> {
+    return Quiz.findByIdAndUpdate(
+      quizId,
+      { $push: { questions: question } },
+      { new: true, runValidators: true }
+    ).exec();
+  }
+
+  async editQuestion(
+    quizId: string,
+    questionId: string,
+    setFields: Record<string, any>
+  ): Promise<IQuiz | null> {
+    return Quiz.findOneAndUpdate(
+      { _id: quizId, 'questions._id': questionId },
+      { $set: setFields },
+      { new: true, runValidators: true }
+    ).exec();
+  }
+
+  async deleteQuestion(quizId: string, questionId: string): Promise<IQuiz | null> {
+    return Quiz.findByIdAndUpdate(
+      quizId,
+      { $pull: { questions: { _id: questionId } } },
+      { new: true }
+    ).exec();
   }
 }
