@@ -2,7 +2,6 @@ import { Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { Bookmark, BookmarkTargetType } from '../models/bookmark.model';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import {
   ILearningAccess,
   LEARNING_ACCESS,
@@ -28,11 +27,7 @@ export class BookmarkService {
   constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
 
   async toggleBookmark(userId: string, dto: ToggleInput) {
-    return BookmarkService.toggleBookmarkWithAccess(
-      userId,
-      dto,
-      (lessonId, viewer) => this.learningAccess.assertLessonViewAccess(lessonId, viewer),
-    );
+    return BookmarkService.toggleBookmark(userId, dto, this.learningAccess);
   }
 
   async listMyBookmarks(
@@ -61,12 +56,16 @@ export class BookmarkService {
   }
 
   /** UC34 — toggle bookmark: nếu đã có → xóa, chưa có → tạo. */
-  static async toggleBookmark(userId: string, dto: ToggleInput) {
+  static async toggleBookmark(
+    userId: string,
+    dto: ToggleInput,
+    accessPort: Pick<ILearningAccess, 'assertLessonViewAccess'>,
+  ) {
     if (!mongoose.isValidObjectId(dto.targetId)) {
       throw new BadRequestError('Invalid targetId format.');
     }
     if (dto.targetType === 'LESSON') {
-      await LearningAccessService.assertLessonViewAccess(dto.targetId, { id: userId, role: 'STUDENT' });
+      await accessPort.assertLessonViewAccess(dto.targetId, { id: userId, role: 'STUDENT' });
     }
     const existing = await Bookmark.findOneAndDelete({
       userId,

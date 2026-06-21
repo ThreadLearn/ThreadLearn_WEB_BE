@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import { Exercise } from '../models/exercise.model';
 import { CodeExecutionService, CodeSubmitPayload } from './code-execution.service';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 export interface ExerciseUpsertPayload {
@@ -122,8 +121,8 @@ export class ExercisesService {
     userId: string,
     exerciseId: string,
     sourceCode: string,
-    accessPort: ExerciseAccess = LearningAccessService,
-    codeRunner: CodeRunner = (runnerUserId, payload) => CodeExecutionService.executeCode(runnerUserId, payload),
+    accessPort: ExerciseAccess,
+    codeRunner: CodeRunner,
   ) {
     const exercise = await ExercisesService.getById(exerciseId);
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');

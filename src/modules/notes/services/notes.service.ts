@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 import { Note } from '../models/note.model';
 
@@ -31,11 +30,11 @@ export class NotesService {
     return NotesService.remove(userId, noteId);
   }
 
-  private static async assertLessonAccess(userId: string, lessonId: string, accessPort: NotesAccess = LearningAccessService) {
+  private static async assertLessonAccess(userId: string, lessonId: string, accessPort: NotesAccess) {
     return accessPort.assertLessonInteractionAccess(lessonId, { id: userId, role: 'STUDENT' });
   }
 
-  static async listByLesson(userId: string, lessonId: string, accessPort: NotesAccess = LearningAccessService) {
+  static async listByLesson(userId: string, lessonId: string, accessPort: NotesAccess) {
     await this.assertLessonAccess(userId, lessonId, accessPort);
     const latest = await Note.findOne({ userId, lessonId }).sort({ updatedAt: -1 });
     return latest ? [latest] : [];
@@ -44,7 +43,7 @@ export class NotesService {
   static async upsert(
     userId: string,
     input: { lessonId: string; noteText: string; codeSnippet?: string },
-    accessPort: NotesAccess = LearningAccessService,
+    accessPort: NotesAccess,
   ) {
     await this.assertLessonAccess(userId, input.lessonId, accessPort);
     if (!input.noteText?.trim()) throw new BadRequestError('noteText is required.');

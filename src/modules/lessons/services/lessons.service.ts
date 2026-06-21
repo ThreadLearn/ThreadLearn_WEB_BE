@@ -5,7 +5,11 @@ import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
 import { CoursesService } from '../../courses/services/courses.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
-import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
+import {
+  AssertLearningAccessOptions,
+  ILearningAccess,
+  LearningAccessViewer,
+} from '../../../shared/domain/interfaces/learning-access.port';
 
 export interface LessonCreatePayload {
   courseId: string;
@@ -24,6 +28,7 @@ export interface LessonCreatePayload {
   createdBy?: string;
 }
 
+type LessonAccess = Pick<ILearningAccess, 'checkLessonAccess' | 'assertLessonAccess'>;
 const VERSION_THRESHOLD_CHARS = 1000;
 
 export class LessonsService {
@@ -34,9 +39,13 @@ export class LessonsService {
     return lesson;
   }
 
-  static async getLessonForViewer(lessonId: string, viewer?: { id?: string; role?: string }) {
+  static async getLessonForViewer(
+    lessonId: string,
+    viewer: LearningAccessViewer | undefined,
+    accessPort: LessonAccess,
+  ) {
     const lesson = await LessonsService.getLesson(lessonId);
-    const access = await LearningAccessService.checkLessonAccess(lessonId, viewer);
+    const access = await accessPort.checkLessonAccess(lessonId, viewer);
     if (!access.canView) {
       if (access.reason === 'LESSON_NOT_FOUND') throw new NotFoundError('Lesson not found.');
       if (access.reason === 'LESSON_LOCKED') throw new ForbiddenError('Lesson is locked.');
@@ -58,10 +67,11 @@ export class LessonsService {
 
   static async assertLessonAccess(
     lessonId: string,
-    viewer: { id?: string; role?: string },
-    options: { allowPreview?: boolean } = {}
+    viewer: LearningAccessViewer,
+    accessPort: Pick<ILearningAccess, 'assertLessonAccess'>,
+    options: AssertLearningAccessOptions = {},
   ) {
-    return LearningAccessService.assertLessonAccess(lessonId, viewer, options);
+    return accessPort.assertLessonAccess(lessonId, viewer, options);
   }
 
   static async listByCourse(courseId: string) {
@@ -237,8 +247,12 @@ export class LessonsService {
     return lesson;
   }
 
-  static async checkAccess(lessonId: string, viewer?: { id?: string; role?: string }) {
-    return LearningAccessService.checkLessonAccess(lessonId, viewer);
+  static async checkAccess(
+    lessonId: string,
+    viewer: LearningAccessViewer | undefined,
+    accessPort: Pick<ILearningAccess, 'checkLessonAccess'>,
+  ) {
+    return accessPort.checkLessonAccess(lessonId, viewer);
   }
 }
 export default LessonsService;
