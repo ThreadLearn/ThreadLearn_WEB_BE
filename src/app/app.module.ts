@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CorrelationIdMiddleware } from '../middlewares/correlation-id.middleware';
 import { RateLimitMiddleware } from '../middlewares/rate-limit.middleware';
+import { LearningAccessModule } from '../shared/application/learning-access/learning-access.module';
 import { SocketGateway } from '../socket';
 import { AdminModule } from '../modules/admin/admin.module';
 import { AIModule } from '../modules/ai/ai.module';
@@ -30,6 +31,7 @@ import { AppController } from './app.controller';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    LearningAccessModule,
     AdminModule,
     AIModule,
     AnalyticsModule,

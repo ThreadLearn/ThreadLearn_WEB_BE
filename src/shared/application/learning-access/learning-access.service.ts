@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { User } from '../../../modules/auth/models/user.model';
@@ -11,6 +12,7 @@ import {
   LearningAccessViewer,
 } from '../../domain/interfaces/learning-access.port';
 
+@Injectable()
 export class LearningAccessService implements ILearningAccess {
   async checkLessonAccess(
     lessonId: string,
