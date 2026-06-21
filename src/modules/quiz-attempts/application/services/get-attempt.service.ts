@@ -3,6 +3,10 @@ import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
 
+/**
+ * UC42: View Quiz Result (Student)
+ * Service to fetch detail of a specific quiz attempt by a student.
+ */
 @Injectable()
 export class GetAttemptService {
   constructor(

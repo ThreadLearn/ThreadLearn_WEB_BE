@@ -5,6 +5,10 @@ import { BadRequestError, NotFoundError } from '../../../../common/custom-error'
 import { CreateQuizDto } from '../../presentation/validators/quiz.validator';
 import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
+/**
+ * UC36: CRUD Quiz (Admin)
+ * Service to create a new quiz for a lesson.
+ */
 @Injectable()
 export class CreateQuizService {
   constructor(

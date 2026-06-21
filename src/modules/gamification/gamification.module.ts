@@ -1,10 +1,25 @@
 import { Module } from '@nestjs/common';
-import { GamificationController } from './controllers/gamification.controller';
-import { GamificationService } from './services/gamification.service';
+import { GamificationController } from './presentation/controller/gamification.controller';
+import { AwardXpService } from './application/services/award-xp.service';
+import { UpdateStreakService } from './application/services/update-streak.service';
+import { GetStatsService } from './application/services/get-stats.service';
+import { UserStatsRepository } from './infrastructure/persistence/repositories/mongo-user-stats.repository';
 
 @Module({
   controllers: [GamificationController],
-  providers: [GamificationService],
-  exports: [GamificationService],
+  providers: [
+    AwardXpService,
+    UpdateStreakService,
+    GetStatsService,
+    {
+      provide: 'IUserStatsRepository',
+      useClass: UserStatsRepository,
+    },
+  ],
+  exports: [
+    AwardXpService,
+    UpdateStreakService,
+    GetStatsService,
+  ],
 })
 export class GamificationModule {}

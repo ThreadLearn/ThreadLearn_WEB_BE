@@ -4,6 +4,10 @@ import { BadRequestError, NotFoundError } from '../../../../common/custom-error'
 import { QuestionDto } from '../../presentation/validators/quiz.validator';
 import { IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
+/**
+ * UC37: Add Question (Admin)
+ * Service to add a new question to a quiz.
+ */
 @Injectable()
 export class AddQuestionService {
   constructor(

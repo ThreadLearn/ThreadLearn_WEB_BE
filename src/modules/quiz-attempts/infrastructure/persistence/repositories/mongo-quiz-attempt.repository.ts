@@ -18,4 +18,8 @@ export class QuizAttemptRepository implements IQuizAttemptRepository {
       .sort({ createdAt: -1 })
       .populate('quizId', 'title description totalQuestions xpReward timeLimit passingScore') as any;
   }
+
+  async deleteById(attemptId: string): Promise<void> {
+    await QuizAttempt.deleteOne({ _id: attemptId });
+  }
 }
