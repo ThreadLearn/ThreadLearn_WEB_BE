@@ -35,6 +35,10 @@ export class LearningAccessService implements ILearningAccess {
     return LearningAccessService.assertLessonInteractionAccess(lessonId, viewer);
   }
 
+  async assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void> {
+    return LearningAccessService.assertCourseInteractionAccess(courseId, viewer);
+  }
+
   static async checkLessonAccess(
     lessonId: string,
     viewer?: LearningAccessViewer,
@@ -106,6 +110,29 @@ export class LearningAccessService implements ILearningAccess {
     viewer: LearningAccessViewer,
   ): Promise<ILesson> {
     return LearningAccessService.assertLessonAccess(lessonId, viewer, { allowPreview: false });
+  }
+
+  static async assertCourseInteractionAccess(
+    courseId: string,
+    viewer: LearningAccessViewer,
+  ): Promise<void> {
+    if (!mongoose.isValidObjectId(courseId)) throw new NotFoundError('Course not found.');
+    const course = await Course.findById(courseId).select('status isPremium');
+    if (!course || course.status === 'deleted') throw new NotFoundError('Course not found.');
+    if (viewer.role === 'ADMIN') return;
+
+    if (course.status !== 'published') {
+      throw new ForbiddenError('Comments are disabled on this course.');
+    }
+    if (!viewer.id) {
+      throw new ForbiddenError('You must enroll to comment on this course.');
+    }
+    if (course.isPremium && !(await LearningAccessService.hasActivePremium(viewer.id))) {
+      throw new ForbiddenError('You need an active premium plan to comment on this course.');
+    }
+
+    const enrolled = await Enrollment.findOne({ userId: viewer.id, courseId }).select('_id');
+    if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
   }
 
   static async hasActivePremium(userId: string): Promise<boolean> {

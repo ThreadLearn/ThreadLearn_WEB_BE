@@ -78,11 +78,12 @@ describe('reported bug regressions', () => {
   });
 
   it('blocks course comments on premium courses for free students', async () => {
-    jest.spyOn(Course, 'findById').mockResolvedValue({
+    const courseSelect = jest.fn().mockResolvedValue({
       _id: '507f1f77bcf86cd799439012',
       status: 'published',
       isPremium: true,
-    } as never);
+    });
+    jest.spyOn(Course, 'findById').mockReturnValue({ select: courseSelect } as never);
     const select = jest.fn().mockResolvedValue({
       planType: 'FREE',
       subscriptionExpiresAt: undefined,

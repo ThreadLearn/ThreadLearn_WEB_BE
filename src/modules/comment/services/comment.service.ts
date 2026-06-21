@@ -1,8 +1,5 @@
 import mongoose from 'mongoose';
 import { Comment, CommentTargetType } from '../models/comment.model';
-import { Course } from '../../courses/models/course.model';
-import { Enrollment } from '../../enrollments/models/enrollment.model';
-import { Lesson } from '../../lessons/models/lesson.model';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
@@ -88,7 +85,7 @@ export class CommentService {
     userRole: 'STUDENT' | 'ADMIN',
     input: CreateCommentInput,
   ) {
-    await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
+    const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
 
     if (input.parentId) {
       if (!mongoose.isValidObjectId(input.parentId)) {
@@ -103,13 +100,12 @@ export class CommentService {
       }
     }
 
-    const lesson = input.targetType === 'LESSON' ? await Lesson.findById(input.targetId).select('courseId') : null;
     const created = await Comment.create({
       userId,
       targetType: input.targetType,
       targetId:   input.targetId,
       lessonId: input.targetType === 'LESSON' ? input.targetId : undefined,
-      courseId: input.targetType === 'COURSE' ? input.targetId : lesson?.courseId,
+      courseId: access.courseId,
       content:    input.content,
       parentId:   input.parentId ? new mongoose.Types.ObjectId(input.parentId) : null,
       mentionUserIds: (input.mentionUserIds ?? []).filter((id) => mongoose.isValidObjectId(id)),
@@ -178,26 +174,17 @@ export class CommentService {
     userRole: 'STUDENT' | 'ADMIN',
     targetType: CommentTargetType,
     targetId: string,
-  ) {
+  ): Promise<{ courseId?: string }> {
     if (!mongoose.isValidObjectId(targetId)) {
       throw new NotFoundError(targetType === 'COURSE' ? 'Course not found.' : 'Lesson not found.');
     }
     if (targetType === 'COURSE') {
-      const course = await Course.findById(targetId);
-      if (!course || course.status === 'deleted') throw new NotFoundError('Course not found.');
-      if (userRole === 'ADMIN') return;
-      // BR: only currently-published courses accept new student comments.
+      await LearningAccessService.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
+      return { courseId: targetId };
       // Hidden/archived/draft → block (students can still read past comments).
-      if (course.status !== 'published') {
-        throw new ForbiddenError('Comments are disabled on this course.');
-      }
-      if (course.isPremium && !(await LearningAccessService.hasActivePremium(userId))) {
-        throw new ForbiddenError('You need an active premium plan to comment on this course.');
-      }
-      const enrolled = await Enrollment.findOne({ userId, courseId: targetId });
-      if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
     } else {
-      await LearningAccessService.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
+      const lesson = await LearningAccessService.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
+      return { courseId: lesson.courseId.toString() };
     }
   }
 }

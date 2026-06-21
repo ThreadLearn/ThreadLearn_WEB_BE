@@ -32,6 +32,7 @@ export interface ILearningAccess {
   ): Promise<ILesson>;
   assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson>;
   assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<ILesson>;
+  assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void>;
 }
 
 export const LEARNING_ACCESS = Symbol('LEARNING_ACCESS');
