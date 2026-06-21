@@ -9,6 +9,7 @@ import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.rep
 import { IQuizAttempt } from '../../models/quiz-attempt.model';
 import { AwardXpService } from '../../../gamification/application/services/award-xp.service';
 import { UpdateStreakService } from '../../../gamification/application/services/update-streak.service';
+import { UserStats } from '../../../gamification/models/user-stats.model';
 
 /**
  * UC40: Take Quiz (Student)
@@ -90,7 +91,6 @@ export class SubmitAttemptService {
         }
       } else {
         // Fallback for isolated unit tests that bypass NestJS DI context
-        const UserStats = require('../../../gamification/models/user-stats.model').UserStats;
         const stats = await UserStats.findOne({ userId });
         if (stats) {
           stats.xp += xpRewarded;
