@@ -1,8 +1,10 @@
+import { Inject, Injectable } from '@nestjs/common';
 import vm from 'vm';
 import { env } from '../../../configs/env';
 import { logger } from '../../../configs/logger';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
 import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
+import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 import { CodeExecution } from '../models/code-execution.model';
 
 type ExecutionResult = {
@@ -184,7 +186,28 @@ const LANGUAGE_IDS: Record<string, number> = {
   c: 50,
 };
 
+type CodeExecutionAccess = Pick<ILearningAccess, 'assertLessonViewAccess'>;
+
+@Injectable()
 export class CodeExecutionService {
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+
+  async executeCode(
+    userId: string,
+    payload: CodeSubmitPayload,
+    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT',
+  ) {
+    return CodeExecutionService.executeCode(userId, payload, userRole, this.learningAccess);
+  }
+
+  async listHistory(userId: string, lessonId?: string) {
+    return CodeExecutionService.listHistory(userId, lessonId);
+  }
+
+  async getById(userId: string, id: string) {
+    return CodeExecutionService.getById(userId, id);
+  }
+
   static resolveLanguageId(language?: string, languageId?: number) {
     if (languageId) return languageId;
     if (!language) throw new BadRequestError('language or languageId is required.');
@@ -196,7 +219,8 @@ export class CodeExecutionService {
   static async executeCode(
     userId: string,
     payload: CodeSubmitPayload,
-    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT'
+    userRole: 'STUDENT' | 'ADMIN' = 'STUDENT',
+    accessPort: CodeExecutionAccess = LearningAccessService,
   ) {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
@@ -227,7 +251,7 @@ export class CodeExecutionService {
     let courseId = payload.courseId;
 
     if (payload.lessonId) {
-      const lesson = await LearningAccessService.assertLessonViewAccess(payload.lessonId, {
+      const lesson = await accessPort.assertLessonViewAccess(payload.lessonId, {
         id: userId,
         role: userRole,
       });

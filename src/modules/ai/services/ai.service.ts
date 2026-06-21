@@ -1,8 +1,10 @@
+import { Inject, Injectable } from '@nestjs/common';
 import { AIHistory } from '../models/ai-history.model';
 import { User } from '../../auth/models/user.model';
 import { Course } from '../../courses/models/course.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
+import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 export interface AIRecommendationPayload {
   courseId?: string;
@@ -16,8 +18,33 @@ export interface AIRecommendationPayload {
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
 
+type AIAccess = Pick<ILearningAccess, 'assertLessonInteractionAccess'>;
+
+@Injectable()
 export class AIService {
-  static async requestRecommendation(userId: string, payload: AIRecommendationPayload | string) {
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+
+  async requestRecommendation(userId: string, payload: AIRecommendationPayload | string) {
+    return AIService.requestRecommendation(userId, payload, this.learningAccess);
+  }
+
+  async getHistoryLogs(userId: string) {
+    return AIService.getHistoryLogs(userId);
+  }
+
+  async getHistoryById(userId: string, id: string) {
+    return AIService.getHistoryById(userId, id);
+  }
+
+  async updateFeedback(userId: string, id: string, feedbackRating: number) {
+    return AIService.updateFeedback(userId, id, feedbackRating);
+  }
+
+  static async requestRecommendation(
+    userId: string,
+    payload: AIRecommendationPayload | string,
+    accessPort: AIAccess = LearningAccessService,
+  ) {
     const normalized: AIRecommendationPayload =
       typeof payload === 'string' ? { courseId: payload } : payload;
 
@@ -36,7 +63,7 @@ export class AIService {
     let lessonTitle = '';
     let courseId = normalized.courseId;
     if (normalized.lessonId) {
-      const lesson = await LearningAccessService.assertLessonInteractionAccess(normalized.lessonId, {
+      const lesson = await accessPort.assertLessonInteractionAccess(normalized.lessonId, {
         id: userId,
         role: 'STUDENT',
       });

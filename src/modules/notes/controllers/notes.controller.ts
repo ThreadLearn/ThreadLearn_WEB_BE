@@ -11,15 +11,17 @@ import { NotesService } from '../services/notes.service';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class NotesController {
+  constructor(private readonly notes: NotesService) {}
+
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const notes = lessonId ? await NotesService.listByLesson(user.id, lessonId) : [];
+    const notes = lessonId ? await this.notes.listByLesson(user.id, lessonId) : [];
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
 
   @Get('search')
   async search(@CurrentUser() user: AuthenticatedUser, @Query('q') query = '') {
-    const notes = await NotesService.search(user.id, query);
+    const notes = await this.notes.search(user.id, query);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
 
@@ -28,7 +30,7 @@ export class NotesController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { lessonId: string; noteText: string; codeSnippet?: string }
   ) {
-    const note = await NotesService.upsert(user.id, body);
+    const note = await this.notes.upsert(user.id, body);
     return ApiResponse.success({ message: 'Note saved.', data: note });
   }
 
@@ -38,13 +40,13 @@ export class NotesController {
     @Param('id') id: string,
     @Body() body: { noteText?: string; content?: string; codeSnippet?: string }
   ) {
-    const note = await NotesService.update(user.id, id, body);
+    const note = await this.notes.update(user.id, id, body);
     return ApiResponse.success({ message: 'Note updated.', data: note });
   }
 
   @Delete(':id')
   async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const result = await NotesService.remove(user.id, id);
+    const result = await this.notes.remove(user.id, id);
     return ApiResponse.success({ message: 'Note deleted.', data: result });
   }
 }

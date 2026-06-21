@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
 import { AIController } from './controllers/ai.controller';
 import { AIService } from './services/ai.service';
 import { AIRetentionService } from './services/ai-retention.service';
 
 @Module({
+  imports: [LearningAccessModule],
   controllers: [AIController],
   providers: [AIService, AIRetentionService],
   exports: [AIService],

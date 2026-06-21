@@ -23,24 +23,26 @@ const runCodeSchema = z.object({
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class CodeExecutionController {
+  constructor(private readonly codeExecution: CodeExecutionService) {}
+
   @Post('run')
   async run(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(runCodeSchema)) body: z.infer<typeof runCodeSchema>
   ) {
-    const result = await CodeExecutionService.executeCode(user.id, body, user.role);
+    const result = await this.codeExecution.executeCode(user.id, body, user.role);
     return ApiResponse.success({ message: 'Code executed successfully.', data: result });
   }
 
   @Get('history')
   async history(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const result = await CodeExecutionService.listHistory(user.id, lessonId);
+    const result = await this.codeExecution.listHistory(user.id, lessonId);
     return ApiResponse.success({ message: 'Code execution history fetched.', data: result });
   }
 
   @Get(':id')
   async detail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const result = await CodeExecutionService.getById(user.id, id);
+    const result = await this.codeExecution.getById(user.id, id);
     return ApiResponse.success({ message: 'Code execution fetched.', data: result });
   }
 }

@@ -1,8 +1,10 @@
+import { Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { Comment, CommentTargetType } from '../models/comment.model';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/custom-error';
 import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
+import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 
 interface CreateCommentInput {
   targetType: CommentTargetType;
@@ -28,7 +30,40 @@ function formatComment(comment: any) {
   };
 }
 
+type CommentAccess = Pick<ILearningAccess, 'assertCourseInteractionAccess' | 'assertLessonInteractionAccess'>;
+
+@Injectable()
 export class CommentService {
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+
+  async getCommentOrThrow(commentId: string) {
+    return CommentService.getCommentOrThrow(commentId);
+  }
+
+  async listComments(targetType: CommentTargetType, targetId: string, page = 1, limit = 10) {
+    return CommentService.listComments(targetType, targetId, page, limit);
+  }
+
+  async listReplies(commentId: string) {
+    return CommentService.listReplies(commentId);
+  }
+
+  async createComment(
+    userId: string,
+    userRole: 'STUDENT' | 'ADMIN',
+    input: CreateCommentInput,
+  ) {
+    return CommentService.createComment(userId, userRole, input, this.learningAccess);
+  }
+
+  async updateComment(userId: string, userRole: 'STUDENT' | 'ADMIN', commentId: string, content: string) {
+    return CommentService.updateComment(userId, userRole, commentId, content);
+  }
+
+  async deleteComment(userId: string, userRole: 'STUDENT' | 'ADMIN', commentId: string) {
+    return CommentService.deleteComment(userId, userRole, commentId);
+  }
+
   static async getCommentOrThrow(commentId: string) {
     if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('COMMENT_NOT_FOUND');
     const comment = await Comment.findById(commentId);
@@ -84,8 +119,9 @@ export class CommentService {
     userId: string,
     userRole: 'STUDENT' | 'ADMIN',
     input: CreateCommentInput,
+    accessPort: CommentAccess = LearningAccessService,
   ) {
-    const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
+    const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId), accessPort);
 
     if (input.parentId) {
       if (!mongoose.isValidObjectId(input.parentId)) {
@@ -174,16 +210,17 @@ export class CommentService {
     userRole: 'STUDENT' | 'ADMIN',
     targetType: CommentTargetType,
     targetId: string,
+    accessPort: CommentAccess = LearningAccessService,
   ): Promise<{ courseId?: string }> {
     if (!mongoose.isValidObjectId(targetId)) {
       throw new NotFoundError(targetType === 'COURSE' ? 'Course not found.' : 'Lesson not found.');
     }
     if (targetType === 'COURSE') {
-      await LearningAccessService.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
+      await accessPort.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
       return { courseId: targetId };
       // Hidden/archived/draft → block (students can still read past comments).
     } else {
-      const lesson = await LearningAccessService.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
+      const lesson = await accessPort.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
       return { courseId: lesson.courseId.toString() };
     }
   }

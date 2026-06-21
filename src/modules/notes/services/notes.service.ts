@@ -1,21 +1,52 @@
+import { Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../../common/custom-error';
 import { LearningAccessService } from '../../../shared/application/learning-access/learning-access.service';
+import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 import { Note } from '../models/note.model';
 
+type NotesAccess = Pick<ILearningAccess, 'assertLessonInteractionAccess'>;
+
+@Injectable()
 export class NotesService {
-  private static async assertLessonAccess(userId: string, lessonId: string) {
-    return LearningAccessService.assertLessonInteractionAccess(lessonId, { id: userId, role: 'STUDENT' });
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+
+  async listByLesson(userId: string, lessonId: string) {
+    return NotesService.listByLesson(userId, lessonId, this.learningAccess);
   }
 
-  static async listByLesson(userId: string, lessonId: string) {
-    await this.assertLessonAccess(userId, lessonId);
+  async upsert(userId: string, input: { lessonId: string; noteText: string; codeSnippet?: string }) {
+    return NotesService.upsert(userId, input, this.learningAccess);
+  }
+
+  async update(userId: string, noteId: string, input: { noteText?: string; content?: string; codeSnippet?: string }) {
+    return NotesService.update(userId, noteId, input);
+  }
+
+  async search(userId: string, query: string) {
+    return NotesService.search(userId, query);
+  }
+
+  async remove(userId: string, noteId: string) {
+    return NotesService.remove(userId, noteId);
+  }
+
+  private static async assertLessonAccess(userId: string, lessonId: string, accessPort: NotesAccess = LearningAccessService) {
+    return accessPort.assertLessonInteractionAccess(lessonId, { id: userId, role: 'STUDENT' });
+  }
+
+  static async listByLesson(userId: string, lessonId: string, accessPort: NotesAccess = LearningAccessService) {
+    await this.assertLessonAccess(userId, lessonId, accessPort);
     const latest = await Note.findOne({ userId, lessonId }).sort({ updatedAt: -1 });
     return latest ? [latest] : [];
   }
 
-  static async upsert(userId: string, input: { lessonId: string; noteText: string; codeSnippet?: string }) {
-    await this.assertLessonAccess(userId, input.lessonId);
+  static async upsert(
+    userId: string,
+    input: { lessonId: string; noteText: string; codeSnippet?: string },
+    accessPort: NotesAccess = LearningAccessService,
+  ) {
+    await this.assertLessonAccess(userId, input.lessonId, accessPort);
     if (!input.noteText?.trim()) throw new BadRequestError('noteText is required.');
 
     const note = await Note.findOneAndUpdate(
