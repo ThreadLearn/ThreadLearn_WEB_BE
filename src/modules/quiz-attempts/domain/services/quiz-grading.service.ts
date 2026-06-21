@@ -1,12 +1,9 @@
-import { Injectable } from '@nestjs/common';
-
 export interface GradingResult {
   score: number;
   passed: boolean;
   isTimeout: boolean;
 }
 
-@Injectable()
 export class QuizGradingService {
   grade(
     questions: any[],
@@ -18,7 +15,7 @@ export class QuizGradingService {
     let correctCount = 0;
 
     questions.forEach((question, index) => {
-      const questionId = question._id?.toString();
+      const questionId = question.id?.toString();
       const userAnswer =
         (questionId ? answers[questionId] : undefined) ??
         answers[index.toString()];
@@ -51,3 +48,4 @@ export class QuizGradingService {
     };
   }
 }
+

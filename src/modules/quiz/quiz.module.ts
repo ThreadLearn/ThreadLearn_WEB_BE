@@ -19,7 +19,6 @@ import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
  *
  * Export:
  * - QUIZ_REPOSITORY (PORT) — chuẩn cross-module
- * - QuizService (facade) — backward-compat cho quiz-attempts (sẽ cắt ở B2)
  */
 @Module({
   imports: [LessonsModule], // inject LESSON_READ_PORT cho CreateQuizService
@@ -41,6 +40,6 @@ import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
     // ── Facade (backward-compat) ──
     QuizService,
   ],
-  exports: [QUIZ_REPOSITORY, QuizService], // PORT + facade (facade hoãn gỡ tới B2)
+  exports: [QUIZ_REPOSITORY], // PORT
 })
 export class QuizModule {}

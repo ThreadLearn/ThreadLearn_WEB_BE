@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { DomainEventPublisher } from '../../domain/events/domain-event.publisher';
+import { DomainEventPublisher } from '../events/domain-event.publisher';
 import { LeaderboardService } from '../../../leaderboard/services/leaderboard.service';
 
 /**

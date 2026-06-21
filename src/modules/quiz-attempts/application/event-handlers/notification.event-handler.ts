@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { DomainEventPublisher } from '../../domain/events/domain-event.publisher';
+import { DomainEventPublisher } from '../events/domain-event.publisher';
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
 
