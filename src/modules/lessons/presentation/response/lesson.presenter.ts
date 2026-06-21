@@ -24,8 +24,11 @@ export interface LessonResponse {
   createdAt?: Date;
   updatedAt?: Date;
   // legacy mirrors
+  /** @deprecated Use `contentMarkdown`; kept until FE migrates. */
   content?: string;
+  /** @deprecated Use `orderIndex`; kept until FE migrates. */
   order?: number;
+  /** @deprecated Use `attachments`; kept until FE migrates. */
   attachmentUrl?: string;
 }
 

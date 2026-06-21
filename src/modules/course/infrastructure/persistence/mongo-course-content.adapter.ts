@@ -15,7 +15,7 @@ import {
 export class MongoCourseContentAdapter implements ICourseContentPort {
   async getContent(courseId: string): Promise<CourseContentSnapshot> {
     const [sections, lessons] = await Promise.all([
-      Section.find({ courseId }).sort({ orderIndex: 1 }),
+      Section.find({ courseId, status: { $ne: 'deleted' } }).sort({ orderIndex: 1 }),
       Lesson.find({ courseId, status: { $ne: 'deleted' } })
         .sort({ orderIndex: 1 })
         .select('-contentMarkdown -content'),

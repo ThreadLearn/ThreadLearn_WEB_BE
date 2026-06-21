@@ -111,7 +111,7 @@ export class CoursesService {
       }
     }
 
-    const sections = await Section.find({ courseId }).sort({ orderIndex: 1 });
+    const sections = await Section.find({ courseId, status: { $ne: 'deleted' } }).sort({ orderIndex: 1 });
     const lessons = await Lesson.find({ courseId, status: { $ne: 'deleted' } })
       .sort({ orderIndex: 1 })
       .select('-contentMarkdown -content');
