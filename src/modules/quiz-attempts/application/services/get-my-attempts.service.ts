@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import mongoose from 'mongoose';
-import { BadRequestError } from '../../../../common/custom-error';
-import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.repository.interface';
+import { IQuizAttemptRepository, QUIZ_ATTEMPT_REPOSITORY } from '../../domain/interfaces/quiz-attempt.repository';
+import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
 
 /**
  * UC43: View Quiz Attempt History (Student)
@@ -10,14 +9,11 @@ import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.reposito
 @Injectable()
 export class GetMyAttemptsService {
   constructor(
-    @Inject('IQuizAttemptRepository')
+    @Inject(QUIZ_ATTEMPT_REPOSITORY)
     private readonly quizAttemptRepository: IQuizAttemptRepository,
   ) {}
 
-  async execute(userId: string) {
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new BadRequestError('Invalid user ID.');
-    }
+  async execute(userId: string): Promise<QuizAttempt[]> {
     return this.quizAttemptRepository.findByUser(userId);
   }
 }

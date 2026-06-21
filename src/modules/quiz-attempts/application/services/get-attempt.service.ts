@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import mongoose from 'mongoose';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
-import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.repository.interface';
+import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
+import { IQuizAttemptRepository, QUIZ_ATTEMPT_REPOSITORY } from '../../domain/interfaces/quiz-attempt.repository';
+import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
 
 /**
  * UC42: View Quiz Result (Student)
@@ -10,20 +10,14 @@ import { IQuizAttemptRepository } from '../../domain/ports/quiz-attempt.reposito
 @Injectable()
 export class GetAttemptService {
   constructor(
-    @Inject('IQuizAttemptRepository')
+    @Inject(QUIZ_ATTEMPT_REPOSITORY)
     private readonly quizAttemptRepository: IQuizAttemptRepository,
   ) {}
 
-  async execute(userId: string, attemptId: string) {
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new BadRequestError('Invalid user ID.');
-    }
-    if (!mongoose.isValidObjectId(attemptId)) {
-      throw new BadRequestError('Invalid attempt ID.');
-    }
+  async execute(userId: string, attemptId: string): Promise<QuizAttempt> {
     const attempt = await this.quizAttemptRepository.findByIdAndUser(attemptId, userId);
     if (!attempt) {
-      throw new NotFoundError('Quiz attempt not found.');
+      throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz attempt not found.');
     }
     return attempt;
   }
