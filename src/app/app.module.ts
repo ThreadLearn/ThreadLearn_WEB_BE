@@ -12,6 +12,7 @@ import { BookmarkModule } from '../modules/bookmark/bookmark.module';
 import { CertificatesModule } from '../modules/certificates/certificates.module';
 import { CommentModule } from '../modules/comment/comment.module';
 import { CodeExecutionModule } from '../modules/code-execution/code-execution.module';
+import { CourseModule } from '../modules/course/course.module';
 import { CoursesModule } from '../modules/courses/courses.module';
 import { EnrollmentsModule } from '../modules/enrollments/enrollments.module';
 import { GamificationModule } from '../modules/gamification/gamification.module';
@@ -37,6 +38,7 @@ import { AppController } from './app.controller';
     CertificatesModule,
     CodeExecutionModule,
     CommentModule,
+    CourseModule,
     CoursesModule,
     EnrollmentsModule,
     GamificationModule,
