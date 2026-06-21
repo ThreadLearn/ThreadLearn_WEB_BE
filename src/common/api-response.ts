@@ -8,6 +8,7 @@ export interface ApiResponsePayload<T = any> {
     total?: number;
     [key: string]: any;
   };
+  code?: string;
   errors?: any[] | null;
 }
 
@@ -34,15 +35,18 @@ export class ApiResponse {
   static error({
     message = 'An error occurred',
     errors = null,
+    code,
     statusCode: _statusCode = 500,
   }: {
     message?: string;
     errors?: any[] | null;
+    code?: string;
     statusCode?: number;
   }): ApiResponsePayload {
     return {
       success: false,
       message,
+      code,
       errors,
     };
   }

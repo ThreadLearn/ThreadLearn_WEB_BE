@@ -25,6 +25,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ApiResponse.error({
           message: exception.message,
           errors: exception.errors,
+          code: exception.code,
           statusCode: exception.statusCode,
         })
       );
