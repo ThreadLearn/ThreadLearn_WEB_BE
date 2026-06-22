@@ -1,0 +1,17 @@
+import { z } from '../../../../common/zod/z';
+
+export const upsertNoteSchema = z.object({
+  lessonId: z.string().min(1),
+  noteText: z.string().min(1).optional(),
+  content: z.string().min(1).optional(),
+  codeSnippet: z.string().optional(),
+});
+
+export const updateNoteSchema = z.object({
+  noteText: z.string().min(1).optional(),
+  content: z.string().min(1).optional(),
+  codeSnippet: z.string().optional(),
+});
+
+export type UpsertNoteDto = z.infer<typeof upsertNoteSchema>;
+export type UpdateNoteDto = z.infer<typeof updateNoteSchema>;
