@@ -13,7 +13,14 @@ The backend runtime has been migrated from Next.js API Routes to NestJS.
 - Build output: `dist/main.js`
 - Removed framework dependencies: `next`, `react`, `react-dom`, `next-auth`
 
-OAuth login/register formerly handled by `next-auth` is not available after the migration. The current supported authentication flow is email/password with JWT access and refresh tokens under `/api/v1/auth/*`.
+Supported authentication flows under `/api/v1/auth/*`:
+
+- Email/password with JWT access and refresh tokens (refresh tokens are stored hashed).
+- Email verification and resend verification.
+- Forgot password and reset password.
+- Google OAuth 2.0 (`GET /api/v1/auth/google` and `GET /api/v1/auth/google/callback`).
+
+GitHub login is not supported.
 
 ## Architecture Overview
 
@@ -88,19 +95,19 @@ npm run start:dev
 The default backend URL is:
 
 ```text
-http://localhost:3000
+http://localhost:5000
 ```
 
 Swagger UI:
 
 ```text
-http://localhost:3000/api/docs
+http://localhost:5000/api/docs
 ```
 
 Health check:
 
 ```text
-http://localhost:3000/api/v1/health
+http://localhost:5000/api/v1/health
 ```
 
 ## Scripts

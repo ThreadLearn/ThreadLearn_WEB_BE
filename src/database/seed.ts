@@ -83,12 +83,15 @@ async function seed() {
     // 2. USERS
     // ════════════════════════════════════════════════════════════
     logger.info('👤 Creating users...');
-    const adminPasswordHash = await hashPassword('Admin@123');
+    // Primary admin is configurable via .env (safe defaults for local dev).
+    const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@threadlearn.com';
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
+    const adminPasswordHash = await hashPassword(adminPassword);
     const studentPasswordHash = await hashPassword('Student@123');
 
     const users = await User.create([
       {
-        email: 'admin@threadlearn.com',
+        email: adminEmail,
         passwordHash: adminPasswordHash,
         firstName: 'John',
         lastName: 'Admin',
@@ -675,7 +678,7 @@ async function seed() {
     logger.info('🎉 DATABASE SEEDING COMPLETED SUCCESSFULLY!');
     logger.info('──────────────────────────────────────────────');
     logger.info('🔐 Login credentials:');
-    logger.info('   ADMIN    → admin@threadlearn.com      / Admin@123');
+    logger.info(`   ADMIN    → ${adminEmail.padEnd(24)} / ${adminPassword}`);
     logger.info('   ADMIN    → instructor@threadlearn.com / Admin@123');
     logger.info('   STUDENT  → student@threadlearn.com    / Student@123');
     logger.info('   STUDENT  → bob@threadlearn.com        / Student@123');

@@ -55,9 +55,18 @@ Current supported flow:
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/session`
 
+Plus Google OAuth and email flows:
+
+- `GET /api/v1/auth/google`
+- `GET /api/v1/auth/google/callback`
+- `POST /api/v1/auth/verify-email`
+- `POST /api/v1/auth/resend-verification`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password`
+
 Protected endpoints use `JwtAuthGuard`. Admin-only endpoints use `@Roles('ADMIN')`.
 
-The previous OAuth implementation was tied to a removed dependency. To support Google or GitHub login again, implement a NestJS Passport OAuth strategy.
+Google OAuth 2.0 is implemented directly in `AuthService` (authorization URL + code exchange). GitHub login is no longer supported.
 
 ## Important Files
 

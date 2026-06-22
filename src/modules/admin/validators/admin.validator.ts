@@ -11,7 +11,7 @@ export const objectIdParamSchema = z.string().regex(objectIdRegex, 'Invalid Obje
 
 export const createStudentSchema = z.object({
   email: z.string().email('Invalid email address format.'),
-  password: z.string().min(6, 'Password must be at least 6 characters long.').optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters long.').optional(),
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
 });

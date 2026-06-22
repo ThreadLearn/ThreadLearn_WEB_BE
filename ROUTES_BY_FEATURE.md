@@ -2,7 +2,7 @@
 
 Base URL:
 
-- `http://localhost:3000`
+- `http://localhost:5000`
 
 Conventions:
 
@@ -19,7 +19,19 @@ Conventions:
 - `POST /api/v1/auth/refresh`
 - `GET /api/v1/auth/session` protected
 
-OAuth endpoints are not currently implemented. The previous framework-specific OAuth route was removed during the NestJS migration.
+### Email verification & password reset
+
+- `POST /api/v1/auth/verify-email`
+- `POST /api/v1/auth/resend-verification`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password`
+
+### Google OAuth
+
+- `GET /api/v1/auth/google` redirects to Google consent screen
+- `GET /api/v1/auth/google/callback` exchanges the code and redirects to the frontend
+
+GitHub login is not supported.
 
 ## Users
 
@@ -62,6 +74,20 @@ OAuth endpoints are not currently implemented. The previous framework-specific O
 
 - `GET /api/v1/admin/stats` protected, ADMIN
 - `POST /api/v1/admin/execute` protected, ADMIN
+
+### Admin — Student management
+
+- `POST /api/v1/admin/students` protected, ADMIN
+- `GET /api/v1/admin/students` protected, ADMIN
+  - Query: `page=1`, `limit=20`, `search`, `isActive`, `isVerified`
+- `PATCH /api/v1/admin/students/:id` protected, ADMIN
+- `PATCH /api/v1/admin/students/:id/lock` protected, ADMIN
+- `PATCH /api/v1/admin/students/:id/unlock` protected, ADMIN
+
+### Admin — Dashboard statistics
+
+- `GET /api/v1/admin/dashboard/statistics` protected, ADMIN
+  - Query: `from`, `to`, `months=6`
 
 ## System
 

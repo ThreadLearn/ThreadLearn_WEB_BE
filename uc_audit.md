@@ -8,9 +8,9 @@ Bản đối chiếu này được cập nhật theo danh sách **53 Use Case (U
 
 | Trạng thái | Số lượng | Tỷ lệ | Mô tả |
 | :--- | :---: | :---: | :--- |
-| ✅ **Đã hoàn thiện (Done)** | **19** | 35.8% | Tính năng đã triển khai đầy đủ cả ở tầng Controller (API Route) và Service. |
-| 🔶 **Một phần (Partial)** | **10** | 18.9% | Đã viết logic Service thô hoặc một phần DB Schema nhưng chưa có Route API hoặc còn thiếu tính năng nhỏ. |
-| ❌ **Chưa có (Missing)** | **24** | 45.3% | Chưa có mã nguồn hoặc mới chỉ là khung rỗng, cần phát triển mới từ đầu. |
+| ✅ **Đã hoàn thiện (Done)** | **29** | 54.7% | Tính năng đã triển khai đầy đủ cả ở tầng Controller (API Route) và Service. |
+| 🔶 **Một phần (Partial)** | **7** | 13.2% | Đã viết logic Service thô hoặc một phần DB Schema nhưng chưa có Route API hoặc còn thiếu tính năng nhỏ. |
+| ❌ **Chưa có (Missing)** | **17** | 32.1% | Chưa có mã nguồn hoặc mới chỉ là khung rỗng, cần phát triển mới từ đầu. |
 | **Tổng số Use Case** | **53** | **100%** | **Hệ thống lõi ThreadLearn** |
 
 ---
@@ -33,7 +33,7 @@ gantt
 
 | Developer | Lĩnh vực phụ trách chính | Số lượng UC | Trạng thái hiện tại |
 | :--- | :--- | :---: | :--- |
-| **DEV 1** | Auth, OAuth, User Management, Dashboard Statistics, Payment, Core System | 14 UC (UC01 - UC14) | ✅ 4 Done, 🔶 3 Partial, ❌ 7 Missing |
+| **DEV 1** | Auth, OAuth, User Management, Dashboard Statistics, Payment, Core System | 14 UC (UC01 - UC14) | ✅ 14 Done, 🔶 0 Partial, ❌ 0 Missing |
 | **DEV 2** | Course, Lesson, Learning Experience, Vector Search, Progress | 14 UC (UC15 - UC28) | ✅ 4 Done, 🔶 5 Partial, ❌ 5 Missing |
 | **DEV 3** | Comments, Bookmarks, Notes, Monaco IDE, Judge0, AI Recommendation | 12 UC (UC29-35, UC44-47, UC53) | ✅ 5 Done, 🔶 0 Partial, ❌ 7 Missing |
 | **DEV 4** | Quiz Engine, Grading, XP Engine, Leaderboard, Subscription Plans | 13 UC (UC36-43, UC48-52) | ✅ 6 Done, 🔶 2 Partial, ❌ 5 Missing |
@@ -50,19 +50,19 @@ gantt
 | UC | Tên Use Case | Trạng thái | Mã nguồn hiện tại / Chỉ dẫn kỹ thuật |
 | :--- | :--- | :---: | :--- |
 | **UC01** | Register Account (Guest) | ✅ Done | `AuthController.register()`, `AuthService.register()`, endpoint `POST /api/v1/auth/register`. Tự động tạo `UserStats`. |
-| **UC02** | Register with Google (Guest, Google OAuth System) | ❌ Missing | OAuth cũ đã bị gỡ khi migrate. Cần triển khai Passport Google strategy. |
-| **UC03** | Verify Email (Guest, Email System) | 🔶 Partial | Có logic đăng ký thô nhưng chưa chặn login khi chưa verify, chưa gửi mail verify qua Nodemailer. |
+| **UC02** | Register with Google (Guest, Google OAuth System) | ✅ Done | `AuthService.getGoogleAuthorizationUrl()` / `loginWithGoogleCode()`, endpoints `GET /api/v1/auth/google` và `GET /api/v1/auth/google/callback`. Tự tạo user mới từ profile Google. |
+| **UC03** | Verify Email (Guest, Email System) | ✅ Done | `AuthService.verifyEmail()` / `resendVerification()`, endpoints `POST /api/v1/auth/verify-email`, `POST /api/v1/auth/resend-verification`. Chặn login khi chưa verify, gửi mail qua `EmailService` (Nodemailer/SMTP). |
 | **UC04** | Log In (Student, Admin) | ✅ Done | `AuthController.login()`, `AuthService.login()`, endpoint `POST /api/v1/auth/login`. So khớp hash bằng `bcrypt.compare()`. |
-| **UC05** | Log In with Google (Student, Admin, Google OAuth System) | ❌ Missing | Chưa có NestJS OAuth strategy. Cần tích hợp Passport Google OAuth 2.0. |
-| **UC06** | Log Out (Student, Admin, Authentication System) | ✅ Done | `AuthController.logout()`, `AuthService.logout()`, endpoint `POST /api/v1/auth/logout`. Xóa RefreshToken. |
-| **UC07** | Forgot Password (Student, Admin, Email System) | ❌ Missing | Chưa có. Cần tạo model `PasswordResetToken` và API `/auth/forgot-password`. |
-| **UC08** | Reset Password (Student, Admin, Authentication System) | ❌ Missing | Chưa có. Cần API `/auth/reset-password` xác thực token và cập nhật password mới. |
+| **UC05** | Log In with Google (Student, Admin, Google OAuth System) | ✅ Done | `AuthService.loginWithGoogleCode()` qua `GET /api/v1/auth/google/callback`, liên kết `googleId` với user hiện hữu. |
+| **UC06** | Log Out (Student, Admin, Authentication System) | ✅ Done | `AuthController.logout()`, `AuthService.logout()`, endpoint `POST /api/v1/auth/logout`. Xóa RefreshToken (theo `tokenHash`). |
+| **UC07** | Forgot Password (Student, Admin, Email System) | ✅ Done | `AuthService.forgotPassword()`, model `PasswordResetToken`, endpoint `POST /api/v1/auth/forgot-password`. Gửi link reset qua email. |
+| **UC08** | Reset Password (Student, Admin, Authentication System) | ✅ Done | `AuthService.resetPassword()`, endpoint `POST /api/v1/auth/reset-password`. Xác thực token (hash), cập nhật mật khẩu và thu hồi refresh token. |
 | **UC09** | Update Personal Profile / Upload Avatar (Student, Admin, Storage System) | ✅ Done | `UsersController.uploadAvatar()`, `saveUploadedFile()`, endpoint `POST /api/v1/users/avatar`. |
-| **UC10** | Add Student (Admin) | ❌ Missing | Chưa có. Cần hàm `createStudent` trong `AdminService` để tạo tài khoản thủ công từ dashboard. |
-| **UC11** | Lock / Unlock Student (Admin) | ❌ Missing | Chưa có. Cần trường `isLocked` trong `User` model, hàm lật trạng thái ở `AdminService` và chặn tại `JwtAuthGuard`. |
-| **UC12** | View Student List (Admin) | 🔶 Partial | Đã có hàm `AdminService.listUsers()` nhưng chưa viết API Route `GET /api/v1/admin/users`. |
-| **UC13** | Update Student Information (Admin) | ❌ Missing | Chưa có. Cần viết hàm `updateUserByAdmin()` cho phép Admin đổi tên, role, trạng thái. |
-| **UC14** | View Statistics Charts (Admin, Analytics System) | 🔶 Partial | Có [analytics.service.ts](file:///d:/FPT_University_các%20kì/kì%208/WDP301/ThreadLearn_WEB_BE/src/modules/analytics/services/analytics.service.ts) đếm số lượng người dùng/khóa học/làm bài. Thiếu biểu đồ time-series và doanh thu. |
+| **UC10** | Add Student (Admin) | ✅ Done | `AdminService.createStudent()`, endpoint `POST /api/v1/admin/students`. Gửi mật khẩu tạm qua email khi không cung cấp. |
+| **UC11** | Lock / Unlock Student (Admin) | ✅ Done | `AdminService.lockStudent()` / `unlockStudent()`, endpoints `PATCH /api/v1/admin/students/:id/lock` và `/unlock`. Chặn auth qua `assertUserCanAuthenticate()`. |
+| **UC12** | View Student List (Admin) | ✅ Done | `AdminService.listStudents()`, endpoint `GET /api/v1/admin/students` với phân trang, tìm kiếm và lọc `isActive`/`isVerified`. |
+| **UC13** | Update Student Information (Admin) | ✅ Done | `AdminService.updateStudent()`, endpoint `PATCH /api/v1/admin/students/:id`. |
+| **UC14** | View Statistics Charts (Admin, Analytics System) | ✅ Done | `AnalyticsService.getAdminDashboardStatistics()`, endpoint `GET /api/v1/admin/dashboard/statistics` với chuỗi thời gian theo `months` và bộ lọc `from`/`to`. |
 
 ---
 

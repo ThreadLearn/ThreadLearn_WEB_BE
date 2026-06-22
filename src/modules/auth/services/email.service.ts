@@ -29,24 +29,28 @@ export class EmailService {
       return;
     }
 
-    this.dispatch('Verification email', {
-      to: payload.email,
-      subject: 'Verify your ThreadLearn email',
-      text: [
-        `Hi ${payload.firstName},`,
-        '',
-        'Please verify your ThreadLearn email address using the link below:',
-        payload.verificationUrl,
-        '',
-        'This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.',
-      ].join('\n'),
-      html: `
+    this.dispatch(
+      'Verification email',
+      {
+        to: payload.email,
+        subject: 'Verify your ThreadLearn email',
+        text: [
+          `Hi ${payload.firstName},`,
+          '',
+          'Please verify your ThreadLearn email address using the link below:',
+          payload.verificationUrl,
+          '',
+          'This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.',
+        ].join('\n'),
+        html: `
         <p>Hi ${this.escapeHtml(payload.firstName)},</p>
         <p>Please verify your ThreadLearn email address using the link below:</p>
         <p><a href="${this.escapeHtml(payload.verificationUrl)}">Verify your email</a></p>
         <p>This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.</p>
       `,
-    });
+      },
+      `SMTP verification email sent to ${payload.email}`
+    );
   }
 
   static async sendPasswordResetEmail(payload: PasswordResetEmailPayload) {
@@ -55,24 +59,28 @@ export class EmailService {
       return;
     }
 
-    this.dispatch('Password reset email', {
-      to: payload.email,
-      subject: 'Reset your ThreadLearn password',
-      text: [
-        `Hi ${payload.firstName},`,
-        '',
-        'Use the link below to reset your ThreadLearn password:',
-        payload.resetUrl,
-        '',
-        'This link will expire soon. If you did not request a password reset, you can ignore this email.',
-      ].join('\n'),
-      html: `
+    this.dispatch(
+      'Password reset email',
+      {
+        to: payload.email,
+        subject: 'Reset your ThreadLearn password',
+        text: [
+          `Hi ${payload.firstName},`,
+          '',
+          'Use the link below to reset your ThreadLearn password:',
+          payload.resetUrl,
+          '',
+          'This link will expire soon. If you did not request a password reset, you can ignore this email.',
+        ].join('\n'),
+        html: `
         <p>Hi ${this.escapeHtml(payload.firstName)},</p>
         <p>Use the link below to reset your ThreadLearn password:</p>
         <p><a href="${this.escapeHtml(payload.resetUrl)}">Reset your password</a></p>
         <p>This link will expire soon. If you did not request a password reset, you can ignore this email.</p>
       `,
-    });
+      },
+      `SMTP reset password email sent to ${payload.email}`
+    );
   }
 
   static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
@@ -103,8 +111,25 @@ export class EmailService {
     });
   }
 
+  /**
+   * Gmail app passwords are shown grouped with spaces (e.g. "abcd efgh ijkl mnop").
+   * Strip all whitespace so a value copied verbatim still authenticates.
+   * Never logged, raw or normalized.
+   */
+  private static normalizedSmtpPass() {
+    return (env.SMTP_PASS ?? '').replace(/\s+/g, '');
+  }
+
+  /**
+   * SMTP is used only when every required value is present. When the config is
+   * incomplete we fall back to mock logging; when it is complete but wrong we
+   * still attempt SMTP and surface a clear failure (see dispatch) instead of
+   * silently mocking.
+   */
   private static hasSmtpConfig() {
-    return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS);
+    return Boolean(
+      env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && this.normalizedSmtpPass() && env.MAIL_FROM_EMAIL
+    );
   }
 
   /**
@@ -113,11 +138,15 @@ export class EmailService {
    * (~1ms instead of 1-3s waiting on Gmail). If all retries fail we log loudly
    * so ops can investigate; the user is never surfaced an SMTP error.
    */
-  private static dispatch(label: string, message: { to: string; subject: string; text: string; html: string }) {
+  private static dispatch(
+    label: string,
+    message: { to: string; subject: string; text: string; html: string },
+    successLog?: string
+  ) {
     const attempt = async (n: number): Promise<void> => {
       try {
         await this.sendMail(message);
-        logger.info(`${label} delivered to ${message.to}${n > 1 ? ` (retry ${n - 1})` : ''}`);
+        logger.info(successLog ?? `${label} delivered to ${message.to}${n > 1 ? ` (retry ${n - 1})` : ''}`);
       } catch (err) {
         if (n >= 3) {
           logger.error(`${label} permanently failed for ${message.to} after ${n} attempts.`, err as Error);
@@ -138,7 +167,7 @@ export class EmailService {
       secure: env.SMTP_SECURE,
       auth: {
         user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
+        pass: this.normalizedSmtpPass(),
       },
     });
 

@@ -49,8 +49,6 @@ const envSchema = z.object({
   SMTP_PASS: optionalNonEmptyString,
   MAIL_FROM_NAME: z.string().default('ThreadLearn'),
   MAIL_FROM_EMAIL: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
-  GITHUB_CLIENT_ID: z.string().optional(),
-  GITHUB_CLIENT_SECRET: z.string().optional(),
   JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
   JUDGE0_API_KEY: z.string().optional(),
   UPLOAD_DIR: z.string().default('./public/uploads'),

@@ -10,7 +10,6 @@ export interface IUser extends Document {
   subscriptionExpiresAt?: Date;
   avatarUrl?: string;
   googleId?: string;
-  githubId?: string;
   isVerified: boolean;
   emailVerifiedAt?: Date;
   isActive: boolean;
@@ -34,7 +33,6 @@ const UserSchema: Schema<IUser> = new Schema(
     subscriptionExpiresAt: { type: Date },
     avatarUrl: { type: String },
     googleId: { type: String, unique: true, sparse: true },
-    githubId: { type: String, unique: true, sparse: true },
     isVerified: { type: Boolean, default: false },
     emailVerifiedAt: { type: Date },
     isActive: { type: Boolean, default: true },

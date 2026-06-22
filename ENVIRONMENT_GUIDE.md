@@ -16,10 +16,17 @@ This guide documents the environment variables used by the NestJS backend. Runti
 | `JWT_REFRESH_SECRET` | Yes | - | Secret for JWT refresh tokens. Use a long random value in production. |
 | `JWT_ACCESS_EXPIRES_IN` | No | `15m` | Access token lifetime. |
 | `JWT_REFRESH_EXPIRES_IN` | No | `7d` | Refresh token lifetime. |
-| `GOOGLE_CLIENT_ID` | No | - | Reserved for a future NestJS Passport Google OAuth implementation. |
-| `GOOGLE_CLIENT_SECRET` | No | - | Reserved for a future NestJS Passport Google OAuth implementation. |
-| `GITHUB_CLIENT_ID` | No | - | Reserved for a future NestJS Passport GitHub OAuth implementation. |
-| `GITHUB_CLIENT_SECRET` | No | - | Reserved for a future NestJS Passport GitHub OAuth implementation. |
+| `GOOGLE_CLIENT_ID` | No | - | Google OAuth client ID. Required to enable Google login. |
+| `GOOGLE_CLIENT_SECRET` | No | - | Google OAuth client secret. Required to enable Google login. |
+| `GOOGLE_CALLBACK_URL` | No | `http://localhost:<PORT>/api/v1/auth/google/callback` | Google OAuth redirect URI. |
+| `FRONTEND_URL` | No | `http://localhost:3000` | Frontend base URL used to build verification and password reset links. |
+| `SMTP_HOST` | No | - | SMTP server host. SMTP is used only when host, port, user, pass, and `MAIL_FROM_EMAIL` are all set. |
+| `SMTP_PORT` | No | - | SMTP server port (e.g. `465` for secure). |
+| `SMTP_SECURE` | No | `false` | Use TLS on connect (`true` for port 465). |
+| `SMTP_USER` | No | - | SMTP username. |
+| `SMTP_PASS` | No | - | SMTP password / Gmail app password. Whitespace is stripped automatically. |
+| `MAIL_FROM_NAME` | No | `ThreadLearn` | Display name on outgoing email. |
+| `MAIL_FROM_EMAIL` | No | - | From address on outgoing email. Required to enable SMTP. |
 | `JUDGE0_API_URL` | No | `https://api.judge0.com` | Judge0 API URL used by code execution. |
 | `JUDGE0_API_KEY` | No | - | Optional Judge0 API key. |
 | `UPLOAD_DIR` | No | `./public/uploads` | Local upload directory for avatars and lesson attachments. |

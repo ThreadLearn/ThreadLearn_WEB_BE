@@ -16,7 +16,6 @@ const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
-const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3000/reset-password';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
@@ -138,7 +137,7 @@ export class AuthService {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     await RefreshToken.create({
-      token: tokens.refreshToken,
+      tokenHash: this.hashToken(tokens.refreshToken),
       userId: user._id,
       expiresAt,
     });
@@ -228,7 +227,11 @@ export class AuthService {
   }
 
   static async refresh(token: string) {
-    const storedToken = await RefreshToken.findOne({ token });
+    const tokenHash = this.hashToken(token);
+    // Prefer the hashed lookup; fall back to the legacy raw-token record so
+    // sessions issued before token hashing keep working until their next refresh.
+    const storedToken =
+      (await RefreshToken.findOne({ tokenHash })) ?? (await RefreshToken.findOne({ token }));
 
     // SECURITY (P0): refresh-token reuse detection. If the token cryptographically
     // verifies but is NOT in our store, assume it was rotated previously and the
@@ -284,7 +287,7 @@ export class AuthService {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     await RefreshToken.create({
-      token: tokens.refreshToken,
+      tokenHash: this.hashToken(tokens.refreshToken),
       userId: decoded.id as any,
       expiresAt,
     });
@@ -293,7 +296,9 @@ export class AuthService {
   }
 
   static async logout(token: string) {
-    await RefreshToken.deleteOne({ token });
+    const tokenHash = this.hashToken(token);
+    // Delete by hash (current) or raw token (legacy records).
+    await RefreshToken.deleteOne({ $or: [{ tokenHash }, { token }] });
     return true;
   }
 
@@ -453,7 +458,7 @@ export class AuthService {
       expiresAt,
     });
 
-    const resetUrl = `${PASSWORD_RESET_URL}?token=${encodeURIComponent(rawToken)}`;
+    const resetUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(rawToken)}`;
     await EmailService.sendPasswordResetEmail({
       email: user.email,
       firstName: user.firstName,
@@ -549,7 +554,7 @@ export class AuthService {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     await RefreshToken.create({
-      token: tokens.refreshToken,
+      tokenHash: this.hashToken(tokens.refreshToken),
       userId: user._id,
       expiresAt,
     });
