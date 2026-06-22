@@ -33,4 +33,17 @@ export class GamificationRewardsEventHandler {
       console.error(`[Gamification Error] Lỗi xử lý course.completed cho user ${event.userId}:`, error);
     }
   }
+
+  @OnEvent('quiz.passed')
+  private async handleQuizPassed(event: { userId: string; quizId: string; xpReward: number }) {
+    console.log(`[Gamification] Bắt đầu xử lý XP cho user ${event.userId} (Quiz: ${event.quizId})`);
+    try {
+      await this.awardXpService.execute(event.userId, event.xpReward, 1);
+      await this.updateStreakService.execute(event.userId);
+      console.log(`[Gamification] Cấp ${event.xpReward} XP thành công cho user ${event.userId}`);
+    } catch (error) {
+      console.error(`[Gamification Error] Không thể cấp XP cho user ${event.userId}:`, error);
+      // Fallback không rollback quiz attempt (Eventual Consistency)
+    }
+  }
 }

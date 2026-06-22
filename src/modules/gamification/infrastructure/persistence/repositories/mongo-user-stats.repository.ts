@@ -29,4 +29,19 @@ export class UserStatsRepository implements IUserStatsRepository {
     ).exec();
     return UserStatsMapper.toEntity(doc);
   }
+
+  async findTopByXp(limit: number): Promise<UserStats[]> {
+    const docs = await UserStatsModel.find()
+      .sort({ xp: -1 })
+      .limit(limit)
+      .exec();
+    return docs.map((doc) => UserStatsMapper.toEntity(doc));
+  }
+
+  async findRankByUserId(userId: string): Promise<number | null> {
+    const userDoc = await UserStatsModel.findOne({ userId }).select('xp').exec();
+    if (!userDoc) return null;
+    const higherCount = await UserStatsModel.countDocuments({ xp: { $gt: userDoc.xp } }).exec();
+    return higherCount + 1;
+  }
 }

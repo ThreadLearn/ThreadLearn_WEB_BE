@@ -15,7 +15,6 @@ import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
 import { CertificatesService } from './certificates/services/certificates.service';
-import { LeaderboardService } from './leaderboard/services/leaderboard.service';
 import { NotificationsService } from './notifications/services/notifications.service';
 
 describe('reported bug regressions', () => {
@@ -142,7 +141,7 @@ describe('reported bug regressions', () => {
     jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
     
     // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
-    jest.spyOn(LeaderboardService, 'invalidateCache').mockResolvedValue(undefined);
+    // TODO DEV4: LeaderboardService.invalidateCache removed — leaderboard uses @OnEvent now
 
     const result = await EnrollmentCompletionPublisher.publishCourseCompleted({
       userId: '507f1f77bcf86cd799439011',
