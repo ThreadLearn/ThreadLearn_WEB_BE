@@ -1,13 +1,13 @@
 import { CodeExecution } from './code-execution/models/code-execution.model';
-import { CodeExecutionService } from './code-execution/services/code-execution.service';
-import { CommentService } from './comment/services/comment.service';
-import { User } from './auth/models/user.model';
-import { Course } from './courses/models/course.model';
+import { CodeExecutionService } from './code-execution/application/services/code-execution.service';
+import { CreateCommentService } from './comment/application/services/create-comment.service';
 import { Enrollment } from './enrollments/models/enrollment.model';
-import { EnrollmentsService } from './enrollments/services/enrollments.service';
+import { EnrollInCourseService } from './enrollments/application/services/enroll-in-course.service';
+import { GetMyCourseEnrollmentService } from './enrollments/application/services/get-my-course-enrollment.service';
+import { MongoEnrollmentRepository } from './enrollments/infrastructure/persistence/mongo-enrollment.repository';
 import { UserStats } from './gamification/models/user-stats.model';
 import { Note } from './notes/models/note.model';
-import { NotesService } from './notes/services/notes.service';
+import { MongoNoteRepository } from './notes/infrastructure/persistence/mongo-note.repository';
 import { Notification } from './notifications/models/notification.model';
 import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
 import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
@@ -18,6 +18,7 @@ import { CertificatesService } from './certificates/services/certificates.servic
 import { GamificationRewardsService } from './gamification/services/gamification-rewards.service';
 import { LeaderboardService } from './leaderboard/services/leaderboard.service';
 import { NotificationsService } from './notifications/services/notifications.service';
+import { CourseEntity } from './course/domain/entities/course.entity';
 
 describe('reported bug regressions', () => {
   afterEach(() => {
@@ -30,7 +31,9 @@ describe('reported bug regressions', () => {
     const accessSpy = jest.fn().mockRejectedValue(accessError);
 
     await expect(
-      CodeExecutionService.executeCode(
+      new CodeExecutionService({ countFreeRunsToday: jest.fn().mockResolvedValue(0) } as any, {
+        assertLessonViewAccess: accessSpy,
+      } as any).executeCode(
         '507f1f77bcf86cd799439011',
         {
           lessonId: '507f1f77bcf86cd799439012',
@@ -38,7 +41,6 @@ describe('reported bug regressions', () => {
           language: 'javascript',
         },
         'ADMIN',
-        { assertLessonViewAccess: accessSpy },
       )
     ).rejects.toBe(accessError);
 
@@ -49,10 +51,11 @@ describe('reported bug regressions', () => {
   });
 
   it('returns null when the student has not enrolled in a course', async () => {
-    jest.spyOn(Enrollment, 'findOne').mockResolvedValue(null);
+    const repo = { findByUserAndCourse: jest.fn().mockResolvedValue(null) } as any;
+    const service = new GetMyCourseEnrollmentService(repo);
 
     await expect(
-      EnrollmentsService.getMyCourseEnrollment(
+      service.execute(
         '507f1f77bcf86cd799439011',
         '507f1f77bcf86cd799439012'
       )
@@ -60,18 +63,34 @@ describe('reported bug regressions', () => {
   });
 
   it('keeps premium enrollment blocked for free students', async () => {
-    jest.spyOn(Course, 'findById').mockResolvedValue({
-      status: 'published',
+    const course = CourseEntity.fromPersistence({
+      id: '507f1f77bcf86cd799439012',
+      title: 'Premium Course',
+      slug: 'premium-course',
+      description: 'Premium course',
+      language: 'javascript',
+      level: 'BEGINNER',
+      tags: [],
       isPremium: true,
-    } as never);
-    const select = jest.fn().mockResolvedValue({
-      planType: 'FREE',
-      subscriptionExpiresAt: undefined,
+      price: 10,
+      status: 'published',
+      prerequisites: [],
+      prerequisiteThreshold: 80,
+      estimatedDuration: 0,
+      totalLessons: 0,
+      totalEnrollments: 0,
+      averageRating: 0,
+      totalReviews: 0,
     });
-    jest.spyOn(User, 'findById').mockReturnValue({ select } as never);
+    const service = new EnrollInCourseService(
+      { findByUserAndCourse: jest.fn() } as any,
+      { findById: jest.fn().mockResolvedValue(course), incrementEnrollmentCount: jest.fn() } as any,
+      { countCourseLessons: jest.fn() } as any,
+      { hasActivePremium: jest.fn().mockResolvedValue(false) } as any,
+    );
 
     await expect(
-      EnrollmentsService.enrollInCourse(
+      service.execute(
         '507f1f77bcf86cd799439011',
         '507f1f77bcf86cd799439012'
       )
@@ -96,11 +115,11 @@ describe('reported bug regressions', () => {
     });
 
     await expect(
-      CommentService.createComment('507f1f77bcf86cd799439011', 'STUDENT', {
+      new CreateCommentService({} as any, accessPort).execute('507f1f77bcf86cd799439011', 'STUDENT', {
         targetType: 'COURSE',
         targetId: '507f1f77bcf86cd799439012',
         content: 'premium course comment',
-      }, accessPort),
+      }),
     ).rejects.toMatchObject({
       message: 'You need an active premium plan to comment on this course.',
       statusCode: 403,
@@ -116,23 +135,26 @@ describe('reported bug regressions', () => {
     jest.spyOn(Enrollment, 'find').mockReturnValue({ populate } as never);
 
     await expect(
-      EnrollmentsService.listMyEnrollments('507f1f77bcf86cd799439011')
-    ).resolves.toEqual([validEnrollment]);
+      new MongoEnrollmentRepository().listByUser('507f1f77bcf86cd799439011')
+    ).resolves.toEqual([
+      expect.objectContaining({
+        _id: 'valid',
+        courseId: 'course',
+      }),
+    ]);
   });
 
   it('returns only the most recently updated note for a lesson', async () => {
     const latest = { _id: 'latest-note', noteText: 'Current note' };
-    const accessPort = { assertLessonInteractionAccess: jest.fn().mockResolvedValue({} as never) };
     const sort = jest.fn().mockResolvedValue(latest);
     jest.spyOn(Note, 'findOne').mockReturnValue({ sort } as never);
 
     await expect(
-      NotesService.listByLesson(
+      new MongoNoteRepository().findLatestByLesson(
         '507f1f77bcf86cd799439011',
         '507f1f77bcf86cd799439012',
-        accessPort,
       )
-    ).resolves.toEqual([latest]);
+    ).resolves.toEqual(latest);
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
   });
 
@@ -172,8 +194,8 @@ describe('reported bug regressions', () => {
         { _id: 'question-b', correctAnswerIndex: 0 },
       ],
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(Quiz, 'findById').mockReturnValue({ exec: jest.fn().mockResolvedValue(quiz) } as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data: any) => ({ _id: 'attempt-1', ...data }) as never);
     jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
     jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
 
@@ -196,8 +218,8 @@ describe('reported bug regressions', () => {
         { _id: 'question-b', correctAnswerIndex: 0 },
       ],
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(Quiz, 'findById').mockReturnValue({ exec: jest.fn().mockResolvedValue(quiz) } as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data: any) => ({ _id: 'attempt-1', ...data }) as never);
 
     const result = await new QuizAttemptsService().submitAttempt('student', 'quiz', {
       0: 1,
@@ -218,8 +240,8 @@ describe('reported bug regressions', () => {
       ],
       timeLimit: 600, // 10 minutes
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(Quiz, 'findById').mockReturnValue({ exec: jest.fn().mockResolvedValue(quiz) } as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data: any) => ({ _id: 'attempt-1', ...data }) as never);
     jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
     jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
 
@@ -243,8 +265,8 @@ describe('reported bug regressions', () => {
       ],
       timeLimit: 600, // 10 minutes
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
+    jest.spyOn(Quiz, 'findById').mockReturnValue({ exec: jest.fn().mockResolvedValue(quiz) } as never);
+    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data: any) => ({ _id: 'attempt-1', ...data }) as never);
     jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
     jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
 
@@ -260,23 +282,37 @@ describe('reported bug regressions', () => {
   });
 
   it('retrieves user quiz attempts history successfully', async () => {
-    const mockAttempts = [{ _id: 'attempt-1', score: 100 }];
-    const populateMock = jest.fn().mockResolvedValue(mockAttempts);
-    const sortMock = jest.fn().mockReturnValue({ populate: populateMock });
+    const mockAttempts = [{
+      _id: 'attempt-1',
+      quizId: 'quiz',
+      userId: '507f1f77bcf86cd799439011',
+      score: 100,
+      answers: {},
+      passed: true,
+    }];
+    const execMock = jest.fn().mockResolvedValue(mockAttempts);
+    const sortMock = jest.fn().mockReturnValue({ exec: execMock });
     jest.spyOn(QuizAttempt, 'find').mockReturnValue({ sort: sortMock } as never);
 
     const result = await new QuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
-    expect(result).toEqual(mockAttempts);
+    expect(result[0].toProps()).toMatchObject({ id: 'attempt-1', score: 100 });
     expect(QuizAttempt.find).toHaveBeenCalledWith({ userId: '507f1f77bcf86cd799439011' });
   });
 
   it('retrieves specific user quiz attempt by id successfully', async () => {
-    const mockAttempt = { _id: 'attempt-1', userId: '507f1f77bcf86cd799439011', score: 100 };
-    const populateMock = jest.fn().mockResolvedValue(mockAttempt);
-    jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ populate: populateMock } as never);
+    const mockAttempt = {
+      _id: 'attempt-1',
+      quizId: 'quiz',
+      userId: '507f1f77bcf86cd799439011',
+      score: 100,
+      answers: {},
+      passed: true,
+    };
+    const execMock = jest.fn().mockResolvedValue(mockAttempt);
+    jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ exec: execMock } as never);
 
     const result = await new QuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
-    expect(result).toEqual(mockAttempt);
+    expect(result.toProps()).toMatchObject({ id: 'attempt-1', score: 100 });
     expect(QuizAttempt.findOne).toHaveBeenCalledWith({ _id: '507f1f77bcf86cd799439012', userId: '507f1f77bcf86cd799439011' });
   });
 });
