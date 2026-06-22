@@ -58,6 +58,11 @@ export class MongoCourseRepository implements ICourseRepository {
     return CourseMapper.toEntity(doc);
   }
 
+  async incrementEnrollmentCount(courseId: string): Promise<void> {
+    if (!mongoose.isValidObjectId(courseId)) return;
+    await Course.findByIdAndUpdate(courseId, { $inc: { totalEnrollments: 1 } });
+  }
+
   /** Dịch CourseListFilter (ngôn ngữ domain) sang câu query Mongo. */
   private buildMongoFilter(filter: CourseListFilter): Record<string, any> {
     const f: Record<string, any> = {};

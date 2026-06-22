@@ -5,7 +5,8 @@ import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { EnrollmentsService } from '../../enrollments/services/enrollments.service';
+import { EnrollInCourseService } from '../../enrollments/application/services/enroll-in-course.service';
+import { EnrollmentPresenter } from '../../enrollments/presentation/response/enrollment.presenter';
 import { CourseReviewsService } from '../services/course-reviews.service';
 
 /**
@@ -15,13 +16,19 @@ import { CourseReviewsService } from '../services/course-reviews.service';
 @ApiTags('Courses')
 @Controller('v1/courses')
 export class CourseLegacyController {
+  constructor(private readonly enrollInCourse: EnrollInCourseService) {}
+
   @Post(':id/enroll')
   @UseGuards(JwtAuthGuard)
   @Roles('STUDENT')
   @ApiBearerAuth('BearerAuth')
   async enroll(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    const enrollment = await EnrollmentsService.enrollInCourse(user.id, id);
-    return ApiResponse.success({ message: 'Course enrolled.', data: enrollment, statusCode: 201 });
+    const enrollment = await this.enrollInCourse.execute(user.id, id);
+    return ApiResponse.success({
+      message: 'Course enrolled.',
+      data: EnrollmentPresenter.toResponse(enrollment),
+      statusCode: 201,
+    });
   }
 
   @Get(':id/reviews')
