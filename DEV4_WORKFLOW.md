@@ -171,8 +171,8 @@ Trả về:
 | Bước | Module | UC | Code (Prompt#1) | Nghiệm thu (Prompt#2) | §6 grep sạch | Build xanh |
 |------|--------|-----|:---:|:---:|:---:|:---:|
 | B1 | quiz | 36–39 | ☑ | ☑ | ☑ | ☑ |
-| B2 | quiz-attempts | 40–43 | ☑ | ☐ | ☐ | ☐ |
-| B3 | gamification | 48–49 | ☐ | ☐ | ☐ | ☐ |
+| B2 | quiz-attempts | 40–43 | ☑ | ☑ | ☑ | ☑ |
+| B3 | gamification | 48–49 | ☑ | ☐ | ☐ | ☐ |
 | B4 | leaderboard | 50 | ☐ | ☐ | ☐ | ☐ |
 | B5 | subscription | 51–52 | ☐ | ☐ | ☐ | ☐ |
 

@@ -15,7 +15,6 @@ import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
 import { CertificatesService } from './certificates/services/certificates.service';
-import { GamificationRewardsService } from './gamification/services/gamification-rewards.service';
 import { LeaderboardService } from './leaderboard/services/leaderboard.service';
 import { NotificationsService } from './notifications/services/notifications.service';
 
@@ -141,9 +140,8 @@ describe('reported bug regressions', () => {
       .spyOn(CertificatesService, 'issueCertificate')
       .mockResolvedValue({ _id: 'certificate' } as never);
     jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
-    const rewardSpy = jest
-      .spyOn(GamificationRewardsService, 'awardCourseCompletion')
-      .mockResolvedValue({ xpRewarded: 500, stats: { xp: 500 } as never });
+    
+    // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
     jest.spyOn(LeaderboardService, 'invalidateCache').mockResolvedValue(undefined);
 
     const result = await EnrollmentCompletionPublisher.publishCourseCompleted({
@@ -158,8 +156,7 @@ describe('reported bug regressions', () => {
       '507f1f77bcf86cd799439011',
       '507f1f77bcf86cd799439012',
     );
-    expect(rewardSpy).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
-    expect(result).toEqual({ xpRewarded: 500, stats: { xp: 500 } });
+    // TODO DEV2: assert qua EventEmitter2
   });
 
   it('grades quiz answers by question id', async () => {

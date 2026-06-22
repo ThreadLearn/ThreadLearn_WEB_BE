@@ -18,7 +18,7 @@ import { Certificate } from '../../modules/certificates/models/certificate.model
 import { Quiz } from '../../modules/quiz/models/quiz.model';
 import { QuizAttempt } from '../../modules/quiz-attempts/models/quiz-attempt.model';
 import { AIHistory } from '../../modules/ai/models/ai-history.model';
-import { UserStats } from '../../modules/gamification/models/user-stats.model';
+import { UserStats } from '../../modules/gamification/infrastructure/persistence/schemas/user-stats.schema';
 import { Notification } from '../../modules/notifications/models/notification.model';
 
 export {

@@ -4,6 +4,10 @@ import { AwardXpService } from './application/services/award-xp.service';
 import { UpdateStreakService } from './application/services/update-streak.service';
 import { GetStatsService } from './application/services/get-stats.service';
 import { UserStatsRepository } from './infrastructure/persistence/repositories/mongo-user-stats.repository';
+import { USER_STATS_REPOSITORY } from './domain/interfaces/user-stats.repository';
+import { MongoStudentProgressAdapter } from './infrastructure/adapters/mongo-student-progress.adapter';
+import { STUDENT_PROGRESS_PORT } from './domain/interfaces/student-progress.port';
+import { GamificationRewardsEventHandler } from './application/event-handlers/gamification-rewards.event-handler';
 
 @Module({
   controllers: [GamificationController],
@@ -11,15 +15,18 @@ import { UserStatsRepository } from './infrastructure/persistence/repositories/m
     AwardXpService,
     UpdateStreakService,
     GetStatsService,
+    GamificationRewardsEventHandler,
     {
-      provide: 'IUserStatsRepository',
+      provide: USER_STATS_REPOSITORY,
       useClass: UserStatsRepository,
+    },
+    {
+      provide: STUDENT_PROGRESS_PORT,
+      useClass: MongoStudentProgressAdapter,
     },
   ],
   exports: [
-    AwardXpService,
-    UpdateStreakService,
-    GetStatsService,
+    USER_STATS_REPOSITORY,
   ],
 })
 export class GamificationModule {}
