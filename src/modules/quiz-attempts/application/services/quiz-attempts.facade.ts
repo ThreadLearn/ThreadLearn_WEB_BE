@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubmitAttemptService } from './submit-attempt.service';
 import { GetAttemptService } from './get-attempt.service';
 import { GetMyAttemptsService } from './get-my-attempts.service';
 import { QuizAttemptRepository } from '../../infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
 import { MongoQuizRepository } from '../../../quiz/infrastructure/persistence/mongo-quiz.repository';
-import { DomainEventPublisher } from '../events/domain-event.publisher';
 
 @Injectable()
 export class QuizAttemptsService {
@@ -19,8 +19,8 @@ export class QuizAttemptsService {
   ) {
     const repo = new QuizAttemptRepository();
     const quizRepo = new MongoQuizRepository();
-    const eventPublisher = new DomainEventPublisher();
-    this.submitAttemptService = submitAttemptService || new SubmitAttemptService(repo, quizRepo, eventPublisher);
+    this.submitAttemptService =
+      submitAttemptService || new SubmitAttemptService(repo, quizRepo, new EventEmitter2());
     this.getAttemptService = getAttemptService || new GetAttemptService(repo);
     this.getMyAttemptsService = getMyAttemptsService || new GetMyAttemptsService(repo);
   }
