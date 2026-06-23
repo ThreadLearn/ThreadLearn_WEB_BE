@@ -5,7 +5,7 @@
 - Date/time: 2026-06-23
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.3A Auth Application Use Cases — Register/Login** (RegisterUserService + LoginUserService; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton + Ports, DEV1.2 Infrastructure Adapters.)
+- Task: **DEV1.3B Auth Application Use Cases — Verify/Resend/Forgot/Reset** (4 use-case; thêm 1 method domain nhỏ `changePasswordHash`; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login.)
 
 ## Current Status
 
@@ -531,4 +531,103 @@ Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.
 
 ### Next recommended task
 
-- **DEV1.3B — Auth Use Cases còn lại:** `VerifyEmailService`, `ResendVerificationEmailService`, `ForgotPasswordService`, `ResetPasswordService`, `RefreshTokenService` (reuse-detection + rotation), `LogoutService`, `GetSessionService`, `GoogleLoginService`. Sau đó wire AuthModule (`useExisting` + provider) + controller, khôi phục parity lockout & `UserStats` (event handler), giữ nguyên path/shape.
+- **DEV1.3B — Auth Use Cases (Verify/Resend/Forgot/Reset):** → **ĐÃ XONG**, xem section dưới.
+
+---
+
+## DEV1.3B Auth Application Use Cases — Verify/Resend/Forgot/Reset
+
+- **Date/time:** 2026-06-23
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files created (4 file `.ts`)
+
+Trong `src/modules/auth/application/services/`:
+- `verify-email.service.ts`
+- `resend-verification-email.service.ts`
+- `forgot-password.service.ts`
+- `reset-password.service.ts`
+
+### Files changed
+
+- `application/dto/auth-use-case.dto.ts` — thêm input/result types (không xoá type cũ).
+- `application/services/index.ts` — export 4 service mới.
+- `domain/entities/user.entity.ts` — **thêm 1 method domain nhỏ** `changePasswordHash(newHash)` (xem "Domain changes").
+- Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### DTO/result types added
+
+- `VerifyEmailInput {token}` → `VerifyEmailResult {user: SafeAuthUser}` (mirror `{ user: sanitizeUser }`).
+- `ResendVerificationEmailInput {email}` → `ResendVerificationEmailResult {success: true}` (service legacy trả `true`; controller set message).
+- `ForgotPasswordInput {email}` → `ForgotPasswordResult {success: true}` (luôn generic).
+- `ResetPasswordInput {token, newPassword}` → `ResetPasswordResult {success: true}`.
+
+### Use cases created
+
+- `VerifyEmailService.execute()` — `@Injectable`, 1 method.
+- `ResendVerificationEmailService.execute()` — `@Injectable`, 1 method.
+- `ForgotPasswordService.execute()` — `@Injectable`, 1 method.
+- `ResetPasswordService.execute()` — `@Injectable`, 1 method.
+
+### Ports used (inject qua Symbol token)
+
+- Verify: `USER_REPOSITORY`, `EMAIL_VERIFICATION_TOKEN_REPOSITORY`, `TOKEN_SERVICE`.
+- Resend: `USER_REPOSITORY`, `EMAIL_VERIFICATION_TOKEN_REPOSITORY`, `TOKEN_SERVICE`, `EMAIL_SENDER`.
+- Forgot: `USER_REPOSITORY`, `PASSWORD_RESET_TOKEN_REPOSITORY`, `TOKEN_SERVICE`, `EMAIL_SENDER`.
+- Reset: `USER_REPOSITORY`, `PASSWORD_RESET_TOKEN_REPOSITORY`, `TOKEN_SERVICE`, `PASSWORD_HASHER`, **+ `REFRESH_TOKEN_REPOSITORY`** (để revoke — xem dưới).
+- Lỗi nghiệp vụ dùng `BadRequestError`/`NotFoundError` (`src/common/custom-error`) — giữ ĐÚNG status+message hiện tại.
+
+### Current behavior mirrored
+
+- **Verify email:** hash token → tra `findByTokenHash` → `BadRequestError` cho invalid/`'...already been used.'`/`'...has expired.'` → `findById` user → `NotFoundError('User for verification token was not found.')` → **nếu user đã verify: đánh dấu token used rồi `BadRequestError('Email address is already verified.')`** → `markEmailVerified` + `markUsed` (cùng `now`) → update cả hai → trả `{ user }`.
+- **Resend:** `findByEmail` → `NotFoundError('User not found.')` → `BadRequestError('Email address is already verified.')` → `invalidateUnusedByUserId` → sinh raw token + lưu hash (24h) → gửi verify email.
+- **Forgot:** `findByEmail` → nếu không có user **hoặc** `isActive === false` → trả `{success:true}` im lặng (anti-enumeration) → `invalidateUnusedByUserId` → sinh raw token + lưu hash (1h) → gửi reset email.
+- **Reset:** hash token → tra `findByTokenHash` → `BadRequestError` cho invalid/used/expired → `findById` user → `NotFoundError('User for password reset token was not found.')` → hash mật khẩu mới → `changePasswordHash` → `markUsed` → update user + token → **`deleteByUserId` revoke toàn bộ refresh token** (mirror `RefreshToken.deleteMany`, đăng xuất mọi nơi).
+
+### Domain changes if any
+
+- **CÓ** — thêm `UserEntity.changePasswordHash(newHash: string)`: set `props.passwordHash`, ném `Error` nếu rỗng. KHÔNG import NestJS/Mongoose/utils. Lý do: ResetPassword cần đổi hash type-safe (entity vốn không có setter). Đây là thay đổi domain tối thiểu, được phép theo brief phase này.
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa controller/`auth.service.ts`/`email.service.ts`/model/validator/`auth.module.ts`/infrastructure.
+- KHÔNG wire runtime (AuthModule chưa khai báo provider mới; use-case chỉ tham chiếu qua barrel `application/**`).
+- KHÔNG đổi route/response shape/refresh-token raw storage/login response thủ công/SMTP/Google flow. KHÔNG sửa `.env`. KHÔNG commit tự động.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. `VerifyEmailResult` giữ `data: { user }`; resend/forgot/reset controller chỉ trả message (use-case trả `{success:true}`, không đổi wire shape). Behavior thật vẫn do AuthController/AuthService cũ.
+
+### Security compatibility
+
+- Không log raw verification/reset token, password, secret. Token verify/reset chỉ lưu **hash** (sha256 qua `TOKEN_SERVICE.hashToken`). `ResetPassword` revoke toàn bộ refresh token đúng như hiện tại. Verify trả `SafeAuthUser` (không `passwordHash`/`tokenHash`).
+
+### Build result
+
+- `npm run build`: ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — pre-existing, ngoài scope; 0 warning file mới.
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- `auth/domain`: ✅ không import cấm (sau khi thêm `changePasswordHash` vẫn thuần).
+- `auth/application`: ✅ KHÔNG import mongoose/model/schema/`src/utils`/infrastructure/`auth.service`/`email.service`.
+- Scan `AuthService|EmailService|UserStats|gamification`: chỉ khớp **comment-only** (dto mô tả behavior mirror) và **tên class của chính mình** (`VerifyEmailService`/`ResendVerificationEmailService` chứa chuỗi con "EmailService"). KHÔNG có import/logic legacy. KHÔNG tạo `UserStats`.
+
+### Known issues / caveats
+
+1. **Resend/Forgot account-existence:** `Resend` ném `NotFoundError('User not found.')` (legacy leak account existence) — **mirror nguyên trạng**; `Forgot` thì generic (không leak). Đây là khác biệt sẵn có của hệ thống, không phải lỗi mới.
+2. **Reset revoke refresh token:** dùng `REFRESH_TOKEN_REPOSITORY.deleteByUserId` (ngoài danh sách port tối thiểu của brief) để **giữ đúng** behavior `RefreshToken.deleteMany({userId})` hiện tại — brief chỉ cấm revoke khi legacy KHÔNG revoke; legacy có revoke nên thêm port này là đúng parity.
+3. **TTL tính bằng ms** (verify 24h, reset 1h) khớp hằng số legacy (`EMAIL_VERIFICATION_TOKEN_TTL_MS`/`PASSWORD_RESET_TOKEN_TTL_MS`).
+4. **Presenter `toSafeUser`** lặp lại ở `VerifyEmailService` (giống `RegisterUserService`) — sẽ gom về presenter `presentation/response` khi wire controller.
+5. **`update()` ở repo dùng `doc!`** — use-case đã `findById`/`findByTokenHash` trước nên entity tồn tại; vẫn nên rà khi wire.
+
+### Next recommended task
+
+- **DEV1.3C — Auth Use Cases còn lại:** `RefreshTokenService` (reuse-detection + rotation, raw storage), `LogoutService`, `GetSessionService`, `GoogleLoginService` (dùng `GOOGLE_OAUTH` + tạo/link user). Sau đó **DEV1.3-wire:** đăng ký provider AuthModule (`useExisting` cho 8 port + service), chuyển controller sang use-case, khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler `user.registered`), giữ nguyên path/shape/login response thủ công.

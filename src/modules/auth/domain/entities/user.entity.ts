@@ -114,6 +114,14 @@ export class UserEntity {
     this.props.isActive = true;
   }
 
+  /** Đổi password hash (đã hash sẵn ở adapter). Dùng cho reset password. */
+  changePasswordHash(newHash: string): void {
+    if (!newHash) {
+      throw new Error('passwordHash is required.');
+    }
+    this.props.passwordHash = newHash;
+  }
+
   /** Snapshot bất biến cho mapper/presenter (không lộ tham chiếu nội bộ). */
   toProps(): UserProps {
     return { ...this.props };

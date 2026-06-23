@@ -78,3 +78,56 @@ export interface LoginUserResult {
   accessToken: string;
   refreshToken: string;
 }
+
+// ----- Verify email -----
+
+export interface VerifyEmailInput {
+  token: string;
+}
+
+/** Mirror `AuthService.verifyEmail` → `{ user: sanitizeUser }`. */
+export interface VerifyEmailResult {
+  user: SafeAuthUser;
+}
+
+// ----- Resend verification email -----
+
+export interface ResendVerificationEmailInput {
+  email: string;
+}
+
+/**
+ * `AuthService.resendVerification` trả `true`; controller tự set message.
+ * Giữ result tối thiểu `{ success: true }` (không đổi wire shape).
+ */
+export interface ResendVerificationEmailResult {
+  success: true;
+}
+
+// ----- Forgot password -----
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+/**
+ * `AuthService.forgotPassword` luôn trả `true` (generic, chống enumeration);
+ * controller trả message trung lập. Giữ result `{ success: true }`.
+ */
+export interface ForgotPasswordResult {
+  success: true;
+}
+
+// ----- Reset password -----
+
+export interface ResetPasswordInput {
+  /** Raw reset token (sẽ được hash để tra cứu). */
+  token: string;
+  /** Mật khẩu mới (đã qua validator ở presentation; field tên `newPassword`). */
+  newPassword: string;
+}
+
+/** `AuthService.resetPassword` trả `true`; controller tự set message. */
+export interface ResetPasswordResult {
+  success: true;
+}
