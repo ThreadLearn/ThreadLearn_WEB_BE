@@ -103,6 +103,17 @@ Layer compliance: infrastructure import được `@nestjs/common`/Mongoose/model
 
 Layer compliance: application chỉ gọi DB/token/email/password **qua port**; lỗi dùng `common/custom-error`; KHÔNG import mongoose/model/`src/utils`/infrastructure/`auth.service`/`email.service`. Caveat parity: **lockout counter** & **UserStats** chưa mirror — khôi phục khi wire (DEV1.3). Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3A".
 
+### Tiến độ Auth (DEV1.3B — Verify/Resend/Forgot/Reset, đã xong)
+
+Thêm 4 use-case trong `application/services/` (CHƯA wire runtime), DTO mở rộng trong `auth-use-case.dto.ts`:
+
+- **`VerifyEmailService`** (`USER_REPOSITORY`/`EMAIL_VERIFICATION_TOKEN_REPOSITORY`/`TOKEN_SERVICE`) — mirror verify (invalid/used/expired + nhánh "đã verify" đánh dấu token used rồi báo lỗi), trả `{ user }`.
+- **`ResendVerificationEmailService`** (+`EMAIL_SENDER`) — invalidate token cũ → sinh + gửi token mới (24h).
+- **`ForgotPasswordService`** (`PASSWORD_RESET_TOKEN_REPOSITORY`/`TOKEN_SERVICE`/`EMAIL_SENDER`) — generic anti-enumeration, token reset 1h.
+- **`ResetPasswordService`** (+`PASSWORD_HASHER` +`REFRESH_TOKEN_REPOSITORY`) — đổi passwordHash + **revoke toàn bộ refresh token** (đúng behavior cũ).
+
+**Domain change tối thiểu:** thêm `UserEntity.changePasswordHash(newHash)` (thuần, không import ngoài) phục vụ reset. Token verify/reset chỉ lưu hash; không log raw token. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3B".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
