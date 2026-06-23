@@ -5,7 +5,7 @@
 - Date/time: 2026-06-23
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.1 Auth Skeleton + Ports** (skeleton 4 tầng + domain entities + ports; KHÔNG đổi behavior/route/response). Xem section "DEV1.1 Auth Skeleton + Ports" cuối file.
+- Task: **DEV1.2 Auth Infrastructure Adapters** (mapper + Mongo repos + bcrypt/JWT/SMTP/Google adapter; KHÔNG wire runtime). Xem section "DEV1.2 Auth Infrastructure Adapters" cuối file. (Trước đó: DEV1.1 Skeleton + Ports.)
 
 ## Current Status
 
@@ -343,4 +343,100 @@ Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.
 
 ### Next recommended task
 
-- **DEV1.2 — Auth Infrastructure Adapters** (Mongo repos + mapper + Bcrypt/Jwt/Smtp/Google adapter). Chi tiết ở mục "Next Recommended Task" phía trên.
+- **DEV1.2 — Auth Infrastructure Adapters** (Mongo repos + mapper + Bcrypt/Jwt/Smtp/Google adapter). → **ĐÃ XONG**, xem section dưới.
+
+---
+
+## DEV1.2 Auth Infrastructure Adapters
+
+- **Date/time:** 2026-06-23
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files created (15 file `.ts` mới) + 3 `.gitkeep` xoá
+
+Chỉ thêm trong `src/modules/auth/infrastructure/**` (không đụng runtime). Đã xoá 3 placeholder `.gitkeep` ở `mapper/`, `persistence/`, `services/` vì đã có file thật thay thế (nằm trong scope `infrastructure/**`).
+
+- `infrastructure/mapper/user.mapper.ts`
+- `infrastructure/mapper/refresh-token.mapper.ts`
+- `infrastructure/mapper/email-verification-token.mapper.ts`
+- `infrastructure/mapper/password-reset-token.mapper.ts`
+- `infrastructure/mapper/index.ts` (barrel)
+- `infrastructure/persistence/mongo-user.repository.ts`
+- `infrastructure/persistence/mongo-refresh-token.repository.ts`
+- `infrastructure/persistence/mongo-email-verification-token.repository.ts`
+- `infrastructure/persistence/mongo-password-reset-token.repository.ts`
+- `infrastructure/persistence/index.ts` (barrel)
+- `infrastructure/services/bcrypt-password-hasher.service.ts`
+- `infrastructure/services/jwt-token.service.ts`
+- `infrastructure/services/smtp-email-sender.service.ts`
+- `infrastructure/services/google-oauth.service.ts`
+- `infrastructure/services/index.ts` (barrel)
+
+Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### Mappers created
+
+- `UserMapper` (doc↔`UserEntity`): `toPersistence` LOẠI BỎ field `undefined` ⇒ KHÔNG ghi đè/xoá field legacy (`googleId`, `planType`, `subscriptionExpiresAt`, `githubId`, `failedLoginAttempts`, `lockedUntil`) mà skeleton chưa quản lý; không set `_id`/timestamps. `passwordHash` map vào props (persistence), không phải presenter.
+- `RefreshTokenMapper`: giữ raw `token`; `tokenHash` chỉ map khi có; `revokedAt` không persist (model dùng delete để revoke).
+- `EmailVerificationTokenMapper` / `PasswordResetTokenMapper`: token `tokenHash`; preserve `userId`/`expiresAt`/`usedAt`/timestamps.
+
+### Repositories created (đều `@Injectable`, trả Entity/null, KHÔNG trả doc thô)
+
+- `MongoUserRepository` (`findById`/`findByEmail`/`findByGoogleId`/`create`/`update`/`updateLastLogin`).
+- `MongoRefreshTokenRepository` (`findByToken`/`findByTokenHash`/`create`/`deleteByToken`/`deleteByTokenHash`/`deleteByUserId`) — giữ raw-token behavior.
+- `MongoEmailVerificationTokenRepository` & `MongoPasswordResetTokenRepository` (`findByTokenHash`/`create`/`update`/`invalidateUnusedByUserId`) — `invalidateUnusedByUserId` mirror đúng `resendVerification`/`forgotPassword` (`updateMany {usedAt}` cho token chưa dùng).
+
+### Infrastructure services created
+
+- `BcryptPasswordHasherService` → wrap `hashPassword`/`comparePasswords` (`src/utils`), giữ bcrypt rounds 10.
+- `JwtTokenService` → wrap `signAccessToken`/`signRefreshToken`/`verifyAccessToken`/`verifyRefreshToken` (`src/utils`); `TokenPayload{role:string}` map sang `JWTPayload{role:'STUDENT'|'ADMIN'}`. `generateRandomToken` = `crypto.randomBytes(32).hex` + `hashToken` = sha256 (giữ ĐÚNG semantics raw-token hiện tại; KHÔNG dùng `utils.generateRandomToken` vì format khác).
+- `SmtpEmailSenderService` → **wrap `EmailService` hiện tại** (giữ mock/retry/backoff, KHÔNG log SMTP_PASS); dựng link y hệt AuthService (verify dùng `env.FRONTEND_URL`, reset dùng `process.env.PASSWORD_RESET_URL`).
+- `GoogleOAuthService` → `buildAuthUrl()` (env→URL, mirror `getGoogleAuthorizationUrl`) + `verifyCallback(code)` (exchange→userinfo, trả profile thô, KHÔNG tạo/link user, KHÔNG đụng DB). Không thêm dependency mới (dùng global `fetch`).
+
+### Shared utils reused
+
+- `src/utils/index.ts`: `hashPassword`, `comparePasswords`, `signAccessToken`, `signRefreshToken`, `verifyAccessToken`, `verifyRefreshToken` — chỉ import ở **infrastructure adapter** (đúng layer rule). `crypto` (random/sha256) dùng tại adapter. KHÔNG tạo lại guard/decorator/ApiResponse/type.
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa: `auth.controller.ts`, `auth.service.ts`, `email.service.ts`, `user-sanitizer.ts`, 4 model, validator, `auth.module.ts` (đã xác minh `git status`), Swagger.
+- KHÔNG wire adapter vào AuthModule/runtime (adapter chỉ được tham chiếu qua barrel `infrastructure/**`, không nằm trong DI graph đang chạy).
+- KHÔNG đổi route, response shape, refresh-token storage (vẫn raw), login response thủ công, Google OAuth flow runtime, SMTP behavior, reset-link behavior. KHÔNG sửa `.env`. KHÔNG commit tự động.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. Toàn bộ endpoint giữ nguyên. Adapter chưa nối runtime ⇒ behavior thật do AuthController/AuthService cũ quyết định, không đổi.
+
+### Security compatibility
+
+- Không file mới nào log token/password/secret/SMTP_PASS. `JwtTokenService.hashToken` = sha256 đúng như hiện tại; `generateRandomToken` giữ entropy `randomBytes(32)`. Repo/mapper không format response, không lộ `passwordHash`/`tokenHash`. `SmtpEmailSenderService` chỉ nhúng raw token vào link email (đúng flow hiện tại), không log token.
+
+### Build result
+
+- `npm run build` (`nest build`): ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — tất cả pre-existing, ngoài scope DEV1, KHÔNG có warning ở file mới.
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- `auth/domain`: ✅ không có import cấm (mongoose/@nestjs/model/schema/utils) — chỉ domain-internal.
+- `auth/application`: ✅ chưa có `.ts` (chỉ `.gitkeep`) ⇒ không vi phạm.
+- `auth/infrastructure`: ✅ KHÔNG import guard/decorator/ApiResponse/api-handler (đúng — đó là presentation concern). Có import `@nestjs/common` (`@Injectable`) + model + `src/utils` đúng layer rule infrastructure.
+
+### Known issues / caveats
+
+1. **Adapter chưa wire runtime** — AuthModule chưa khai báo `{ provide: TOKEN, useExisting: MongoXRepository }`; wiring + tách use-case là DEV1.3.
+2. **Clear-field qua `update`**: `UserMapper.toPersistence` bỏ field `undefined` ⇒ `unlock()` (đặt `lockedAt/lockedReason = undefined`) sẽ KHÔNG `$unset` field cũ qua `findByIdAndUpdate`. Khi wire use-case (DEV1.3) cần `$unset` rõ ràng nếu muốn xoá hẳn — hiện behavior thật vẫn do `admin.service`/`auth.service` cũ (dùng mongoose doc `.save()`), chưa đổi.
+3. **RefreshToken `*ByTokenHash`**: model hiện chưa có field `tokenHash` ⇒ các query/delete theo `tokenHash` chưa khớp doc nào. Giữ để chuẩn bị migration; runtime vẫn dùng `findByToken`/`deleteByToken` (raw).
+4. **`GoogleOAuthService.verifyCallback`** chỉ trả profile thô — logic tạo/link user (kiểm `googleId`, set `isVerified`, tạo `UserStats`…) vẫn ở AuthService và sẽ chuyển vào use-case DEV1.3.
+5. **`update()` dùng `doc!`** (non-null assertion theo chuẩn `course`): nếu id không tồn tại sẽ ném runtime khi map — use-case nên đảm bảo entity tồn tại trước khi gọi `update`.
+
+### Next recommended task
+
+- **DEV1.3 — Auth Use Cases:** tách `auth.service.ts` (~563 dòng) thành 10 service 1-method (`RegisterUserService`…`GetSessionService`), inject port qua Symbol token + adapter DEV1.2; wire AuthModule provider (`useExisting`); chuyển tạo `UserStats` thành event handler (`user.registered`). **Giữ y nguyên** path + response shape (đặc biệt login response thủ công), raw refresh-token storage, reset-link behavior, SMTP behavior.
