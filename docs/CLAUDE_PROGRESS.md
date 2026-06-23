@@ -5,7 +5,7 @@
 - Date/time: 2026-06-23
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.2 Auth Infrastructure Adapters** (mapper + Mongo repos + bcrypt/JWT/SMTP/Google adapter; KHÔNG wire runtime). Xem section "DEV1.2 Auth Infrastructure Adapters" cuối file. (Trước đó: DEV1.1 Skeleton + Ports.)
+- Task: **DEV1.3A Auth Application Use Cases — Register/Login** (RegisterUserService + LoginUserService; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton + Ports, DEV1.2 Infrastructure Adapters.)
 
 ## Current Status
 
@@ -439,4 +439,96 @@ Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.
 
 ### Next recommended task
 
-- **DEV1.3 — Auth Use Cases:** tách `auth.service.ts` (~563 dòng) thành 10 service 1-method (`RegisterUserService`…`GetSessionService`), inject port qua Symbol token + adapter DEV1.2; wire AuthModule provider (`useExisting`); chuyển tạo `UserStats` thành event handler (`user.registered`). **Giữ y nguyên** path + response shape (đặc biệt login response thủ công), raw refresh-token storage, reset-link behavior, SMTP behavior.
+- **DEV1.3 — Auth Use Cases:** tách `auth.service.ts` (~563 dòng) thành 10 service 1-method (`RegisterUserService`…`GetSessionService`), inject port qua Symbol token + adapter DEV1.2; wire AuthModule provider (`useExisting`); chuyển tạo `UserStats` thành event handler (`user.registered`). **Giữ y nguyên** path + response shape (đặc biệt login response thủ công), raw refresh-token storage, reset-link behavior, SMTP behavior. → **Bắt đầu bằng DEV1.3A (Register/Login), xem dưới.**
+
+---
+
+## DEV1.3A Auth Application Use Cases — Register/Login
+
+- **Date/time:** 2026-06-23
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files created (5 file `.ts`) + 2 `.gitkeep` xoá
+
+Chỉ trong `src/modules/auth/application/**` (không đụng runtime). Xoá placeholder `.gitkeep` ở `dto/` và `services/` (đã có file thật); `application/events/` vẫn giữ `.gitkeep`.
+
+- `application/dto/auth-use-case.dto.ts`
+- `application/dto/index.ts` (barrel)
+- `application/services/register-user.service.ts`
+- `application/services/login-user.service.ts`
+- `application/services/index.ts` (barrel)
+
+Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### DTO/result types created
+
+- `SafeAuthUser` (mirror `SafeUser` của `user-sanitizer` — whitelist field an toàn, không passwordHash/tokenHash/googleId).
+- `RegisterUserInput {email,password,firstName,lastName}` (firstName/lastName **required** theo `registerSchema`).
+- `RegisterUserResult {user: SafeAuthUser, verificationRequired: true, message}` — **không token** (cần verify email trước).
+- `LoginUserInput {email,password,userAgent?,ipAddress?}` (userAgent/ipAddress chưa dùng, chuẩn bị audit session sau).
+- `LoginManualUser {id,email,firstName,lastName,role}` — giữ ĐÚNG shape thủ công của login (KHÔNG avatarUrl/isVerified/isActive).
+- `LoginUserResult {user: LoginManualUser, accessToken, refreshToken}`.
+
+### Use cases created
+
+- `RegisterUserService.execute(RegisterUserInput): RegisterUserResult` — `@Injectable`, 1 method.
+- `LoginUserService.execute(LoginUserInput): LoginUserResult` — `@Injectable`, 1 method.
+
+### Ports used (inject qua Symbol token)
+
+- Register: `USER_REPOSITORY`, `PASSWORD_HASHER`, `TOKEN_SERVICE`, `EMAIL_VERIFICATION_TOKEN_REPOSITORY`, `EMAIL_SENDER`.
+- Login: `USER_REPOSITORY`, `PASSWORD_HASHER`, `TOKEN_SERVICE`, `REFRESH_TOKEN_REPOSITORY`.
+- Lỗi nghiệp vụ dùng `BadRequestError`/`ForbiddenError` (`src/common/custom-error`) để giữ ĐÚNG status+message hiện tại.
+
+### Current behavior mirrored
+
+- **Register:** check trùng email (`findByEmail`) → `BadRequestError('Email address is already in use.')`; hash password (bcrypt 10 qua port); tạo user `isVerified:false`/`isActive:true`; sinh raw token + lưu **hash** (TTL 24h); gửi verification email qua port; trả `{ user: sanitizeUser-equivalent, verificationRequired:true, message:'Please verify your email before logging in.' }`.
+- **Login:** `findByEmail`; nếu không có user/passwordHash → chạy **dummy bcrypt compare** (chống enumeration) rồi `BadRequestError('Invalid email or password credentials.')`; sai password → cùng lỗi; chặn inactive (`'User account is inactive.'`)/locked (`'User account is locked.'`); chặn chưa verify (`ForbiddenError('Please verify your email before logging in.')`); ký access+refresh `{id,email,role}`; lưu refresh token **raw** (TTL 7 ngày); `updateLastLogin`; trả response thủ công `{ user:{id,email,firstName,lastName,role}, accessToken, refreshToken }`.
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa controller/`auth.service.ts`/`email.service.ts`/model/validator/`auth.module.ts`/infrastructure/domain.
+- KHÔNG wire vào runtime (AuthModule chưa khai báo provider mới; use-case chỉ tham chiếu qua barrel `application/**`).
+- KHÔNG đổi route/response shape/refresh-token raw storage/login response thủ công. KHÔNG sửa `.env`. KHÔNG commit tự động.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. Result type được thiết kế để khớp 1-1 response hiện tại khi wire controller (DEV1.3). Behavior thật vẫn do AuthController/AuthService cũ.
+
+### Security compatibility
+
+- Không log password/raw token/secret. Không lộ `passwordHash`/`tokenHash` (register trả `SafeAuthUser`; verification token chỉ lưu hash). Dummy-compare giữ anti-enumeration. Refresh token raw đúng hiện trạng. `DUMMY_PASSWORD_HASH` là hằng số bcrypt cố ý không hợp lệ (không phải secret).
+
+### UserStats caveat
+
+- `RegisterUserService` **KHÔNG** tạo `UserStats` (gamification) trực tiếp — khác luồng register legacy hiện đang tạo `UserStats {xp:0,level:1}` ngay sau khi tạo user. **Khi wire runtime (DEV1.3)** phải khôi phục parity bằng **event handler** (vd nghe `user.registered`) hoặc port gamification, nếu FE/analytics phụ thuộc bản ghi `UserStats`. Cho tới khi wire, runtime vẫn do AuthService cũ xử lý nên parity chưa bị ảnh hưởng.
+
+### Build result
+
+- `npm run build` (`nest build`): ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — tất cả pre-existing, ngoài scope; 0 warning ở file mới (`eslint src/modules/auth/application` sạch).
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- `auth/domain`: ✅ không import cấm.
+- `auth/application`: ✅ KHÔNG import mongoose/model/schema/`src/utils`/infrastructure/`auth.service`/`email.service`.
+- ✅ KHÔNG có chuỗi `AuthService`/`EmailService`/`UserStats`/`gamification` ở bất kỳ đâu trong `application` (kể cả comment).
+
+### Known issues / caveats
+
+1. **Lockout counter chưa mirror:** login legacy có `failedLoginAttempts`/`lockedUntil` (khoá 15' sau 5 lần sai) — `UserEntity`/`UserProps` & `IUserRepository` chưa mô hình hoá field/counter này, nên use-case mới CHƯA tăng/khoá đếm. Cần mở rộng entity + port khi wire (DEV1.3); hiện runtime vẫn do AuthService cũ giữ đầy đủ lockout.
+2. **`id` ObjectId vs string:** login legacy trả `id = user._id` (ObjectId); use-case trả `id: string`. Qua JSON là tương đương; giữ caveat để khi wire không "vô tình" đổi kiểu trong body.
+3. **Refresh expiry tính bằng ms** (`+7*24h`) thay vì `setDate(+7)` calendar — lệch tối đa ~1h khi qua mốc DST, không ảnh hưởng thực tế.
+4. **UserStats parity** — xem mục UserStats caveat ở trên.
+5. **Presenter cuối** (entity→safe user) hiện làm trong service; khi wire controller có thể chuyển sang `presentation/response` presenter cho đúng tầng.
+
+### Next recommended task
+
+- **DEV1.3B — Auth Use Cases còn lại:** `VerifyEmailService`, `ResendVerificationEmailService`, `ForgotPasswordService`, `ResetPasswordService`, `RefreshTokenService` (reuse-detection + rotation), `LogoutService`, `GetSessionService`, `GoogleLoginService`. Sau đó wire AuthModule (`useExisting` + provider) + controller, khôi phục parity lockout & `UserStats` (event handler), giữ nguyên path/shape.
