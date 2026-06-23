@@ -93,6 +93,16 @@ Skeleton CHƯA wire vào runtime — route/response/behavior auth giữ nguyên.
 
 Layer compliance: infrastructure import được `@nestjs/common`/Mongoose/model/`src/utils`/`crypto`; KHÔNG đụng guard/decorator/ApiResponse (presentation concern). Wiring vào AuthModule + tách use-case là DEV1.3. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.2 Auth Infrastructure Adapters".
 
+### Tiến độ Auth (DEV1.3A — application use-cases Register/Login, đã xong)
+
+Đã tạo 2 use-case đầu trong `src/modules/auth/application/**` (CHƯA wire runtime):
+
+- **DTO:** `auth-use-case.dto.ts` — `RegisterUserInput/Result`, `LoginUserInput/Result`, `SafeAuthUser`, `LoginManualUser` (giữ login response thủ công hiện tại).
+- **`RegisterUserService`** (inject `USER_REPOSITORY`/`PASSWORD_HASHER`/`TOKEN_SERVICE`/`EMAIL_VERIFICATION_TOKEN_REPOSITORY`/`EMAIL_SENDER`) — mirror register: check trùng email → hash → tạo user chưa verify → lưu verification token (hash, TTL 24h) → gửi email → trả safe user + cờ verify (không token).
+- **`LoginUserService`** (inject `USER_REPOSITORY`/`PASSWORD_HASHER`/`TOKEN_SERVICE`/`REFRESH_TOKEN_REPOSITORY`) — mirror login: dummy-compare chống enumeration → chặn inactive/locked/chưa-verify → ký access+refresh `{id,email,role}` → lưu refresh **raw** (7 ngày) → `updateLastLogin` → response thủ công.
+
+Layer compliance: application chỉ gọi DB/token/email/password **qua port**; lỗi dùng `common/custom-error`; KHÔNG import mongoose/model/`src/utils`/infrastructure/`auth.service`/`email.service`. Caveat parity: **lockout counter** & **UserStats** chưa mirror — khôi phục khi wire (DEV1.3). Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3A".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
