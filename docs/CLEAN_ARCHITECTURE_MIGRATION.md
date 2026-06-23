@@ -83,6 +83,16 @@ Domain thuần đã có:
 
 Skeleton CHƯA wire vào runtime — route/response/behavior auth giữ nguyên. Adapter hiện thực port nằm ở DEV1.2. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.1 Auth Skeleton + Ports".
 
+### Tiến độ Auth (DEV1.2 — infrastructure adapters, đã xong)
+
+Đã hiện thực toàn bộ port DEV1.1 trong `src/modules/auth/infrastructure/**` (CHƯA wire runtime):
+
+- **Mapper (doc↔entity):** `UserMapper` (strip `undefined` để preserve field legacy `googleId`/`planType`…), `RefreshTokenMapper` (raw `token`), `EmailVerificationTokenMapper`, `PasswordResetTokenMapper`.
+- **Mongo repositories (`@Injectable`, trả Entity):** `MongoUserRepository`, `MongoRefreshTokenRepository`, `MongoEmailVerificationTokenRepository`, `MongoPasswordResetTokenRepository` — nơi DUY NHẤT import 4 model auth.
+- **Service adapters:** `BcryptPasswordHasherService` & `JwtTokenService` (wrap `src/utils`), `SmtpEmailSenderService` (wrap `EmailService` — giữ SMTP behavior + link format), `GoogleOAuthService` (build URL + exchange→profile, không đụng DB).
+
+Layer compliance: infrastructure import được `@nestjs/common`/Mongoose/model/`src/utils`/`crypto`; KHÔNG đụng guard/decorator/ApiResponse (presentation concern). Wiring vào AuthModule + tách use-case là DEV1.3. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.2 Auth Infrastructure Adapters".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
