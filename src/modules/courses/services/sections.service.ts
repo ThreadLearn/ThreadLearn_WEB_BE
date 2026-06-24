@@ -15,7 +15,7 @@ export interface SectionPayload {
 export class SectionsService {
   static async listByCourse(courseId: string) {
     if (!mongoose.isValidObjectId(courseId)) throw new BadRequestError('Invalid course id.');
-    return Section.find({ courseId }).sort({ orderIndex: 1 });
+    return Section.find({ courseId, status: { $ne: 'deleted' } }).sort({ orderIndex: 1 });
   }
 
   static async create(data: SectionPayload) {
@@ -26,7 +26,7 @@ export class SectionsService {
     const order =
       typeof data.orderIndex === 'number'
         ? data.orderIndex
-        : (await Section.countDocuments({ courseId: data.courseId }));
+        : (await Section.countDocuments({ courseId: data.courseId, status: { $ne: 'deleted' } }));
     return Section.create({
       courseId: data.courseId,
       title: data.title,
@@ -38,7 +38,7 @@ export class SectionsService {
 
   static async update(id: string, data: Partial<SectionPayload>) {
     if (!mongoose.isValidObjectId(id)) throw new BadRequestError('Invalid section id.');
-    const section = await Section.findById(id);
+    const section = await Section.findOne({ _id: id, status: { $ne: 'deleted' } });
     if (!section) throw new NotFoundError('Section not found.');
     if (data.title !== undefined) section.title = data.title;
     if (data.description !== undefined) section.description = data.description;
@@ -50,10 +50,13 @@ export class SectionsService {
 
   static async remove(id: string) {
     if (!mongoose.isValidObjectId(id)) throw new BadRequestError('Invalid section id.');
-    const section = await Section.findById(id);
+    const section = await Section.findOne({ _id: id, status: { $ne: 'deleted' } });
     if (!section) throw new NotFoundError('Section not found.');
     await Lesson.updateMany({ sectionId: id }, { $unset: { sectionId: '' } });
-    await section.deleteOne();
+    section.status = 'deleted';
+    section.deletedAt = new Date();
+    section.isPublished = false;
+    await section.save();
     return { id };
   }
 
@@ -62,7 +65,12 @@ export class SectionsService {
     await Promise.all(
       ordered
         .filter((item) => mongoose.isValidObjectId(item.id))
-        .map((item) => Section.updateOne({ _id: item.id, courseId }, { orderIndex: item.orderIndex }))
+        .map((item) =>
+          Section.updateOne(
+            { _id: item.id, courseId, status: { $ne: 'deleted' } },
+            { orderIndex: item.orderIndex },
+          ),
+        )
     );
     return SectionsService.listByCourse(courseId);
   }

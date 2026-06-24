@@ -28,6 +28,7 @@ export interface ICourseRepository {
   list(filter: CourseListFilter, pagination: PaginationParams): Promise<{ items: CourseEntity[]; total: number }>;
   create(course: CourseEntity): Promise<CourseEntity>;
   update(course: CourseEntity): Promise<CourseEntity>;
+  incrementEnrollmentCount(courseId: string): Promise<void>;
 }
 
 /** DI token cho `ICourseRepository`. */

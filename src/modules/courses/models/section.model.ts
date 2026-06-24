@@ -6,6 +6,8 @@ export interface ISection extends Document {
   orderIndex: number;
   description?: string;
   isPublished: boolean;
+  status: 'active' | 'deleted';
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +19,8 @@ const SectionSchema: Schema<ISection> = new Schema(
     orderIndex: { type: Number, required: true, default: 0 },
     description: { type: String, trim: true },
     isPublished: { type: Boolean, default: true },
+    status: { type: String, enum: ['active', 'deleted'], default: 'active', index: true },
+    deletedAt: { type: Date },
   },
   { timestamps: true }
 );

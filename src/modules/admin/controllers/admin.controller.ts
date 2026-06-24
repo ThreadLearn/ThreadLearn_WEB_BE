@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { AuthenticatedUser } from '../../../common/api-handler';
@@ -9,13 +9,12 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { User } from '../../auth/models/user.model';
-import { CodeExecutionService } from '../../code-execution/services/code-execution.service';
+import { CodeExecutionService } from '../../code-execution/application/services/code-execution.service';
 import { AnalyticsService } from '../../analytics/services/analytics.service';
 import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
 import { QuizAttempt } from '../../quiz-attempts/models/quiz-attempt.model';
 import { AdminService } from '../services/admin.service';
-import { ILearningAccess, LEARNING_ACCESS } from '../../../shared/domain/interfaces/learning-access.port';
 import {
   createStudentSchema,
   dashboardStatisticsQuerySchema,
@@ -37,7 +36,7 @@ const executeSchema = z.object({
 @Roles('ADMIN')
 @ApiBearerAuth('BearerAuth')
 export class AdminController {
-  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
+  constructor(private readonly codeExecution: CodeExecutionService) {}
 
   @Post('students')
   @ApiOperation({ summary: 'Create a student account.' })
@@ -162,7 +161,7 @@ export class AdminController {
     @Body(new ZodValidationPipe(executeSchema))
     body: { sourceCode: string; languageId: number; stdin?: string }
   ) {
-    const result = await CodeExecutionService.executeCode(admin.id, body, admin.role, this.learningAccess);
+    const result = await this.codeExecution.executeCode(admin.id, body, admin.role);
     return ApiResponse.success({
       message: 'Code execution completed.',
       data: result,

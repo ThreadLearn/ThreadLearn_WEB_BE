@@ -1,11 +1,27 @@
 import { Module } from '@nestjs/common';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
-import { CommentController, LessonCommentsController } from './controllers/comment.controller';
-import { CommentService } from './services/comment.service';
+import { CreateCommentService } from './application/services/create-comment.service';
+import { DeleteCommentService } from './application/services/delete-comment.service';
+import { GetCommentService } from './application/services/get-comment.service';
+import { ListCommentsService } from './application/services/list-comments.service';
+import { ListRepliesService } from './application/services/list-replies.service';
+import { UpdateCommentService } from './application/services/update-comment.service';
+import { COMMENT_REPOSITORY } from './domain/interfaces/comment.repository';
+import { MongoCommentRepository } from './infrastructure/persistence/mongo-comment.repository';
+import { CommentController, LessonCommentsController } from './presentation/controller/comment.controller';
 
 @Module({
   imports: [LearningAccessModule],
   controllers: [CommentController, LessonCommentsController],
-  providers: [CommentService],
+  providers: [
+    MongoCommentRepository,
+    { provide: COMMENT_REPOSITORY, useExisting: MongoCommentRepository },
+    ListCommentsService,
+    ListRepliesService,
+    GetCommentService,
+    CreateCommentService,
+    UpdateCommentService,
+    DeleteCommentService,
+  ],
 })
 export class CommentModule {}

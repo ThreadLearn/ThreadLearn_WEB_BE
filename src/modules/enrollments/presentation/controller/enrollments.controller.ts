@@ -106,7 +106,10 @@ export class LessonCompletionController {
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
   ) {
     const result = await this.completeLesson.execute(user.id, id);
-    return ApiResponse.success({ message: 'Lesson marked as complete.', data: result });
+    return ApiResponse.success({
+      message: 'Lesson marked as complete.',
+      data: { ...result, enrollment: EnrollmentPresenter.toResponse(result.enrollment) },
+    });
   }
 }
 
