@@ -11,14 +11,42 @@ import { MongoNoteRepository } from './notes/infrastructure/persistence/mongo-no
 import { Notification } from './notifications/models/notification.model';
 import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
 import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
+import { SubmitAttemptService } from './quiz-attempts/application/services/submit-attempt.service';
+import { GetAttemptService } from './quiz-attempts/application/services/get-attempt.service';
+import { GetMyAttemptsService } from './quiz-attempts/application/services/get-my-attempts.service';
+import { QuizGradingService } from './quiz-attempts/domain/services/quiz-grading.service';
+import { QuizAttemptRepository } from './quiz-attempts/infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
 import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
 import { CertificatesService } from './certificates/services/certificates.service';
 import { NotificationsService } from './notifications/services/notifications.service';
 import { CourseEntity } from './course/domain/entities/course.entity';
+import { QuizMapper } from './quiz/infrastructure/mapper/quiz.mapper';
+import { IQuizRepository } from './quiz/domain/interfaces/quiz.repository';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('reported bug regressions', () => {
+  const createQuizAttemptsService = () => {
+    const attemptsRepo = new QuizAttemptRepository();
+    const quizRepo: IQuizRepository = {
+      findById: jest.fn().mockImplementation(async (id: string) => {
+        const doc = await Quiz.findById(id).exec();
+        return doc ? QuizMapper.toEntity(doc) : null;
+      }),
+      findByLessonId: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    };
+    return new QuizAttemptsService(
+      new SubmitAttemptService(attemptsRepo, quizRepo, new EventEmitter2(), new QuizGradingService()),
+      new GetAttemptService(attemptsRepo),
+      new GetMyAttemptsService(attemptsRepo),
+      { execute: jest.fn() } as any,
+    );
+  };
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -161,7 +189,7 @@ describe('reported bug regressions', () => {
       .spyOn(CertificatesService, 'issueCertificate')
       .mockResolvedValue({ _id: 'certificate' } as never);
     jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
-    
+
     // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
     // TODO DEV4: LeaderboardService.invalidateCache removed — leaderboard uses @OnEvent now
 
@@ -195,7 +223,7 @@ describe('reported bug regressions', () => {
     jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
     jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
 
-    const result = await new QuizAttemptsService().submitAttempt('student', 'quiz', {
+    const result = await createQuizAttemptsService().submitAttempt('student', 'quiz', {
       'question-a': 1,
       'question-b': 2,
     });
@@ -217,7 +245,7 @@ describe('reported bug regressions', () => {
     jest.spyOn(Quiz, 'findById').mockReturnValue({ exec: jest.fn().mockResolvedValue(quiz) } as never);
     jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data: any) => ({ _id: 'attempt-1', ...data }) as never);
 
-    const result = await new QuizAttemptsService().submitAttempt('student', 'quiz', {
+    const result = await createQuizAttemptsService().submitAttempt('student', 'quiz', {
       0: 1,
       1: 2,
     });
@@ -243,7 +271,7 @@ describe('reported bug regressions', () => {
 
     // 1 minute ago
     const startTime = new Date(Date.now() - 60 * 1000).toISOString();
-    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+    const result = await createQuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
       'question-a': 1,
     }, startTime);
 
@@ -268,7 +296,7 @@ describe('reported bug regressions', () => {
 
     // 11 minutes ago (exceeded 10 mins + 15s buffer)
     const startTime = new Date(Date.now() - 11 * 60 * 1000).toISOString();
-    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+    const result = await createQuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
       'question-a': 1,
     }, startTime);
 
@@ -290,7 +318,7 @@ describe('reported bug regressions', () => {
     const sortMock = jest.fn().mockReturnValue({ exec: execMock });
     jest.spyOn(QuizAttempt, 'find').mockReturnValue({ sort: sortMock } as never);
 
-    const result = await new QuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
+    const result = await createQuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
     expect(result[0].toProps()).toMatchObject({ id: 'attempt-1', score: 100 });
     expect(QuizAttempt.find).toHaveBeenCalledWith({ userId: '507f1f77bcf86cd799439011' });
   });
@@ -307,7 +335,7 @@ describe('reported bug regressions', () => {
     const execMock = jest.fn().mockResolvedValue(mockAttempt);
     jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ exec: execMock } as never);
 
-    const result = await new QuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
+    const result = await createQuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
     expect(result.toProps()).toMatchObject({ id: 'attempt-1', score: 100 });
     expect(QuizAttempt.findOne).toHaveBeenCalledWith({ _id: '507f1f77bcf86cd799439012', userId: '507f1f77bcf86cd799439011' });
   });

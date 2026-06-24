@@ -27,6 +27,8 @@ export class QuizMapper {
         xpReward: doc.xpReward ?? 100,
         timeLimitSeconds: doc.timeLimitSeconds ?? doc.timeLimit,
         questions,
+        isDeleted: doc.isDeleted === true,
+        deletedAt: doc.deletedAt,
       },
       String(doc._id),
     );
@@ -44,6 +46,8 @@ export class QuizMapper {
       // ── legacy mirror fields ──
       passingScore: p.passingScorePercent,
       timeLimit: p.timeLimitSeconds ?? 1800,
+      isDeleted: p.isDeleted === true,
+      deletedAt: p.deletedAt ?? null,
       // ── questions ──
       questions: p.questions.map((q) => {
         const qp = q.toProps();

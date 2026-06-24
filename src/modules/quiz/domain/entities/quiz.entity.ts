@@ -10,6 +10,8 @@ export interface QuizProps {
   xpReward: number;
   timeLimitSeconds?: number;
   questions: Question[];
+  isDeleted?: boolean;
+  deletedAt?: Date;
 }
 
 export class Quiz extends AggregateRoot<QuizProps> {
@@ -60,6 +62,7 @@ export class Quiz extends AggregateRoot<QuizProps> {
         xpReward,
         timeLimitSeconds: input.timeLimitSeconds,
         questions,
+        isDeleted: false,
       },
     );
   }
@@ -96,6 +99,14 @@ export class Quiz extends AggregateRoot<QuizProps> {
 
   get questions(): Question[] {
     return this.props.questions;
+  }
+
+  get isDeleted(): boolean {
+    return this.props.isDeleted === true;
+  }
+
+  get deletedAt(): Date | undefined {
+    return this.props.deletedAt;
   }
 
   // ─── Legacy alias getters (backward-compat cho quiz-attempts, gỡ ở B2) ──
@@ -174,6 +185,14 @@ export class Quiz extends AggregateRoot<QuizProps> {
     (this.props as QuizProps).questions = this.props.questions.filter((q) => q.id !== questionId);
   }
 
+  softRemove(): void {
+    if (this.isDeleted) {
+      return;
+    }
+    (this.props as QuizProps).isDeleted = true;
+    (this.props as QuizProps).deletedAt = new Date();
+  }
+
   // ─── Snapshot ─────────────────────────────────────────────
 
   toProps(): QuizProps & { id: string } {
@@ -186,6 +205,8 @@ export class Quiz extends AggregateRoot<QuizProps> {
       xpReward: this.props.xpReward,
       timeLimitSeconds: this.props.timeLimitSeconds,
       questions: this.props.questions,
+      isDeleted: this.props.isDeleted,
+      deletedAt: this.props.deletedAt,
     };
   }
 }

@@ -14,15 +14,14 @@ import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
  */
 @Injectable()
 export class SubmitAttemptService {
-  private readonly quizGradingService = new QuizGradingService();
-
   constructor(
     @Inject(QUIZ_ATTEMPT_REPOSITORY)
     private readonly quizAttemptRepository: IQuizAttemptRepository,
     @Inject(QUIZ_REPOSITORY)
     private readonly quizRepository: IQuizRepository,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+    private readonly quizGradingService: QuizGradingService,
+  ) { }
 
   async execute(
     userId: string,

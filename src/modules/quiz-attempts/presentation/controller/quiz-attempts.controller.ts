@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, Inject, Param, Post, UseGuards,
+  Body, Controller, Get, HttpCode, Param, Post, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
@@ -9,8 +9,6 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import { QuizAttemptsService } from '../../application/services/quiz-attempts.facade';
 import { quizSubmitSchema, QuizSubmitDto } from '../validators/quiz-attempt.validator';
-import { IQuizRepository, QUIZ_REPOSITORY } from '../../../quiz/domain/interfaces/quiz.repository';
-import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
 import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 
 @ApiTags('Quiz - Student')
@@ -20,17 +18,12 @@ import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 export class QuizAttemptsController {
   constructor(
     private readonly quizAttemptsService: QuizAttemptsService,
-    @Inject(QUIZ_REPOSITORY)
-    private readonly quizRepository: IQuizRepository,
-  ) {}
+  ) { }
 
   // ─── UC40: Học viên lấy quiz theo lesson (ẩn đáp án) ──────
   @Get('lesson/:lessonId')
   async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await this.quizRepository.findByLessonId(lessonId);
-    if (!quiz) {
-      throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found for this lesson.');
-    }
+    const quiz = await this.quizAttemptsService.getQuizByLesson(lessonId);
     return ApiResponse.success({ message: 'Quiz fetched successfully.', data: QuizAttemptPresenter.toStudentQuizResponse(quiz) });
   }
 
@@ -44,7 +37,7 @@ export class QuizAttemptsController {
     const result = await this.quizAttemptsService.submitAttempt(
       user.id, body.quizId, body.answers, body.startTime,
     );
-    
+
     return ApiResponse.success({
       message: result.passed
         ? 'Congratulations! You passed the quiz successfully.'

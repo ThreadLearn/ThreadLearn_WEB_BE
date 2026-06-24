@@ -36,7 +36,7 @@ export const createQuizSchema = z.object({
   description: z.string()
     .optional()
     .openapi({ example: 'Test your knowledge of async JS.' }),
-  passingScorePercent: z.number().int().min(0).max(100).default(80)
+  passingScorePercent: z.number().int().min(1).max(100).default(80)
     .openapi({ example: 80 }),
   timeLimitSeconds: z.number().int().positive().optional()
     .openapi({ example: 300 }),
@@ -100,7 +100,7 @@ registry.register('AddQuestionDto', addQuestionSchema);
 registry.register('UpdateQuestionDto', updateQuestionSchema);
 
 // ─── DTO types (suy ra từ schema) ──────────────────────────────
-export type CreateQuizDto      = z.infer<typeof createQuizSchema>;
-export type UpdateQuizDto      = z.infer<typeof updateQuizSchema>;
-export type QuestionDto        = z.infer<typeof questionSchema>;
-export type UpdateQuestionDto  = z.infer<typeof updateQuestionSchema>;
+export type CreateQuizDto = z.infer<typeof createQuizSchema>;
+export type UpdateQuizDto = z.infer<typeof updateQuizSchema>;
+export type QuestionDto = z.infer<typeof questionSchema>;
+export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>;

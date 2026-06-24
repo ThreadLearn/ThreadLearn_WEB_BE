@@ -13,10 +13,11 @@ export class DeleteQuizService {
   ) {}
 
   async execute(quizId: string): Promise<Quiz> {
-    const quiz = await this.quizRepo.delete(quizId);
+    const quiz = await this.quizRepo.findById(quizId);
     if (!quiz) {
       throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
     }
-    return quiz;
+    quiz.softRemove();
+    return this.quizRepo.update(quiz);
   }
 }

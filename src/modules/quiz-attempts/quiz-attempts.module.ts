@@ -5,6 +5,7 @@ import { QuizAttemptsService } from './application/services/quiz-attempts.facade
 import { SubmitAttemptService } from './application/services/submit-attempt.service';
 import { GetAttemptService } from './application/services/get-attempt.service';
 import { GetMyAttemptsService } from './application/services/get-my-attempts.service';
+import { GetStudentQuizByLessonService } from './application/services/get-student-quiz-by-lesson.service';
 import { QuizGradingService } from './domain/services/quiz-grading.service';
 import { NotificationEventHandler } from './application/event-handlers/notification.event-handler';
 import { QuizAttemptRepository } from './infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
@@ -25,6 +26,7 @@ import { QUIZ_ATTEMPT_REPOSITORY } from './domain/interfaces/quiz-attempt.reposi
     SubmitAttemptService,
     GetAttemptService,
     GetMyAttemptsService,
+    GetStudentQuizByLessonService,
     QuizGradingService,
     NotificationEventHandler,
     QuizAttemptRepository,

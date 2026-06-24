@@ -11,7 +11,6 @@ export interface IQuizRepository {
   findAll(): Promise<Quiz[]>;
   create(entity: Quiz): Promise<Quiz>;
   update(entity: Quiz): Promise<Quiz>;
-  delete(id: string): Promise<Quiz | null>;
 }
 
 export const QUIZ_REPOSITORY = Symbol('QUIZ_REPOSITORY');
