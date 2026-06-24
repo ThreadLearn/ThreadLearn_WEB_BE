@@ -5,6 +5,7 @@ import { CurrentUser } from '../../../../common/decorators/current-user.decorato
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { GetStatsService } from '../../application/services/get-stats.service';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
+import { UserStatsPresenter } from '../response/user-stats.presenter';
 
 @ApiTags('Gamification')
 @Controller('v1/gamification')
@@ -17,7 +18,10 @@ export class GamificationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('BearerAuth')
   async stats(@CurrentUser() user: AuthenticatedUser) {
-    const data = await this.getStatsService.execute(user.id);
-    return ApiResponse.success({ message: 'Stats fetched.', data });
+    const entity = await this.getStatsService.execute(user.id);
+    return ApiResponse.success({ 
+      message: 'Stats fetched.', 
+      data: UserStatsPresenter.toResponse(entity) 
+    });
   }
 }

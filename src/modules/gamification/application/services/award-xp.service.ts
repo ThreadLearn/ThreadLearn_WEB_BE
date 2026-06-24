@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundError } from '../../../../common/custom-error';
-import { IUserStatsRepository } from '../../domain/ports/user-stats.repository.interface';
-import { calculateLevel } from '../../domain/level-calculator';
+import { IUserStatsRepository, USER_STATS_REPOSITORY } from '../../domain/interfaces/user-stats.repository';
 
 /**
  * UC48: Accumulate Experience Points - XP Engine (Student, XP System)
@@ -10,20 +9,17 @@ import { calculateLevel } from '../../domain/level-calculator';
 @Injectable()
 export class AwardXpService {
   constructor(
-    @Inject('IUserStatsRepository')
+    @Inject(USER_STATS_REPOSITORY)
     private readonly userStatsRepository: IUserStatsRepository,
   ) {}
 
-  async execute(userId: string, xpAmount: number, quizzesCompletedDelta = 0) {
+  async execute(userId: string, xpAmount: number, quizzesCompletedDelta = 0, now: Date = new Date()) {
     const stats = await this.userStatsRepository.findByUserId(userId);
     if (!stats) {
       throw new NotFoundError('User stats profile not found.');
     }
 
-    stats.xp += xpAmount;
-    stats.quizzesCompleted = (stats.quizzesCompleted ?? 0) + quizzesCompletedDelta;
-    stats.level = calculateLevel(stats.xp);
-    stats.lastActiveDate = new Date();
+    stats.addXp(xpAmount, quizzesCompletedDelta, now);
     await this.userStatsRepository.save(stats);
 
     return stats;

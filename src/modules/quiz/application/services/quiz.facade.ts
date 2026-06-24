@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Quiz } from '../../domain/entities/quiz.entity';
-import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
+// import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
 import { CreateQuizInput, UpdateQuizInput, QuestionInput, UpdateQuestionInput } from '../dto/quiz.dto';
 import { CreateQuizService } from './create-quiz.service';
 import { UpdateQuizService } from './update-quiz.service';
@@ -28,7 +28,7 @@ export class QuizService {
     private readonly editQuestionService: EditQuestionService,
     private readonly deleteQuestionService: DeleteQuestionService,
     private readonly getQuizByLessonService: GetQuizByLessonService,
-  ) {}
+  ) { }
 
   // ─── UC36-1: Tạo quiz ──────────────────────────────────────
   async createQuiz(dto: CreateQuizInput): Promise<Quiz> {

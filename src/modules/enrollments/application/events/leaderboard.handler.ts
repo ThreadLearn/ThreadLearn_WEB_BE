@@ -1,13 +1,13 @@
-import { LeaderboardService } from '../../../leaderboard/services/leaderboard.service';
+// TODO DEV2: Remove this file. Leaderboard module now uses its own @OnEvent handler.
+// import { LeaderboardService } from '../../../leaderboard/services/leaderboard.service';
 import { CourseCompletedEvent, LessonCompletedEvent } from './enrollment-completion.events';
 
 export class LeaderboardHandler {
-  static async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
-    if (event.alreadyCompleted) return;
-    await LeaderboardService.invalidateCache();
+  static async onLessonCompleted(_event: LessonCompletedEvent): Promise<void> {
+    // No-op: leaderboard module handles cache invalidation via @OnEvent('lesson.completed')
   }
 
   static async onCourseCompleted(_event: CourseCompletedEvent): Promise<void> {
-    await LeaderboardService.invalidateCache();
+    // No-op: leaderboard module handles cache invalidation via @OnEvent('course.completed')
   }
 }

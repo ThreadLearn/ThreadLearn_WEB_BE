@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CorrelationIdMiddleware } from '../middlewares/correlation-id.middleware';
 import { RateLimitMiddleware } from '../middlewares/rate-limit.middleware';
 import { LearningAccessModule } from '../shared/application/learning-access/learning-access.module';
@@ -31,6 +32,7 @@ import { AppController } from './app.controller';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     LearningAccessModule,
     AdminModule,
     AIModule,

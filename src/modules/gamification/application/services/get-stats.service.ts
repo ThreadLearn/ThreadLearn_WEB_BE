@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Enrollment } from '../../../enrollments/models/enrollment.model';
 import { COURSE_COMPLETION_XP, LESSON_COMPLETION_XP } from '../../constants';
-import { IUserStatsRepository } from '../../domain/ports/user-stats.repository.interface';
-import { calculateLevel } from '../../domain/level-calculator';
+import { IUserStatsRepository, USER_STATS_REPOSITORY } from '../../domain/interfaces/user-stats.repository';
+import { IStudentProgressPort, STUDENT_PROGRESS_PORT } from '../../domain/interfaces/student-progress.port';
 
 /**
  * UC49: View User Level (Student)
@@ -11,49 +10,25 @@ import { calculateLevel } from '../../domain/level-calculator';
 @Injectable()
 export class GetStatsService {
   constructor(
-    @Inject('IUserStatsRepository')
+    @Inject(USER_STATS_REPOSITORY)
     private readonly userStatsRepository: IUserStatsRepository,
+    @Inject(STUDENT_PROGRESS_PORT)
+    private readonly studentProgressPort: IStudentProgressPort,
   ) {}
 
   async execute(userId: string) {
     const stats = await this.userStatsRepository.findOrCreate(userId);
 
-    const enrollments = await Enrollment.find({ userId })
-      .select('completedLessons completed')
-      .lean();
-    const completedLessonIds = new Set(
-      enrollments.flatMap((enrollment) =>
-        (enrollment.completedLessons ?? []).map((lessonId) => lessonId.toString())
-      )
-    );
-    const completedCourses = enrollments.filter((enrollment) => enrollment.completed).length;
-    const minimumXp =
-      completedLessonIds.size * LESSON_COMPLETION_XP +
-      completedCourses * COURSE_COMPLETION_XP;
+    const completedLessonsCount = await this.studentProgressPort.getCompletedLessonsCount(userId);
+    const completedCoursesCount = await this.studentProgressPort.getCompletedCoursesCount(userId);
 
-    let changed = false;
-    if ((stats.totalLessonsCompleted ?? 0) < completedLessonIds.size) {
-      stats.totalLessonsCompleted = completedLessonIds.size;
-      changed = true;
-    }
-    if ((stats.coursesCompleted ?? 0) < completedCourses) {
-      stats.coursesCompleted = completedCourses;
-      changed = true;
-    }
-    if (stats.xp < minimumXp) {
-      stats.xp = minimumXp;
-      changed = true;
-    }
-    if (completedLessonIds.size > 0 && stats.currentStreak < 1) {
-      stats.currentStreak = 1;
-      stats.highestStreak = Math.max(stats.highestStreak ?? 0, 1);
-      changed = true;
-    }
-    const expectedLevel = calculateLevel(stats.xp);
-    if (stats.level !== expectedLevel) {
-      stats.level = expectedLevel;
-      changed = true;
-    }
+    const changed = stats.syncProgress(
+      completedLessonsCount,
+      completedCoursesCount,
+      LESSON_COMPLETION_XP,
+      COURSE_COMPLETION_XP,
+    );
+
     if (changed) {
       await this.userStatsRepository.save(stats);
     }

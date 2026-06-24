@@ -1,3 +1,2 @@
-export { IUserStats, UserStats } from '../infrastructure/persistence/schemas/user-stats.schema';
-import { UserStats } from '../infrastructure/persistence/schemas/user-stats.schema';
-export default UserStats;
+// [B-3] giữ vì các module ngoài (admin/users/auth/leaderboard) chưa refactor
+export { UserStats } from '../infrastructure/persistence/schemas/user-stats.schema';
