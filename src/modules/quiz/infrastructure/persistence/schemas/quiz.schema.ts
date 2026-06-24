@@ -17,6 +17,8 @@ export interface IQuiz extends Document {
   timeLimit: number;
   xpReward: number;
   questions: IQuestion[];
+  isDeleted: boolean;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,8 +29,6 @@ export const QuizSchema: Schema<IQuiz> = new Schema(
       type: Schema.Types.ObjectId, 
       ref: 'Lesson', 
       required: true, 
-      index: true,
-      unique: true,
     },
     title: { type: String, required: true, trim: true },
     description: { type: String },
@@ -37,6 +37,8 @@ export const QuizSchema: Schema<IQuiz> = new Schema(
     xpReward: { type: Number, default: 100 },
     timeLimit: { type: Number, default: 1800, min: 0 },
     passingScore: { type: Number, default: 80, min: 0, max: 100 },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
     questions: [
       {
         questionText: { type: String, required: true },
@@ -46,6 +48,14 @@ export const QuizSchema: Schema<IQuiz> = new Schema(
     ],
   },
   { timestamps: true }
+);
+
+QuizSchema.index(
+  { lessonId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isDeleted: false },
+  },
 );
 
 export const Quiz: Model<IQuiz> =
