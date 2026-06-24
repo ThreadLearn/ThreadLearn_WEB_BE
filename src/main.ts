@@ -22,6 +22,17 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.setGlobalPrefix('api');
+
+  // Thêm middleware log request (method, url, status, duration ms)
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const ms = Date.now() - start;
+      logger.info(`[HTTP] ${req.method} ${req.originalUrl} ${res.statusCode} - ${ms}ms`);
+    });
+    next();
+  });
+
   app.use(helmet());
   app.use(compression());
   app.use('/uploads', express.static(join(process.cwd(), env.UPLOAD_DIR)));

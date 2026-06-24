@@ -22,7 +22,7 @@ export class SubmitAttemptService {
     @Inject(QUIZ_REPOSITORY)
     private readonly quizRepository: IQuizRepository,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   async execute(
     userId: string,

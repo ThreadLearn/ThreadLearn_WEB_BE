@@ -4,13 +4,13 @@ import { Quiz } from '../../domain/entities/quiz.entity';
 import { QUIZ_REPOSITORY, IQuizRepository } from '../../domain/interfaces/quiz.repository';
 
 /**
- * UC39: Admin xóa 1 câu hỏi khỏi quiz.
+ * UC39: Admin xóa 1 câu hỏi khỏi quiz. Hard remove, cần được cập nhật lại
  */
 @Injectable()
 export class DeleteQuestionService {
   constructor(
     @Inject(QUIZ_REPOSITORY) private readonly quizRepo: IQuizRepository,
-  ) {}
+  ) { }
 
   async execute(quizId: string, questionId: string): Promise<Quiz> {
     const quiz = await this.quizRepo.findById(quizId);
