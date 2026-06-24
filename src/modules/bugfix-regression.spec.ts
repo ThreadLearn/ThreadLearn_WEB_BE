@@ -165,7 +165,7 @@ describe('reported bug regressions', () => {
     // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
     // TODO DEV4: LeaderboardService.invalidateCache removed — leaderboard uses @OnEvent now
 
-    const result = await EnrollmentCompletionPublisher.publishCourseCompleted({
+    await EnrollmentCompletionPublisher.publishCourseCompleted({
       userId: '507f1f77bcf86cd799439011',
       courseId: '507f1f77bcf86cd799439012',
       progressPercent: 100,

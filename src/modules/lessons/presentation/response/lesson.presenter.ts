@@ -66,8 +66,10 @@ export class LessonPresenter {
 
   /** Danh sách: bỏ nội dung markdown nặng (giữ đúng hành vi `.select('-contentMarkdown -content')`). */
   static toListItem(lesson: LessonEntity): Omit<LessonResponse, 'contentMarkdown' | 'content'> {
-    const { contentMarkdown: _c, content: _c2, ...rest } = LessonPresenter.toResponse(lesson);
-    return rest;
+    const response = LessonPresenter.toResponse(lesson);
+    delete response.contentMarkdown;
+    delete response.content;
+    return response;
   }
 
   static toList(lessons: LessonEntity[]) {

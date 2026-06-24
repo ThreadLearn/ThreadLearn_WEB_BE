@@ -15,7 +15,7 @@ export class GamificationHandler {
     return { xpRewarded: 0, stats: null as any };
   }
 
-  static async onCourseCompleted(event: CourseCompletedEvent): Promise<CompletionEffects> {
+  static async onCourseCompleted(_event: CourseCompletedEvent): Promise<CompletionEffects> {
     // return GamificationRewardsService.awardCourseCompletion(event.userId);
     return { xpRewarded: 0, stats: null as any };
   }

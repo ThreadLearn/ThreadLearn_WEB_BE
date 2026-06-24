@@ -11,6 +11,6 @@ import { LearningAccessService } from './learning-access.service';
     { provide: LEARNING_ACCESS_DATA, useExisting: MongoLearningAccessDataAdapter },
     { provide: LEARNING_ACCESS, useExisting: LearningAccessService },
   ],
-  exports: [LearningAccessService, LEARNING_ACCESS],
+  exports: [LearningAccessService, LEARNING_ACCESS, LEARNING_ACCESS_DATA],
 })
 export class LearningAccessModule {}
