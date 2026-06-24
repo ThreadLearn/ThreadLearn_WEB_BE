@@ -87,6 +87,18 @@ export class QuizController {
     return ApiResponse.success({ message: 'Question updated successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
+  // ─── UC39: Admin xoá câu hỏi ──────────────────────────────
+  @Delete(':quizId/questions/:questionId')
+  @HttpCode(200)
+  @Roles('ADMIN')
+  async removeQuestionFromQuiz(
+    @Param('quizId') quizId: string,
+    @Param('questionId') questionId: string,
+  ) {
+    const quiz = await this.deleteQuestion.execute(quizId, questionId);
+    return ApiResponse.success({ message: 'Question deleted successfully.', data: QuizPresenter.toResponse(quiz) });
+  }
+
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
   @Roles('ADMIN')

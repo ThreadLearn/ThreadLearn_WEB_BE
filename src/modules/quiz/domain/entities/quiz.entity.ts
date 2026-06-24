@@ -174,6 +174,8 @@ export class Quiz extends AggregateRoot<QuizProps> {
     question.update(updates);
   }
 
+
+  // Hard remove, cần được cập nhật lại
   removeQuestion(questionId: string): void {
     this.findQuestion(questionId); // assert exists
     if (this.props.questions.length <= 1) {
