@@ -1,0 +1,34 @@
+Prompt chung (dán cho mọi model, mọi dev)
+
+Bạn đang làm BE dự án ThreadLearn (NestJS + Mongoose).
+
+LUẬT BẮT BUỘC: đọc file `ThreadLearn_WEB_BE/ARCHITECTURE_RULES.md` và tuân thủ tuyệt đối.
+
+Quy tắc làm việc:
+1. Code mẫu chuẩn là `src/modules/course/` — copy y cấu trúc, đừng tự nghĩ kiểu mới.
+2. Áp §0–§4 cho MỌI file. Tuyệt đối KHÔNG nhân lại các lỗi liệt kê ở §1.3.
+3. Tìm phần việc của tôi trong §8 và §7, tick đủ Definition of Done.
+4. Giữ nguyên API path + response shape (FE không được vỡ).
+5. Làm từng module một, KHÔNG big-bang.
+6. TRƯỚC khi báo "xong", chạy hết §6 (build + 4 lệnh grep) và dán kết quả ra cho tôi.
+   Nếu grep còn ra dòng nào → CHƯA xong, sửa tiếp.
+
+Tôi là [DEV_]. Module tôi đang làm: [tên module]. Bắt đầu đi.
+Đổi [DEV_] và [tên module] theo người dùng. Ví dụ cụ thể:
+
+Dev	Điền vào prompt
+DEV1	DEV1 · module notifications
+DEV2	DEV2 · module course / lesson / enrollment
+DEV3	DEV3 · module comment / bookmark / note
+DEV4	DEV4 · module quiz (chỉnh về chuẩn theo §8)
+Prompt riêng cho việc "check / nghiệm thu" (sau khi 1 model làm xong)
+Dùng prompt này với model khác để bắt lỗi chéo, đừng để model tự chấm bài mình:
+
+
+Đọc `ThreadLearn_WEB_BE/ARCHITECTURE_RULES.md`. KHÔNG sửa code.
+Soi module [tên module] xem có vi phạm §0 (7 luật vàng), §1.3 (nợ cấm nhân), hay §2 (bảng import) không.
+Chạy đúng 4 lệnh grep ở §6 và dán nguyên kết quả.
+Trả về: PASS/FAIL từng mục + file:line của mỗi vi phạm. Không khen chung chung.
+Mẹo dùng: prompt #1 để code, prompt #2 để nghiệm thu — vì self-check của chính model làm bài thường lỏng (đúng cái lỗi Codex extra-high vừa mắc). Tách 2 model ra mới khách quan.
+
+Bạn cần tôi đóng gói luôn 2 prompt này thành 1 mục cuối trong file ARCHITECTURE_RULES.md (để khỏi phải tra lại chỗ này) không?

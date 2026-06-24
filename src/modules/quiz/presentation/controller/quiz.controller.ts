@@ -16,13 +16,14 @@ import { AddQuestionService } from '../../application/services/add-question.serv
 import { EditQuestionService } from '../../application/services/edit-question.service';
 import { DeleteQuestionService } from '../../application/services/delete-question.service';
 import { GetQuizByLessonService } from '../../application/services/get-quiz-by-lesson.service';
-import { QuizPresenter } from '../response/quiz.presenter';
+
 import {
   createQuizSchema, CreateQuizDto,
   updateQuizSchema, UpdateQuizDto,
   addQuestionSchema, QuestionDto,
   updateQuestionSchema, UpdateQuestionDto,
 } from '../validators/quiz.validator';
+import { QuizPresenter } from '../response/quiz.presenter';
 
 /**
  * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC39).
@@ -43,7 +44,7 @@ export class QuizController {
     private readonly editQuestion: EditQuestionService,
     private readonly deleteQuestion: DeleteQuestionService,
     private readonly getQuizByLesson: GetQuizByLessonService,
-  ) {}
+  ) { }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()

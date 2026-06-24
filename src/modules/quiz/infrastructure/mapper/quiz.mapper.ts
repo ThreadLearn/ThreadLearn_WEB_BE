@@ -47,8 +47,13 @@ export class QuizMapper {
       // ── questions ──
       questions: p.questions.map((q) => {
         const qp = q.toProps();
+        // BaseEntity sinh id mặc định là timestamp string (13 số).
+        // Mongoose cần 24 hex string cho ObjectId. 
+        // Nếu id không phải ObjectId hợp lệ, ta bỏ qua (_id: undefined) để Mongoose tự sinh.
+        const isValidObjectId = qp.id && /^[0-9a-fA-F]{24}$/.test(qp.id);
+        
         return {
-          _id: qp.id || undefined,
+          _id: isValidObjectId ? qp.id : undefined,
           questionText: qp.questionText,
           options: qp.options,
           correctAnswerIndex: qp.correctAnswerIndex,
