@@ -5,7 +5,7 @@
 - Date/time: 2026-06-25
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.3D Auth Application Use Case — Google Login** (1 use-case `GoogleLoginService`; +3 method domain nhỏ + field `googleId` vào `UserProps`; mapper reflect `googleId`; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset, DEV1.3C Refresh/Logout/Session.)
+- Task: **DEV1.4A AuthModule Provider Wiring Only** (đăng ký 4 repo adapter + 4 service adapter + 8 port token mapping + 10 use-case provider trong `auth.module.ts`; CHƯA chuyển controller; KHÔNG đổi runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset, DEV1.3C Refresh/Logout/Session, DEV1.3D Google Login.)
 
 ## Current Status
 
@@ -850,4 +850,92 @@ Trong `src/modules/auth/application/services/`:
 
 ### Next recommended task
 
-- **DEV1.3-wire (Auth controller wiring):** đăng ký provider trong `AuthModule` (`{ provide: TOKEN, useExisting: Mongo*Repository }` cho 8 port + Bcrypt/Jwt/Smtp/Google adapter + 10 use-case service), chuyển `AuthController` sang inject use-case (giữ path + response shape, đặc biệt login response thủ công + Google redirect query), khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler `user.registered`/Google-created). Smoke-test: register→verify→login; forgot→reset→login; login→refresh→logout; Google callback→FE.
+- **DEV1.3-wire (Auth controller wiring):** đăng ký provider trong `AuthModule` (`{ provide: TOKEN, useExisting: Mongo*Repository }` cho 8 port + Bcrypt/Jwt/Smtp/Google adapter + 10 use-case service), chuyển `AuthController` sang inject use-case (giữ path + response shape, đặc biệt login response thủ công + Google redirect query), khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler `user.registered`/Google-created). Smoke-test: register→verify→login; forgot→reset→login; login→refresh→logout; Google callback→FE. → **DI wiring ĐÃ XONG ở DEV1.4A** (xem dưới); controller migration là phase kế.
+
+---
+
+## DEV1.4A AuthModule Provider Wiring Only
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/auth.module.ts` — thêm provider Clean Architecture mới (giữ nguyên `controllers`, `exports`, legacy provider).
+- Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+> KHÔNG sửa file nào khác (không cần thiết để build/wire). `EmailService` legacy đã là provider sẵn — `SmtpEmailSenderService` gọi `EmailService` **tĩnh** nên KHÔNG cần inject.
+
+### Repository providers registered (concrete)
+
+- `MongoUserRepository`, `MongoRefreshTokenRepository`, `MongoEmailVerificationTokenRepository`, `MongoPasswordResetTokenRepository`.
+
+### Port token mappings (`useExisting` — tránh tạo instance trùng)
+
+- `USER_REPOSITORY → MongoUserRepository`
+- `REFRESH_TOKEN_REPOSITORY → MongoRefreshTokenRepository`
+- `EMAIL_VERIFICATION_TOKEN_REPOSITORY → MongoEmailVerificationTokenRepository`
+- `PASSWORD_RESET_TOKEN_REPOSITORY → MongoPasswordResetTokenRepository`
+- `PASSWORD_HASHER → BcryptPasswordHasherService`
+- `TOKEN_SERVICE → JwtTokenService`
+- `EMAIL_SENDER → SmtpEmailSenderService`
+- `GOOGLE_OAUTH → GoogleOAuthService`
+
+### Infrastructure providers registered (concrete)
+
+- `BcryptPasswordHasherService`, `JwtTokenService`, `SmtpEmailSenderService`, `GoogleOAuthService`.
+
+### Application use-case providers registered
+
+- `RegisterUserService`, `LoginUserService`, `VerifyEmailService`, `ResendVerificationEmailService`, `ForgotPasswordService`, `ResetPasswordService`, `RefreshTokenService`, `LogoutService`, `GetSessionService`, `GoogleLoginService` (10).
+
+### What was intentionally NOT changed
+
+- `AuthController` (constructor/method/Swagger/route giữ nguyên — CHƯA inject use-case mới).
+- `AuthService`/`EmailService` legacy (vẫn là provider + export; runtime auth vẫn chạy qua legacy).
+- Model/validator/`.env`/route path/response shape/Google OAuth flow/SMTP behavior/refresh-token raw storage/login response thủ công.
+- `controllers` & `exports` của module không đổi (chỉ thêm vào `providers`).
+
+### Runtime compatibility
+
+- Mọi endpoint vẫn đi qua legacy `AuthController → AuthService` (tĩnh). Provider mới chỉ nằm trong DI graph để khởi tạo được, KHÔNG tham gia request flow nào.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. Path + response shape không đổi.
+
+### Security compatibility
+
+- Không log token/secret/password trong module. Wiring thuần DI; không thêm logic xử lý token.
+
+### Build result
+
+- `npm run build` (`nest build`): ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — pre-existing, ngoài scope; 0 warning ở `auth.module.ts`.
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- domain: ✅ không import cấm. application: ✅ không import cấm (mongoose/model/utils/infra/AuthService/EmailService). infrastructure: ✅ không dùng guard/decorator/ApiResponse. controller: ✅ CHƯA inject use-case mới (grep rỗng).
+
+### App boot / smoke result
+
+- ⚠️ **`npm run start:dev` hiện KHÔNG boot tới cùng** do lỗi DI **pre-existing, KHÔNG liên quan DEV1**: `EnrollInCourseService` (EnrollmentsModule) không resolve được `Symbol(LEARNING_ACCESS_DATA)` — đúng nợ kernel/`LearningAccessService` mô tả ở ARCHITECTURE_RULES §1.3 (scope DEV2/DEV3/kernel).
+- **Đã xác minh là pre-existing:** revert `auth.module.ts` về HEAD → boot lại → lỗi `LEARNING_ACCESS_DATA` **tái hiện y hệt** ⇒ KHÔNG do wiring DEV1.4A. MongoDB kết nối OK; NestFactory abort ở dependency đầu tiên (Enrollments) trước khi tới AuthModule, nên **KHÔNG có lỗi DI nào của Auth**. Sau đó đã restore `auth.module.ts` về bản wired.
+- Build TypeScript xanh xác nhận token/class/barrel wiring hợp lệ. DI Auth sẽ kiểm chứng đầy đủ khi nợ kernel Enrollments được sửa (ngoài scope phase này) — KHÔNG sửa runtime legacy unrelated theo brief.
+
+### Known issues / caveats
+
+1. **Boot bị chặn bởi nợ kernel Enrollments (`LEARNING_ACCESS_DATA`)** — pre-existing, ngoài scope DEV1. Cần kernel/DEV2/DEV3 sửa (`LearningAccessService` bỏ static/`mongoose`, wire `LEARNING_ACCESS_DATA`). Không thể smoke Auth routes tới khi việc này xong.
+2. **Use-case mới chưa vào request flow** — chỉ ở DI graph. Parity **lockout counter** & **UserStats** vẫn chưa khôi phục (sẽ làm ở controller-migration phase).
+3. `EmailService` là static class; được giữ làm provider để không đổi cấu trúc module, dù `SmtpEmailSenderService` gọi tĩnh (không thực sự inject).
+
+### Next recommended task
+
+- **DEV1.4B — Auth controller migration (từng route một, có cờ rollback):** chuyển `AuthController` sang inject use-case mới (bắt đầu route rủi ro thấp như `session`/`logout`/`refresh`), giữ path + response shape (đặc biệt login response thủ công + Google redirect query), khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler). Lưu ý: cần kernel sửa nợ `LEARNING_ACCESS_DATA` để app boot smoke-test được end-to-end.

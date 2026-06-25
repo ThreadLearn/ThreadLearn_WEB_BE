@@ -132,6 +132,17 @@ Thêm 1 use-case `GoogleLoginService` (CHƯA wire runtime), DTO mở rộng tron
 
 **Domain change tối thiểu:** `UserProps` thêm `googleId?`; thêm method thuần `linkGoogleAccount`/`setAvatarUrl`/`recordLogin`. **Infra hệ quả:** `UserMapper` reflect `googleId` 2 chiều (strip-undefined giữ field legacy). **UserStats caveat:** use-case KHÔNG tạo `UserStats` — khôi phục bằng event handler khi wire. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3D".
 
+### Tiến độ Auth (DEV1.4A — AuthModule provider wiring, đã xong)
+
+Đăng ký provider Clean Architecture mới trong `auth.module.ts` (CHỈ DI wiring, CHƯA chuyển controller):
+
+- **Repo adapter (concrete):** `MongoUserRepository`, `MongoRefreshTokenRepository`, `MongoEmailVerificationTokenRepository`, `MongoPasswordResetTokenRepository`.
+- **Service adapter (concrete):** `BcryptPasswordHasherService`, `JwtTokenService`, `SmtpEmailSenderService`, `GoogleOAuthService`.
+- **Port token mapping (`useExisting`):** `USER_REPOSITORY`/`REFRESH_TOKEN_REPOSITORY`/`EMAIL_VERIFICATION_TOKEN_REPOSITORY`/`PASSWORD_RESET_TOKEN_REPOSITORY`/`PASSWORD_HASHER`/`TOKEN_SERVICE`/`EMAIL_SENDER`/`GOOGLE_OAUTH`.
+- **Use-case (10):** Register/Login/Verify/Resend/Forgot/Reset/Refresh/Logout/GetSession/GoogleLogin.
+
+Legacy `AuthService`/`EmailService` giữ nguyên (vẫn export; runtime auth vẫn qua legacy). Build/lint/test xanh. **Caveat boot:** `start:dev` bị chặn bởi nợ kernel **pre-existing** `Symbol(LEARNING_ACCESS_DATA)` (EnrollmentsModule, ngoài scope DEV1) — đã xác minh tái hiện trên HEAD, KHÔNG do wiring Auth. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.4A".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
