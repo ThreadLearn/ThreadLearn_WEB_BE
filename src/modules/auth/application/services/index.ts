@@ -7,3 +7,4 @@ export * from './reset-password.service';
 export * from './refresh-token.service';
 export * from './logout.service';
 export * from './get-session.service';
+export * from './google-login.service';

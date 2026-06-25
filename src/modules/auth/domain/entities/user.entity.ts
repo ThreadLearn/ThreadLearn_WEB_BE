@@ -15,6 +15,8 @@ export interface UserProps {
   firstName?: string;
   lastName?: string;
   avatarUrl?: string;
+  /** Google subject id (sparse unique trong model). Phục vụ Google login link. */
+  googleId?: string;
   role: UserRole;
   isVerified: boolean;
   emailVerifiedAt?: Date;
@@ -120,6 +122,27 @@ export class UserEntity {
       throw new Error('passwordHash is required.');
     }
     this.props.passwordHash = newHash;
+  }
+
+  /** Liên kết tài khoản Google (set `googleId`). Dùng cho Google login. */
+  linkGoogleAccount(googleId: string): void {
+    if (!googleId) {
+      throw new Error('googleId is required.');
+    }
+    this.props.googleId = googleId;
+  }
+
+  /** Đặt avatar (mirror Google: chỉ set khi profile có ảnh). */
+  setAvatarUrl(avatarUrl: string): void {
+    if (!avatarUrl) {
+      throw new Error('avatarUrl is required.');
+    }
+    this.props.avatarUrl = avatarUrl;
+  }
+
+  /** Ghi nhận thời điểm đăng nhập gần nhất (mirror set `lastLoginAt`). */
+  recordLogin(at: Date = new Date()): void {
+    this.props.lastLoginAt = at;
   }
 
   /** Snapshot bất biến cho mapper/presenter (không lộ tham chiếu nội bộ). */

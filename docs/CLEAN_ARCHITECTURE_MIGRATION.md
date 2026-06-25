@@ -124,6 +124,14 @@ Thêm 3 use-case trong `application/services/` (CHƯA wire runtime), DTO mở r�
 
 **KHÔNG đổi domain/infrastructure** (port đã đủ method). Khác biệt duy nhất với legacy: bỏ dòng `logger.warn` reuse-detection (observability-only) để giữ application thuần — hành vi revoke-all giữ nguyên. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3C".
 
+### Tiến độ Auth (DEV1.3D — Google Login, đã xong)
+
+Thêm 1 use-case `GoogleLoginService` (CHƯA wire runtime), DTO mở rộng trong `auth-use-case.dto.ts`:
+
+- **`GoogleLoginService`** (`USER_REPOSITORY`/`TOKEN_SERVICE`/`REFRESH_TOKEN_REPOSITORY`; KHÔNG inject `GOOGLE_OAUTH` vì profile đã được adapter/strategy xác thực trước) — mirror `AuthService.loginWithGoogleCode` + `createGoogleUser` + `createAuthResponse`: validate profile (email/sub/`email_verified`) → tra **bằng email** → link googleId/verify/avatar/lastLogin cho user cũ, hoặc tạo user Google mới (`isVerified=true`, role STUDENT, fallback name, KHÔNG passwordHash giả) → ký token → lưu refresh **raw** 7 ngày → trả `{ user: SafeAuthUser, accessToken, refreshToken }`.
+
+**Domain change tối thiểu:** `UserProps` thêm `googleId?`; thêm method thuần `linkGoogleAccount`/`setAvatarUrl`/`recordLogin`. **Infra hệ quả:** `UserMapper` reflect `googleId` 2 chiều (strip-undefined giữ field legacy). **UserStats caveat:** use-case KHÔNG tạo `UserStats` — khôi phục bằng event handler khi wire. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3D".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
