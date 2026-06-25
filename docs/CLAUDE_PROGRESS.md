@@ -2,10 +2,10 @@
 
 ## Last Updated
 
-- Date/time: 2026-06-23
+- Date/time: 2026-06-25
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.3B Auth Application Use Cases — Verify/Resend/Forgot/Reset** (4 use-case; thêm 1 method domain nhỏ `changePasswordHash`; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login.)
+- Task: **DEV1.3C Auth Application Use Cases — Refresh/Logout/Session** (3 use-case; KHÔNG sửa domain/infrastructure; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset.)
 
 ## Current Status
 
@@ -631,3 +631,114 @@ Trong `src/modules/auth/application/services/`:
 ### Next recommended task
 
 - **DEV1.3C — Auth Use Cases còn lại:** `RefreshTokenService` (reuse-detection + rotation, raw storage), `LogoutService`, `GetSessionService`, `GoogleLoginService` (dùng `GOOGLE_OAUTH` + tạo/link user). Sau đó **DEV1.3-wire:** đăng ký provider AuthModule (`useExisting` cho 8 port + service), chuyển controller sang use-case, khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler `user.registered`), giữ nguyên path/shape/login response thủ công.
+
+---
+
+## DEV1.3C Auth Application Use Cases — Refresh/Logout/Session
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files created (3 file `.ts`)
+
+Trong `src/modules/auth/application/services/`:
+- `refresh-token.service.ts`
+- `logout.service.ts`
+- `get-session.service.ts`
+
+### Files changed
+
+- `application/dto/auth-use-case.dto.ts` — thêm input/result types (không xoá/đổi type cũ).
+- `application/services/index.ts` — export 3 service mới.
+- Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### DTO/result types added
+
+- `RefreshTokenInput { refreshToken }` → `RefreshTokenResult { accessToken, refreshToken }` — mirror `AuthService.refresh` trả `return tokens` (CHỈ token, KHÔNG user/message).
+- `LogoutInput { refreshToken }` → `LogoutResult { success: true }` — mirror `AuthService.logout(token)` (chỉ raw refresh token; KHÔNG logout-all theo userId vì legacy không làm).
+- `GetSessionInput { userId }` → `GetSessionResult { user: SafeAuthUser }` — mirror `AuthService.getSessionUser(userId)` (`{ user: sanitizeUser }`).
+
+### Use cases created
+
+- `RefreshTokenService.execute()` — `@Injectable`, 1 method.
+- `LogoutService.execute()` — `@Injectable`, 1 method.
+- `GetSessionService.execute()` — `@Injectable`, 1 method.
+
+### Ports used (inject qua Symbol token)
+
+- Refresh: `USER_REPOSITORY`, `REFRESH_TOKEN_REPOSITORY`, `TOKEN_SERVICE`.
+- Logout: `REFRESH_TOKEN_REPOSITORY`.
+- Session: `USER_REPOSITORY` (KHÔNG cần `TOKEN_SERVICE` — guard đã decode JWT ở presentation).
+- Lỗi nghiệp vụ dùng `UnauthorizedError`/`ForbiddenError` (`src/common/custom-error`) — giữ ĐÚNG status+message hiện tại.
+
+### Current behavior mirrored
+
+- **Refresh:** `findByToken(raw)` → (không có store) reuse-detection → (expired store) xoá + reject → verify chữ ký → tìm user → chặn inactive/locked → rotation → trả `{ accessToken, refreshToken }`. Mirror đúng 3 message lỗi phân biệt của legacy:
+  - `'Refresh token is invalid or has expired.'` (không có trong store **hoặc** store quá hạn).
+  - `'Refresh token verification failed.'` (có trong store, chưa hết hạn, nhưng verify chữ ký fail).
+  - `'Refresh token user no longer exists.'` (verify ok nhưng user không tồn tại).
+- **Logout:** `deleteByToken(refreshToken)` — idempotent, KHÔNG verify, KHÔNG check user (đúng legacy `RefreshToken.deleteOne({token})` rồi trả `true`).
+- **Session:** `findById(userId)` → `UnauthorizedError('Authenticated user no longer exists.')` nếu null → chặn inactive/locked → trả `SafeAuthUser` (whitelist, KHÔNG passwordHash/tokenHash).
+
+### Refresh rotation behavior
+
+- Xoá raw token cũ (`deleteByToken`) **trước**, tạo refresh token mới **raw** (`create`) **sau** — đúng thứ tự `deleteOne` → `create` của legacy.
+- Token payload ký lại từ `{ id, email, role }` của token đã verify (giữ nguyên payload). TTL refresh 7 ngày (tính bằng ms, đồng bộ với `LoginUserService` của DEV1.3A — lệch ≤ ~1h ở mốc DST so với `setDate(+7)` calendar của legacy, không ảnh hưởng thực tế).
+- Refresh token vẫn lưu **raw** (KHÔNG hash) — đúng raw-token storage hiện tại.
+
+### Reuse-detection behavior
+
+- Token verify chữ ký hợp lệ nhưng KHÔNG có trong store ⇒ `deleteByUserId(decoded.id)` (mirror `RefreshToken.deleteMany({userId})`) revoke toàn bộ session, rồi reject. Chữ ký sai ⇒ chỉ reject (không revoke).
+- **Khác biệt duy nhất so với legacy:** legacy có `logger.warn(...)` (chỉ ghi `userId`, KHÔNG ghi token) khi phát hiện reuse — use-case **bỏ dòng log này** để giữ application layer thuần (không import `src/configs/logger`) và tuân thủ quy tắc không log token. Đây là observability-only; **hành vi bảo mật (revoke-all) được giữ nguyên**.
+
+### Domain changes if any
+
+- **KHÔNG.** Port `IRefreshTokenRepository` đã có sẵn đủ method (`findByToken`/`deleteByToken`/`deleteByUserId`/`create`); `RefreshTokenEntity.isExpired()` đã có. Không thêm/đổi entity/port/props.
+
+### Infrastructure changes if any
+
+- **KHÔNG.** Không sửa adapter/mapper/repository nào (port không đổi nên không cần implement thêm).
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa controller/`auth.service.ts`/`email.service.ts`/model/validator/`auth.module.ts`/infrastructure/domain.
+- KHÔNG wire runtime (AuthModule chưa khai báo provider mới; use-case chỉ tham chiếu qua barrel `application/**`).
+- KHÔNG làm `GoogleLoginService` ở phase này.
+- KHÔNG đổi route/response shape/refresh-token raw storage/login response thủ công/SMTP/Google flow. KHÔNG sửa `.env`. KHÔNG commit tự động.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. Result types khớp 1-1 response hiện tại khi wire (`refresh` → `data:{accessToken,refreshToken}`; `logout` → chỉ `message`; `session` → `data:{user}`). Behavior thật vẫn do AuthController/AuthService cũ.
+
+### Security compatibility
+
+- KHÔNG log raw/access/refresh token, password, secret. Refresh giữ reuse-detection (revoke-all) + rotation. Logout idempotent (không lộ token validity). Session trả `SafeAuthUser` (không lộ field nhạy cảm). Refresh token vẫn raw đúng hiện trạng.
+
+### Build result
+
+- `npm run build`: ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — pre-existing, ngoài scope; 0 warning ở file mới.
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- `auth/application`: ✅ KHÔNG import mongoose/model/schema/`src/utils`/infrastructure/`auth.service`/`email.service`. Mọi match grep `AuthService|EmailService` chỉ là **comment-only** (doc mô tả mirror) và **class-name only** (`VerifyEmailService`/`ResendVerificationEmailService` chứa chuỗi con "EmailService"). KHÔNG tạo `UserStats`/`gamification`. KHÔNG có `console.log`/`logger.`. Các chuỗi `refreshToken`/`accessToken` đều là **field/type/variable name hợp lệ**, KHÔNG phải log token.
+- `auth/domain`: ✅ không đổi (không sửa file domain nào).
+
+### Known issues / caveats
+
+1. **Reuse-detection log bị lược bỏ** — xem mục Reuse-detection behavior. Behavior bảo mật giữ nguyên; chỉ thiếu dòng `logger.warn` observability. Nếu cần khôi phục log khi wire, đặt ở presentation/handler hoặc qua một port logging, KHÔNG đưa `src/configs/logger` vào application.
+2. **Lockout counter chưa mirror** (caveat chung từ DEV1.3A) — refresh/session chỉ chặn inactive/locked qua `assertCanAuthenticate`, không liên quan đếm login. Runtime vẫn do AuthService cũ giữ.
+3. **TTL refresh tính bằng ms** (đồng bộ DEV1.3A) thay vì `setDate(+7)` calendar — lệch tối đa ~1h ở mốc DST.
+4. **`GoogleLoginService` chưa làm** — cần `GOOGLE_OAUTH` + tạo/link user; để task sau.
+5. **Presenter `toSafeUser`** lặp ở `GetSessionService`/`VerifyEmailService`/`RegisterUserService` — sẽ gom về `presentation/response` khi wire controller.
+
+### Next recommended task
+
+- **DEV1.3D — `GoogleLoginService`** (dùng `GOOGLE_OAUTH` adapter + tạo/link user, set `isVerified`, mirror chặn `email_verified===false` & `googleId` linking, trả `{ user: SafeAuthUser, accessToken, refreshToken }` cho redirect). Sau đó **DEV1.3-wire:** đăng ký provider AuthModule (`useExisting` cho 8 port + 10 service), chuyển controller sang use-case, khôi phục parity **lockout counter** & **UserStats** (event handler), giữ nguyên path/shape/login response thủ công.

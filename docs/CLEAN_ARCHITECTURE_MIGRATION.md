@@ -114,6 +114,16 @@ Thêm 4 use-case trong `application/services/` (CHƯA wire runtime), DTO mở r�
 
 **Domain change tối thiểu:** thêm `UserEntity.changePasswordHash(newHash)` (thuần, không import ngoài) phục vụ reset. Token verify/reset chỉ lưu hash; không log raw token. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3B".
 
+### Tiến độ Auth (DEV1.3C — Refresh/Logout/Session, đã xong)
+
+Thêm 3 use-case trong `application/services/` (CHƯA wire runtime), DTO mở rộng trong `auth-use-case.dto.ts`:
+
+- **`RefreshTokenService`** (`USER_REPOSITORY`/`REFRESH_TOKEN_REPOSITORY`/`TOKEN_SERVICE`) — mirror `AuthService.refresh`: reuse-detection (`deleteByUserId` revoke-all khi token verify được nhưng không có trong store) + rotation (xoá raw cũ → tạo raw mới, TTL 7 ngày) + 3 message lỗi phân biệt; trả `{ accessToken, refreshToken }` (KHÔNG user). Refresh token vẫn **raw**.
+- **`LogoutService`** (`REFRESH_TOKEN_REPOSITORY`) — `deleteByToken` idempotent, KHÔNG verify/check user (đúng legacy).
+- **`GetSessionService`** (`USER_REPOSITORY`) — `findById(userId)` từ guard, chặn inactive/locked, trả `SafeAuthUser`. KHÔNG tự decode JWT.
+
+**KHÔNG đổi domain/infrastructure** (port đã đủ method). Khác biệt duy nhất với legacy: bỏ dòng `logger.warn` reuse-detection (observability-only) để giữ application thuần — hành vi revoke-all giữ nguyên. Chi tiết: `docs/CLAUDE_PROGRESS.md` section "DEV1.3C".
+
 ---
 
 ## Cách thêm một DEV1 use case mới
