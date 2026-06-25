@@ -9,6 +9,11 @@ import { BadRequestError } from '../../../common/custom-error';
 import { env } from '../../../configs/env';
 import { AuthService } from '../services/auth.service';
 import {
+  RefreshTokenService,
+  LogoutService,
+  GetSessionService,
+} from '../application/services';
+import {
   forgotPasswordSchema,
   googleOAuthCallbackSchema,
   loginSchema,
@@ -22,6 +27,17 @@ import {
 @ApiTags('Auth')
 @Controller('v1/auth')
 export class AuthController {
+  /**
+   * DEV1.4C-1: inject use-case Clean Architecture cho 3 route session/logout/refresh.
+   * Các route còn lại (register/login/google/verify/resend/forgot/reset) VẪN gọi
+   * `AuthService` tĩnh như cũ — chưa migrate trong phase này.
+   */
+  constructor(
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly logoutService: LogoutService,
+    private readonly getSessionService: GetSessionService,
+  ) {}
+
   @Post('register')
   async register(@Body(new ZodValidationPipe(registerSchema)) body: unknown) {
     const result = await AuthService.register(body);
@@ -126,7 +142,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    const result = await AuthService.refresh(body.refreshToken);
+    const result = await this.refreshTokenService.execute({ refreshToken: body.refreshToken });
     return ApiResponse.success({
       message: 'Tokens refreshed successfully.',
       data: result,
@@ -136,7 +152,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   async logout(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    await AuthService.logout(body.refreshToken);
+    await this.logoutService.execute({ refreshToken: body.refreshToken });
     return ApiResponse.success({
       message: 'Logged out successfully.',
     });
@@ -149,10 +165,10 @@ export class AuthController {
     if (!user) {
       throw new BadRequestError('User context missing from request.');
     }
-    const sessionUser = await AuthService.getSessionUser(user.id);
+    const result = await this.getSessionService.execute({ userId: user.id });
     return ApiResponse.success({
       message: 'User context retrieved successfully.',
-      data: { user: sessionUser },
+      data: { user: result.user },
     });
   }
 

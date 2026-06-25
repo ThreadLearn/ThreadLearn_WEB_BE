@@ -1071,3 +1071,77 @@ New (4):
 ### Next recommended task
 
 - **DEV1.4C — Auth controller migration (từng route, có rollback):** chuyển `AuthController` sang inject use-case mới, bắt đầu route rủi ro thấp (`session`/`logout`/`refresh`) rồi `login`/`register`/`google`. Giữ path + response shape (login thủ công + Google redirect query). Cần kernel sửa nợ `LEARNING_ACCESS_DATA` để smoke-test end-to-end.
+
+---
+
+## DEV1.4C-1 AuthController Migration — Session/Logout/Refresh
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/controllers/auth.controller.ts` — inject 3 use-case + migrate 3 route (refresh/logout/session).
+- `docs/CLAUDE_PROGRESS.md`, `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn).
+
+### Routes migrated
+
+- `POST /api/v1/auth/refresh` → `RefreshTokenService.execute({ refreshToken })`.
+- `POST /api/v1/auth/logout` → `LogoutService.execute({ refreshToken })`.
+- `GET  /api/v1/auth/session` → `GetSessionService.execute({ userId })` (guard `JwtAuthGuard` + `@CurrentUser`).
+
+### Routes intentionally NOT migrated (vẫn gọi `AuthService` tĩnh)
+
+- `register`, `login`, `google`, `google/callback`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`.
+
+### Legacy behavior found (3 route)
+
+- **Refresh:** `POST /refresh`, `@HttpCode(200)`, body `{ refreshToken }` (validate `refreshTokenSchema`). Gọi `AuthService.refresh(body.refreshToken)` → trả `{ accessToken, refreshToken }`. Bọc `ApiResponse.success({ message: 'Tokens refreshed successfully.', data: result })`. Error: `UnauthorizedError` (reuse-detection revoke-all, expired, verify fail, user gone). → use-case đã mirror đủ.
+- **Logout:** `POST /logout`, `@HttpCode(200)`, body `{ refreshToken }` (cùng `refreshTokenSchema`). KHÔNG guard. Gọi `AuthService.logout(token)` (`deleteOne({ token })`, **idempotent**, không verify, không lộ token hợp lệ hay không). Response chỉ `message: 'Logged out successfully.'` (KHÔNG `data`). → use-case `deleteByToken`, idempotent.
+- **Session:** `GET /session`, `@UseGuards(JwtAuthGuard)` + `@ApiBearerAuth('BearerAuth')` + `@CurrentUser() user?`. Guard `if (!user) BadRequestError('User context missing from request.')`. Gọi `AuthService.getSessionUser(user.id)` → `sanitizeUser` (SafeUser). Response `{ message: 'User context retrieved successfully.', data: { user: SafeUser } }`. → use-case trả `{ user: SafeAuthUser }` (whitelist trùng `sanitizeUser`).
+
+### Controller changes
+
+- Thêm `constructor` inject `RefreshTokenService`/`LogoutService`/`GetSessionService` (từ barrel `../application/services`). **KHÔNG** inject `AuthService` (legacy gọi tĩnh nên các route chưa migrate vẫn dùng `AuthService.<static>` như cũ).
+- 3 route đổi thân hàm sang `this.<service>.execute(...)`. Giữ nguyên decorator/route/`@HttpCode`/guard/`@CurrentUser`/message/data wrapper. Session vẫn giữ guard `if (!user)`.
+
+### Use cases used
+
+- `RefreshTokenService`, `LogoutService`, `GetSessionService` (đã đăng ký provider từ DEV1.4A; lockout/UserStats parity từ DEV1.4B không ảnh hưởng 3 route này).
+
+### Response shape compatibility
+
+- Refresh: `data: { accessToken, refreshToken }` — giữ nguyên. Logout: chỉ `message` — giữ nguyên. Session: `data: { user: SafeUser }` — whitelist giống `sanitizeUser` (id/email/firstName/lastName/avatarUrl?/role/isVerified/isActive/lastLoginAt/createdAt/updatedAt). KHÔNG lộ passwordHash/tokenHash/googleId.
+
+### API path compatibility
+
+- Không đổi path/method/HTTP code/guard nào.
+
+### Security compatibility
+
+- Không log access/refresh token. Logout giữ idempotent + không verify (mirror legacy). Refresh giữ raw-token storage + reuse-detection. Session không decode JWT thủ công (qua guard) + không query DB ở controller.
+
+### What was intentionally NOT changed
+
+- `auth.service.ts`, `email.service.ts`, models, validators, `auth.module.ts`, infrastructure, domain, các route còn lại, `.env`. KHÔNG commit. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope. `npm test`: ✅ 13/13.
+
+### Self-check result
+
+- controller: ✅ KHÔNG import mongoose/model/schema/utils. ✅ KHÔNG inject register/login/google/verify/resend/forgot/reset use-case. ✅ CÓ inject `RefreshTokenService`/`LogoutService`/`GetSessionService`. domain/application: ✅ không import cấm (match grep chỉ là comment/class-name).
+
+### App boot/smoke result
+
+- `node dist/main.js`: boot fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` — NestFactory abort TRƯỚC khi tới AuthModule ⇒ **KHÔNG có lỗi DI mới** của AuthController/use-case. Không sửa kernel (ngoài scope). Chưa smoke được route HTTP do app chưa boot.
+
+### Known issues / caveats
+
+1. Không thể smoke 3 route qua HTTP cho tới khi kernel `LEARNING_ACCESS_DATA` được sửa (pre-existing, ngoài scope DEV1). Build + DI-graph (qua `nest build`) xác nhận wiring AuthController hợp lệ.
+2. Các route chưa migrate vẫn gọi `AuthService` tĩnh — mixed-mode tạm thời (có chủ đích, sẽ dọn ở các bước DEV1.4C kế).
+
+### Next recommended task
+
+- **DEV1.4C-2 — Migrate `verify-email`/`resend-verification`/`forgot-password`/`reset-password`** (nhóm token, vẫn rủi ro vừa, response shape đơn giản), rồi `register`/`login` và cuối cùng `google`/`google/callback` (giữ login response thủ công + Google redirect query). Sau khi route cuối migrate mới cân nhắc gỡ `AuthService` legacy ở Phase cleanup.
