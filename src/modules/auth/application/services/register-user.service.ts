@@ -10,6 +10,7 @@ import {
   IEmailVerificationTokenRepository,
 } from '../../domain/interfaces/email-verification-token.repository';
 import { EMAIL_SENDER, IEmailSender } from '../../domain/interfaces/email-sender.port';
+import { UserRegisteredHandler } from '../events/user-registered.handler';
 import { RegisterUserInput, RegisterUserResult, SafeAuthUser } from '../dto/auth-use-case.dto';
 
 /** TTL token xác minh email — giữ đúng 24h như luồng đăng ký hiện tại. */
@@ -34,6 +35,7 @@ export class RegisterUserService {
     @Inject(EMAIL_VERIFICATION_TOKEN_REPOSITORY)
     private readonly emailVerificationTokenRepo: IEmailVerificationTokenRepository,
     @Inject(EMAIL_SENDER) private readonly emailSender: IEmailSender,
+    private readonly userRegisteredHandler: UserRegisteredHandler,
   ) {}
 
   async execute(input: RegisterUserInput): Promise<RegisterUserResult> {
@@ -54,6 +56,10 @@ export class RegisterUserService {
         isVerified: false,
       }),
     );
+
+    // Parity: legacy tạo UserStats ngay sau khi tạo user. Đi qua side-effect handler
+    // (→ IUserStatsProvisioner) thay vì import model UserStats vào application.
+    await this.userRegisteredHandler.onUserRegistered(user.id);
 
     // Sinh raw token, chỉ LƯU hash (raw token chỉ đi trong link email).
     const rawToken = this.tokenService.generateRandomToken();

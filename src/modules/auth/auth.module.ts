@@ -13,6 +13,7 @@ import {
   TOKEN_SERVICE,
   EMAIL_SENDER,
   GOOGLE_OAUTH,
+  USER_STATS_PROVISIONER,
 } from './domain/interfaces';
 
 // --- Infrastructure: Mongo repository adapters ---
@@ -23,12 +24,13 @@ import {
   MongoPasswordResetTokenRepository,
 } from './infrastructure/persistence';
 
-// --- Infrastructure: service adapters (bcrypt / jwt / smtp / google) ---
+// --- Infrastructure: service adapters (bcrypt / jwt / smtp / google / user-stats) ---
 import {
   BcryptPasswordHasherService,
   JwtTokenService,
   SmtpEmailSenderService,
   GoogleOAuthService,
+  MongoUserStatsProvisionerService,
 } from './infrastructure/services';
 
 // --- Application: use-case services (DEV1.3A/B/C/D) ---
@@ -44,6 +46,9 @@ import {
   GetSessionService,
   GoogleLoginService,
 } from './application/services';
+
+// --- Application: side-effect handler (DEV1.4B — UserStats parity) ---
+import { UserRegisteredHandler } from './application/events';
 
 /**
  * AuthModule.
@@ -74,6 +79,7 @@ import {
     JwtTokenService,
     SmtpEmailSenderService,
     GoogleOAuthService,
+    MongoUserStatsProvisionerService,
 
     // Domain port token → adapter (useExisting để tránh tạo instance trùng)
     { provide: USER_REPOSITORY, useExisting: MongoUserRepository },
@@ -87,6 +93,10 @@ import {
     { provide: TOKEN_SERVICE, useExisting: JwtTokenService },
     { provide: EMAIL_SENDER, useExisting: SmtpEmailSenderService },
     { provide: GOOGLE_OAUTH, useExisting: GoogleOAuthService },
+    { provide: USER_STATS_PROVISIONER, useExisting: MongoUserStatsProvisionerService },
+
+    // Application side-effect handler (UserStats parity cho user mới)
+    UserRegisteredHandler,
 
     // Application use-cases (đăng ký provider; CHƯA inject vào controller)
     RegisterUserService,

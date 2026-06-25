@@ -26,6 +26,8 @@ export class UserMapper {
       isActive: doc.isActive !== false,
       lockedAt: doc.lockedAt,
       lockedReason: doc.lockedReason,
+      failedLoginAttempts: doc.failedLoginAttempts,
+      lockedUntil: doc.lockedUntil,
       lastLoginAt: doc.lastLoginAt,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
@@ -47,6 +49,8 @@ export class UserMapper {
       isActive: p.isActive,
       lockedAt: p.lockedAt,
       lockedReason: p.lockedReason,
+      failedLoginAttempts: p.failedLoginAttempts,
+      lockedUntil: p.lockedUntil,
       lastLoginAt: p.lastLoginAt,
     };
     // KHÔNG set _id/timestamps. Loại field undefined để không đụng field legacy.
