@@ -12,6 +12,10 @@ import {
   RefreshTokenService,
   LogoutService,
   GetSessionService,
+  VerifyEmailService,
+  ResendVerificationEmailService,
+  ForgotPasswordService,
+  ResetPasswordService,
 } from '../application/services';
 import {
   forgotPasswordSchema,
@@ -28,14 +32,19 @@ import {
 @Controller('v1/auth')
 export class AuthController {
   /**
-   * DEV1.4C-1: inject use-case Clean Architecture cho 3 route session/logout/refresh.
-   * Các route còn lại (register/login/google/verify/resend/forgot/reset) VẪN gọi
-   * `AuthService` tĩnh như cũ — chưa migrate trong phase này.
+   * DEV1.4C-1: session/logout/refresh → use-case.
+   * DEV1.4C-2: verify-email/resend-verification/forgot-password/reset-password → use-case.
+   * Các route còn lại (register/login/google/google-callback) VẪN gọi `AuthService`
+   * tĩnh như cũ — chưa migrate trong phase này.
    */
   constructor(
     private readonly refreshTokenService: RefreshTokenService,
     private readonly logoutService: LogoutService,
     private readonly getSessionService: GetSessionService,
+    private readonly verifyEmailService: VerifyEmailService,
+    private readonly resendVerificationEmailService: ResendVerificationEmailService,
+    private readonly forgotPasswordService: ForgotPasswordService,
+    private readonly resetPasswordService: ResetPasswordService,
   ) {}
 
   @Post('register')
@@ -52,7 +61,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Verify an email address with a verification token.' })
   async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { token: string }) {
-    const result = await AuthService.verifyEmail(body.token);
+    const result = await this.verifyEmailService.execute({ token: body.token });
     return ApiResponse.success({
       message: 'Email verified successfully.',
       data: result,
@@ -63,7 +72,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Resend the email verification link.' })
   async resendVerification(@Body(new ZodValidationPipe(resendVerificationSchema)) body: { email: string }) {
-    await AuthService.resendVerification(body.email);
+    await this.resendVerificationEmailService.execute({ email: body.email });
     return ApiResponse.success({
       message: 'Verification email sent successfully.',
     });
@@ -73,7 +82,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Request a password reset link.' })
   async forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) body: { email: string }) {
-    await AuthService.forgotPassword(body.email);
+    await this.forgotPasswordService.execute({ email: body.email });
     return ApiResponse.success({
       message: 'If the email exists, a password reset link has been sent.',
     });
@@ -86,7 +95,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(resetPasswordSchema))
     body: { token: string; newPassword: string }
   ) {
-    await AuthService.resetPassword(body.token, body.newPassword);
+    await this.resetPasswordService.execute({ token: body.token, newPassword: body.newPassword });
     return ApiResponse.success({
       message: 'Password reset successfully.',
     });
