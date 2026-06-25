@@ -1145,3 +1145,78 @@ New (4):
 ### Next recommended task
 
 - **DEV1.4C-2 — Migrate `verify-email`/`resend-verification`/`forgot-password`/`reset-password`** (nhóm token, vẫn rủi ro vừa, response shape đơn giản), rồi `register`/`login` và cuối cùng `google`/`google/callback` (giữ login response thủ công + Google redirect query). Sau khi route cuối migrate mới cân nhắc gỡ `AuthService` legacy ở Phase cleanup.
+
+---
+
+## DEV1.4C-2 AuthController Migration — Verify/Resend/Forgot/Reset
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/controllers/auth.controller.ts` — inject thêm 4 use-case + migrate 4 route.
+- `docs/CLAUDE_PROGRESS.md`, `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn).
+
+### Routes migrated
+
+- `POST /api/v1/auth/verify-email` → `VerifyEmailService.execute({ token })`.
+- `POST /api/v1/auth/resend-verification` → `ResendVerificationEmailService.execute({ email })`.
+- `POST /api/v1/auth/forgot-password` → `ForgotPasswordService.execute({ email })`.
+- `POST /api/v1/auth/reset-password` → `ResetPasswordService.execute({ token, newPassword })`.
+
+### Routes intentionally NOT migrated (vẫn gọi `AuthService` tĩnh)
+
+- `register`, `login`, `google`, `google/callback`.
+
+### Legacy behavior found (4 route)
+
+- **Verify Email:** `POST /verify-email`, `@HttpCode(200)`, body `{ token }` (`verifyEmailSchema`, min 1). `AuthService.verifyEmail(token)` → `{ user: SafeUser }`. Response `{ message: 'Email verified successfully.', data: { user } }`. Errors: `BadRequestError` (invalid/used/expired/đã verified), `NotFoundError` (user của token không còn). → use-case mirror đủ (kèm markUsed khi đã verified).
+- **Resend Verification:** `POST /resend-verification`, `@HttpCode(200)`, body `{ email }` (`resendVerificationSchema`). `AuthService.resendVerification(email)` → `true` (ignore). Response chỉ `message: 'Verification email sent successfully.'`. Behavior: user không tồn tại → `NotFoundError('User not found.')`; đã verified → `BadRequestError('Email address is already verified.')` (KHÔNG generic — mirror đúng legacy, không "ẩn"). → use-case mirror đủ.
+- **Forgot Password:** `POST /forgot-password`, `@HttpCode(200)`, body `{ email }` (`forgotPasswordSchema`). `AuthService.forgotPassword(email)` → `true` (ignore). Response `message: 'If the email exists, a password reset link has been sent.'`. **Anti-enumeration:** user không tồn tại / `isActive===false` → trả generic im lặng (không lỗi). → use-case luôn `{ success: true }`, mirror đủ.
+- **Reset Password:** `POST /reset-password`, `@HttpCode(200)`, body `{ token, newPassword }` (`resetPasswordSchema`, newPassword min 6). `AuthService.resetPassword(token, newPassword)` → `true` (ignore). Response `message: 'Password reset successfully.'`. **Revoke all refresh token** của user sau khi đổi (đăng xuất mọi nơi). Errors: `BadRequestError` (invalid/used/expired), `NotFoundError` (user). → use-case mirror đủ (`deleteByUserId`).
+
+### Controller changes
+
+- Constructor inject thêm `VerifyEmailService`/`ResendVerificationEmailService`/`ForgotPasswordService`/`ResetPasswordService` (giữ 3 service DEV1.4C-1). 4 route đổi thân hàm sang `this.<service>.execute(...)`. Giữ nguyên decorator/route/method/`@HttpCode(200)`/`@ApiOperation`/validator/body extraction/message/data wrapper. **Không** inject `AuthService` (legacy gọi tĩnh; register/login/google vẫn dùng `AuthService.<static>`).
+
+### Use cases used
+
+- `VerifyEmailService`, `ResendVerificationEmailService`, `ForgotPasswordService`, `ResetPasswordService` (provider từ DEV1.4A, parity từ DEV1.3B).
+
+### Response shape compatibility
+
+- verify-email: `data: { user: SafeUser }` (whitelist trùng `sanitizeUser`, không lộ passwordHash/tokenHash). resend/forgot/reset: chỉ `message` (không `data`) — giữ nguyên. Tất cả message/status giữ y nguyên.
+
+### API path compatibility
+
+- Không đổi path/method/HTTP code/validator.
+
+### Security compatibility
+
+- Không log raw verification/reset token, không log password. Forgot giữ anti-enumeration. Reset giữ revoke-all refresh token. Controller không hash token, không gửi email trực tiếp, không query DB (đều qua use-case → port).
+
+### What was intentionally NOT changed
+
+- `auth.service.ts`, `email.service.ts`, models, validators, `auth.module.ts`, infrastructure, domain, route register/login/google/google-callback, `.env`. KHÔNG commit. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope. `npm test`: ✅ 13/13.
+
+### Self-check result
+
+- controller: ✅ KHÔNG import mongoose/model/schema/utils. ✅ KHÔNG inject Register/Login/Google use-case. ✅ CÓ inject 4 service verify/resend/forgot/reset (+ 3 service DEV1.4C-1). domain/application: ✅ không import cấm.
+
+### App boot/smoke result
+
+- `node dist/main.js`: boot fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước AuthModule) ⇒ **KHÔNG có lỗi DI mới** của AuthController/use-case. Chưa smoke route HTTP được do app chưa boot. Không sửa kernel (ngoài scope).
+
+### Known issues / caveats
+
+1. Không smoke 4 route qua HTTP cho tới khi kernel `LEARNING_ACCESS_DATA` được sửa (pre-existing). Build + DI graph (`nest build`) xác nhận wiring hợp lệ.
+2. Mixed-mode tạm thời: register/login/google vẫn gọi `AuthService` tĩnh; verify/resend/forgot/reset/session/logout/refresh đã dùng use-case.
+
+### Next recommended task
+
+- **DEV1.4C-3 — Migrate `register` + `login`** (giữ register response `{ user, verificationRequired, message }` 201; **giữ login response thủ công** `{ user:{id,email,firstName,lastName,role}, accessToken, refreshToken }`), rồi **DEV1.4C-4** `google`/`google/callback` (giữ redirect query `accessToken`/`refreshToken`/`user`). Gỡ `AuthService` legacy chỉ ở Phase cleanup sau khi route cuối migrate.

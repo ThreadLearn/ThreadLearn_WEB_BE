@@ -185,3 +185,7 @@ Chuẩn bị parity cho use-case Auth **trước** khi migrate controller (contr
 ## Tiến độ DEV1.4C-1 (2026-06-25) — AuthController migrate Session/Logout/Refresh
 
 `AuthController` thêm constructor inject `RefreshTokenService`/`LogoutService`/`GetSessionService`; 3 route `POST /refresh`, `POST /logout`, `GET /session` (JwtAuthGuard + @CurrentUser) đổi sang `this.<service>.execute(...)`. Giữ nguyên path/HTTP code/guard/message/data shape (refresh `{ accessToken, refreshToken }`, logout chỉ message, session `{ user: SafeUser }`). Các route còn lại (register/login/google/verify/resend/forgot/reset) **vẫn gọi `AuthService` tĩnh** — chưa migrate. Build/lint/test xanh; boot vẫn fail ở nợ kernel `LEARNING_ACCESS_DATA` (pre-existing, KHÔNG do Auth). Chi tiết: `docs/CLAUDE_PROGRESS.md` §DEV1.4C-1.
+
+## Tiến độ DEV1.4C-2 (2026-06-25) — AuthController migrate Verify/Resend/Forgot/Reset
+
+Inject thêm `VerifyEmailService`/`ResendVerificationEmailService`/`ForgotPasswordService`/`ResetPasswordService`; 4 route `POST /verify-email|/resend-verification|/forgot-password|/reset-password` đổi sang `this.<service>.execute(...)`. Giữ nguyên path/method/HTTP 200/validator/message/data (verify `{ user: SafeUser }`, 3 route còn lại chỉ message). Anti-enumeration (forgot) + revoke-all refresh token (reset) giữ nguyên. Còn lại register/login/google **vẫn legacy**. Build/lint/test xanh; boot vẫn fail ở nợ kernel `LEARNING_ACCESS_DATA` (pre-existing). Chi tiết: `docs/CLAUDE_PROGRESS.md` §DEV1.4C-2.
