@@ -4,3 +4,6 @@ export * from './verify-email.service';
 export * from './resend-verification-email.service';
 export * from './forgot-password.service';
 export * from './reset-password.service';
+export * from './refresh-token.service';
+export * from './logout.service';
+export * from './get-session.service';

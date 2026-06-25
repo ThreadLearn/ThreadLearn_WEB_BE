@@ -131,3 +131,54 @@ export interface ResetPasswordInput {
 export interface ResetPasswordResult {
   success: true;
 }
+
+// ----- Refresh token -----
+
+export interface RefreshTokenInput {
+  /** Raw refresh token gửi lên từ client (field name only — KHÔNG log giá trị). */
+  refreshToken: string;
+}
+
+/**
+ * Mirror `AuthService.refresh` → `return tokens` = `{ accessToken, refreshToken }`.
+ * KHÔNG có `user`/`message` trong data (controller tự set message bao ngoài).
+ * `accessToken`/`refreshToken` ở đây là **tên field hợp lệ của result**, không phải log.
+ */
+export interface RefreshTokenResult {
+  accessToken: string;
+  refreshToken: string;
+}
+
+// ----- Logout -----
+
+/**
+ * `AuthService.logout(token)` chỉ nhận raw refresh token và `deleteOne({ token })`.
+ * Mirror đúng: chỉ giữ `refreshToken` (KHÔNG logout-all theo userId, vì legacy không làm).
+ */
+export interface LogoutInput {
+  refreshToken: string;
+}
+
+/**
+ * `AuthService.logout` trả `true`; controller tự set message. Giữ result tối thiểu
+ * `{ success: true }` (không đổi wire shape — controller chỉ trả `message`).
+ */
+export interface LogoutResult {
+  success: true;
+}
+
+// ----- Get session -----
+
+/**
+ * Session endpoint hiện lấy user từ `JwtAuthGuard` + `@CurrentUser()`; controller
+ * truyền `user.id` vào `AuthService.getSessionUser(userId)`. Use-case nhận `userId`
+ * từ input — KHÔNG tự decode JWT (guard đã decode).
+ */
+export interface GetSessionInput {
+  userId: string;
+}
+
+/** Mirror `AuthService.getSessionUser` → `sanitizeUser`; controller bọc `{ user }`. */
+export interface GetSessionResult {
+  user: SafeAuthUser;
+}
