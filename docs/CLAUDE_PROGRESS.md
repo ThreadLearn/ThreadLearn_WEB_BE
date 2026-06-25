@@ -5,7 +5,7 @@
 - Date/time: 2026-06-25
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `auth`
-- Task: **DEV1.3C Auth Application Use Cases — Refresh/Logout/Session** (3 use-case; KHÔNG sửa domain/infrastructure; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset.)
+- Task: **DEV1.3D Auth Application Use Case — Google Login** (1 use-case `GoogleLoginService`; +3 method domain nhỏ + field `googleId` vào `UserProps`; mapper reflect `googleId`; KHÔNG wire runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset, DEV1.3C Refresh/Logout/Session.)
 
 ## Current Status
 
@@ -741,4 +741,113 @@ Trong `src/modules/auth/application/services/`:
 
 ### Next recommended task
 
-- **DEV1.3D — `GoogleLoginService`** (dùng `GOOGLE_OAUTH` adapter + tạo/link user, set `isVerified`, mirror chặn `email_verified===false` & `googleId` linking, trả `{ user: SafeAuthUser, accessToken, refreshToken }` cho redirect). Sau đó **DEV1.3-wire:** đăng ký provider AuthModule (`useExisting` cho 8 port + 10 service), chuyển controller sang use-case, khôi phục parity **lockout counter** & **UserStats** (event handler), giữ nguyên path/shape/login response thủ công.
+- **DEV1.3D — `GoogleLoginService`** (dùng `GOOGLE_OAUTH` adapter + tạo/link user, set `isVerified`, mirror chặn `email_verified===false` & `googleId` linking, trả `{ user: SafeAuthUser, accessToken, refreshToken }` cho redirect). Sau đó **DEV1.3-wire:** đăng ký provider AuthModule (`useExisting` cho 8 port + 10 service), chuyển controller sang use-case, khôi phục parity **lockout counter** & **UserStats** (event handler), giữ nguyên path/shape/login response thủ công. → **ĐÃ XONG**, xem section dưới.
+
+---
+
+## DEV1.3D Auth Application Use Case — Google Login
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files created (1 file `.ts`)
+
+- `src/modules/auth/application/services/google-login.service.ts`
+
+### Files changed
+
+- `application/dto/auth-use-case.dto.ts` — thêm `GoogleProfileInput`/`GoogleLoginInput`/`GoogleLoginResult` (không xoá/đổi type cũ).
+- `application/services/index.ts` — export `GoogleLoginService`.
+- `domain/entities/user.entity.ts` — **domain change tối thiểu** (xem dưới).
+- `infrastructure/mapper/user.mapper.ts` — reflect field `googleId` (xem dưới).
+- Docs: `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+> `application/dto/index.ts` đã dùng `export * from './auth-use-case.dto'` (wildcard) ⇒ tự pick type mới, không cần sửa.
+
+### DTO/result types added
+
+- `GoogleProfileInput { googleId, email, emailVerified?, firstName?, lastName?, name?, avatarUrl?, picture? }` — profile **đã xác thực** (exchange code→userinfo) ở strategy/adapter trước khi vào use-case. Map từ Google userinfo: `sub→googleId`, `email_verified→emailVerified`, `given_name→firstName`, `family_name→lastName`, `name`, `picture`. KHÔNG mang Google access token.
+- `GoogleLoginInput { profile, userAgent?, ipAddress? }` (userAgent/ipAddress chưa dùng).
+- `GoogleLoginResult { user: SafeAuthUser, accessToken, refreshToken }` — mirror `createAuthResponse` (`sanitizeUser` đầy đủ, KHÁC login email/password thủ công).
+
+### Use case created
+
+- `GoogleLoginService.execute(GoogleLoginInput): GoogleLoginResult` — `@Injectable`, 1 method.
+
+### Ports used (inject qua Symbol token)
+
+- `USER_REPOSITORY`, `TOKEN_SERVICE`, `REFRESH_TOKEN_REPOSITORY`.
+- **KHÔNG inject `GOOGLE_OAUTH`** — theo thiết kế, profile đã được strategy/adapter (`GOOGLE_OAUTH.verifyCallback`) xác thực TRƯỚC; use-case chỉ nhận profile qua input (đúng gợi ý brief Nhiệm vụ 3).
+- Lỗi nghiệp vụ dùng `BadRequestError`/`ForbiddenError` (`src/common/custom-error`) — giữ ĐÚNG status+message hiện tại.
+
+### Current Google behavior mirrored
+
+- **Validate profile:** email thiếu → `BadRequestError('Google profile email is missing.')`; googleId(`sub`) thiếu → `'Google profile subject is missing.'`; `emailVerified === false` → `'Google profile email is not verified.'`.
+- **Tra cứu user bằng EMAIL** (`findByEmail`) — đúng legacy (legacy KHÔNG tra theo googleId trong Google flow; googleId chỉ để phát hiện mismatch).
+- **User tồn tại:** `assertUserCanAuthenticate` (inactive/locked) → nếu `googleId` đã set & khác `sub` → `BadRequestError('Email address is linked to a different Google account.')` → link `googleId` nếu chưa có → `markEmailVerified(verifiedAt)` → set avatar **chỉ khi** chưa có & profile có `picture` → `recordLogin(verifiedAt)` → `update`.
+- **User chưa tồn tại:** tạo từ profile với fallback name (`given_name || name[0] || 'Google'` / `family_name || name[1..] || 'User'`), `role='STUDENT'`, `isVerified=true` + `emailVerifiedAt`, link `googleId`, `lastLoginAt` → `create`. **KHÔNG tạo passwordHash giả** (đúng legacy — Google user không có mật khẩu; model cho phép `passwordHash` optional).
+- **Token:** ký access+refresh payload `{ id, email, role }` → lưu refresh **raw** (TTL 7 ngày, ms-based đồng bộ DEV1.3A) → trả `{ user: SafeAuthUser, accessToken, refreshToken }`.
+
+### Domain changes if any
+
+- **CÓ (tối thiểu):**
+  - `UserProps` thêm field `googleId?: string` (model thật đã có `googleId` sparse-unique).
+  - 3 method thuần (không import ngoài): `linkGoogleAccount(googleId)`, `setAvatarUrl(url)`, `recordLogin(at?)`. Lý do: mirror các mutation của legacy (`createGoogleUser` + nhánh existing-user link). `markEmailVerified` đã có từ trước (tái dùng).
+  - KHÔNG import NestJS/Mongoose/utils trong domain (đã self-check).
+
+### Port changes if any
+
+- **KHÔNG.** `IUserRepository` đã đủ (`findByEmail`/`create`/`update`). KHÔNG dùng `findByGoogleId` (legacy Google flow không tra theo googleId).
+
+### Infrastructure changes if any
+
+- **CÓ (hệ quả của domain change):** `UserMapper` thêm `googleId` cả 2 chiều (`toEntity`: `doc.googleId`; `toPersistence`: `p.googleId`, vẫn strip-undefined nên KHÔNG clobber field legacy khi update). Cần để `googleId` round-trip đúng khi use-case được wire. KHÔNG sửa repository/adapter khác. KHÔNG wire runtime.
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa controller/`auth.service.ts`/`email.service.ts`/model/validator/`auth.module.ts`.
+- KHÔNG sửa `GoogleOAuthService` adapter / `IGoogleOAuth` port.
+- KHÔNG wire runtime (AuthModule chưa khai báo provider mới; use-case chỉ tham chiếu qua barrel `application/**`).
+- KHÔNG đổi route/response shape/Google OAuth runtime flow/refresh-token raw storage/login response thủ công/SMTP. KHÔNG sửa `.env`. KHÔNG commit tự động.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. `GoogleLoginResult` khớp response Google hiện tại (`{ user, accessToken, refreshToken }`) để controller giữ nguyên redirect query `accessToken`/`refreshToken`/`user=JSON.stringify(user)` khi wire. Behavior thật vẫn do AuthController/AuthService cũ.
+
+### Security compatibility
+
+- KHÔNG log Google profile/token, access/refresh token, secret. Reject `emailVerified===false` + chặn googleId mismatch giữ nguyên. Google user `isVerified=true` (đúng legacy). KHÔNG passwordHash giả. Trả `SafeAuthUser` (không lộ `passwordHash`/`googleId`/`tokenHash`). Refresh token raw đúng hiện trạng.
+
+### UserStats caveat
+
+- `GoogleLoginService` **KHÔNG** tạo `UserStats` (gamification) trực tiếp — khác `createGoogleUser` legacy (tạo `UserStats {xp:0,level:1}` cho user Google mới). **Khi wire runtime** phải khôi phục parity bằng **event handler** (vd `user.registered`/`user.google-created`) hoặc port gamification, nếu FE/analytics phụ thuộc bản ghi `UserStats`. Tới khi wire, runtime vẫn do AuthService cũ xử lý nên parity chưa bị ảnh hưởng. (Cùng caveat với DEV1.3A register.)
+
+### Build result
+
+- `npm run build`: ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** — pre-existing, ngoài scope; 0 warning ở file mới.
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass.
+
+### Self-check result
+
+- `auth/domain`: ✅ KHÔNG import cấm (sau khi thêm `googleId` + 3 method vẫn thuần). Mọi match grep `mongoose|@nestjs|infrastructure|src/utils` đều là **comment/prose-only**.
+- `auth/application`: ✅ KHÔNG import mongoose/model/schema/`src/utils`/infrastructure/`auth.service`/`email.service`. Match grep `Mongoose/infrastructure/utils` là **comment-only**; `UserStats`/`Google ...token` là **comment-only** (caveat/security note). KHÔNG `console.log`/`logger.`. `accessToken`/`refreshToken`/`GoogleLoginService` là **field/type/class-name hợp lệ**, không log token.
+
+### Known issues / caveats
+
+1. **UserStats parity** — xem mục UserStats caveat.
+2. **Mapper đụng infrastructure**: thêm `googleId` vào `UserMapper` là hệ quả bắt buộc của domain field mới (để round-trip). Đây là thay đổi infra duy nhất, an toàn (strip-undefined giữ nguyên field legacy), KHÔNG wire runtime.
+3. **Lookup theo email, không theo googleId**: mirror đúng legacy. Nếu sau này muốn cho phép cùng googleId trên email khác, cần đổi cả legacy (ngoài scope).
+4. **TTL refresh ms-based** (đồng bộ DEV1.3A/C) thay vì `setDate(+7)` calendar — lệch ≤ ~1h ở mốc DST.
+5. **Presenter `toSafeUser`** lặp ở 4 service (Register/Verify/Session/Google) — sẽ gom về `presentation/response` khi wire controller.
+6. **Validate profile (email/sub/email_verified) đặt trong use-case**: adapter `verifyCallback` hiện chỉ trả profile thô (không check `email_verified`); để giữ parity khi wire, các guard này nằm ở use-case.
+
+### Next recommended task
+
+- **DEV1.3-wire (Auth controller wiring):** đăng ký provider trong `AuthModule` (`{ provide: TOKEN, useExisting: Mongo*Repository }` cho 8 port + Bcrypt/Jwt/Smtp/Google adapter + 10 use-case service), chuyển `AuthController` sang inject use-case (giữ path + response shape, đặc biệt login response thủ công + Google redirect query), khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler `user.registered`/Google-created). Smoke-test: register→verify→login; forgot→reset→login; login→refresh→logout; Google callback→FE.

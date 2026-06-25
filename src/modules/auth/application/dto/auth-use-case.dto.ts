@@ -182,3 +182,52 @@ export interface GetSessionInput {
 export interface GetSessionResult {
   user: SafeAuthUser;
 }
+
+// ----- Google login -----
+
+/**
+ * Google profile đã được xác thực (exchange code → userinfo) ở
+ * strategy/adapter (`GOOGLE_OAUTH.verifyCallback`) TRƯỚC khi vào use-case.
+ * Field map từ Google userinfo:
+ * `sub→googleId`, `email`, `email_verified→emailVerified`, `given_name→firstName`,
+ * `family_name→lastName`, `name`, `picture→picture`.
+ * THUẦN type — không import Mongoose/infrastructure/utils. KHÔNG mang Google access token.
+ */
+export interface GoogleProfileInput {
+  /** Google subject id (legacy: `profile.sub` → `user.googleId`). Bắt buộc. */
+  googleId: string;
+  email: string;
+  /** Google `email_verified`; legacy reject khi `=== false`. */
+  emailVerified?: boolean;
+  /** Tương ứng Google `given_name`. */
+  firstName?: string;
+  /** Tương ứng Google `family_name`. */
+  lastName?: string;
+  /** Google `name` đầy đủ — legacy fallback parse firstName/lastName từ đây. */
+  name?: string;
+  /** Ảnh đại diện đã map sẵn (nếu có). */
+  avatarUrl?: string;
+  /** Google `picture` thô (legacy đọc field này). */
+  picture?: string;
+}
+
+export interface GoogleLoginInput {
+  profile: GoogleProfileInput;
+  /** Optional metadata; chưa dùng ở phase này (chuẩn bị audit session sau). */
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+/**
+ * Mirror Google login response hiện tại (`AuthService.createAuthResponse`):
+ * `{ user: sanitizeUser, accessToken, refreshToken }`.
+ *
+ * Lưu ý: KHÁC login email/password (login dùng object user **thủ công**) — Google
+ * dùng `SafeAuthUser` đầy đủ (qua `sanitizeUser`). `accessToken`/`refreshToken` là
+ * **tên field hợp lệ của result**, không phải log.
+ */
+export interface GoogleLoginResult {
+  user: SafeAuthUser;
+  accessToken: string;
+  refreshToken: string;
+}
