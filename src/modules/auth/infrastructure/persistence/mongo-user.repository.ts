@@ -42,4 +42,30 @@ export class MongoUserRepository implements IUserRepository {
   async updateLastLogin(userId: string, date: Date): Promise<void> {
     await User.updateOne({ _id: userId }, { lastLoginAt: date });
   }
+
+  /**
+   * Persist trạng thái lockout. `lockedUntil` được `$set` khi còn hạn hoặc `$unset`
+   * khi entity đã clear (login thành công) — tránh việc mapper strip-undefined bỏ
+   * sót, dẫn tới khoá "dính" mãi. `failedLoginAttempts` luôn `$set`; `lastLoginAt`
+   * `$set` khi có giá trị.
+   */
+  async updateLoginSecurityState(entity: UserEntity): Promise<UserEntity> {
+    const p = entity.toProps();
+    const set: Record<string, unknown> = {
+      failedLoginAttempts: p.failedLoginAttempts ?? 0,
+    };
+    if (p.lastLoginAt) {
+      set.lastLoginAt = p.lastLoginAt;
+    }
+
+    const update: Record<string, unknown> = { $set: set };
+    if (p.lockedUntil) {
+      set.lockedUntil = p.lockedUntil;
+    } else {
+      update.$unset = { lockedUntil: '' };
+    }
+
+    const doc = await User.findByIdAndUpdate(entity.id, update, { new: true });
+    return UserMapper.toEntity(doc!);
+  }
 }

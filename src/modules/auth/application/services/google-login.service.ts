@@ -14,6 +14,7 @@ import {
   GoogleProfileInput,
   SafeAuthUser,
 } from '../dto/auth-use-case.dto';
+import { UserRegisteredHandler } from '../events/user-registered.handler';
 
 /** Refresh token sống 7 ngày — giữ đúng TTL của luồng hiện tại. */
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -36,7 +37,8 @@ const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
  * 7. Trả `{ user: SafeAuthUser, accessToken, refreshToken }` (đúng `createAuthResponse`).
  *
  * Chỉ điều phối qua port. KHÔNG log Google profile/token. KHÔNG lộ passwordHash.
- * KHÔNG tạo `UserStats` (xem UserStats caveat trong docs). Phase DEV1.3D: chưa wire runtime.
+ * UserStats parity (DEV1.4B): khi tạo Google user MỚI, gọi `UserRegisteredHandler`
+ * (→ `IUserStatsProvisioner`) thay vì import model UserStats. CHƯA wire vào controller.
  */
 @Injectable()
 export class GoogleLoginService {
@@ -44,6 +46,7 @@ export class GoogleLoginService {
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
     @Inject(REFRESH_TOKEN_REPOSITORY) private readonly refreshTokenRepo: IRefreshTokenRepository,
+    private readonly userRegisteredHandler: UserRegisteredHandler,
   ) {}
 
   async execute(input: GoogleLoginInput): Promise<GoogleLoginResult> {
@@ -87,6 +90,9 @@ export class GoogleLoginService {
       user = await this.userRepo.update(existingUser);
     } else {
       user = await this.userRepo.create(this.buildGoogleUser(profile, email, verifiedAt));
+      // Parity: legacy `createGoogleUser` tạo UserStats cho Google user MỚI. Đi qua
+      // side-effect handler (→ IUserStatsProvisioner), KHÔNG import model UserStats.
+      await this.userRegisteredHandler.onUserRegistered(user.id);
     }
 
     const props = user.toProps();

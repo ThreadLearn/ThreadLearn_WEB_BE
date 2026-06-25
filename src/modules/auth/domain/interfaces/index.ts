@@ -6,3 +6,4 @@ export * from './password-hasher.port';
 export * from './token-service.port';
 export * from './email-sender.port';
 export * from './google-oauth.port';
+export * from './user-stats-provisioner.port';

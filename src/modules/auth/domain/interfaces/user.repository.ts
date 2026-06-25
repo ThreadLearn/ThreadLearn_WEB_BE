@@ -12,6 +12,13 @@ export interface IUserRepository {
   create(entity: UserEntity): Promise<UserEntity>;
   update(entity: UserEntity): Promise<UserEntity>;
   updateLastLogin(userId: string, date: Date): Promise<void>;
+  /**
+   * Persist trạng thái bảo mật đăng nhập (lockout): `failedLoginAttempts`,
+   * `lockedUntil` (clear bằng `$unset` khi entity không còn lockedUntil) và
+   * `lastLoginAt`. Tách riêng để clear field đúng cách (mapper strip-undefined
+   * không tự `$unset`). Nhận/trả Entity — KHÔNG dùng FilterQuery/UpdateQuery ở port.
+   */
+  updateLoginSecurityState(entity: UserEntity): Promise<UserEntity>;
 }
 
 /** DI token cho `IUserRepository`. */

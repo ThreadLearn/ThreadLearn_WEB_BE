@@ -171,3 +171,13 @@ Legacy `AuthService`/`EmailService` giữ nguyên (vẫn export; runtime auth v�
   - dashboard → `data: { summary{...}, charts{ *ByMonth: [{month:'YYYY-MM', count}] } }`; `/stats` → `{ totalUsers, totalCourses, totalEnrollments, totalQuizAttempts }`.
   - `SafeUser` = `{ id, email, firstName, lastName, avatarUrl?, role, isVerified?, isActive?, lastLoginAt?, createdAt?, updatedAt? }`.
 - **Field legacy/đổi shape chỉ động ở Phase cleanup (DEV1.7)**, sau khi FE đã migrate.
+
+---
+
+## Tiến độ DEV1.4B (2026-06-25) — Auth parity fix (lockout + UserStats)
+
+Chuẩn bị parity cho use-case Auth **trước** khi migrate controller (controller chưa đổi):
+
+- **Lockout parity:** `UserEntity` thêm `recordFailedLogin`/`recordSuccessfulLogin`/`isTemporarilyLocked`; port `IUserRepository.updateLoginSecurityState` (repo dùng `$unset lockedUntil` khi login thành công); `LoginUserService` mirror đúng thứ tự + message + ngưỡng 5 lần/15 phút của legacy.
+- **UserStats parity:** thêm port `IUserStatsProvisioner` (token `USER_STATS_PROVISIONER`) + adapter `MongoUserStatsProvisionerService` (upsert idempotent `xp:0, level:1`) — nơi DUY NHẤT scope auth chạm model UserStats. Side-effect đi qua `UserRegisteredHandler` (application/events); `RegisterUserService`/`GoogleLoginService` gọi handler thay vì import model. Caveat: chưa có event bus → gọi handler trực tiếp như side-effect service (sẽ đổi sang subscribe event ở cleanup).
+- AuthModule wire thêm 2 provider + 1 token (`useExisting`). Build/lint/test xanh; runtime/route/response **không đổi**. Chi tiết: `docs/CLAUDE_PROGRESS.md` §DEV1.4B.

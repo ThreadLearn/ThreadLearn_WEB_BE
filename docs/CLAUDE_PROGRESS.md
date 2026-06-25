@@ -939,3 +939,135 @@ Trong `src/modules/auth/application/services/`:
 ### Next recommended task
 
 - **DEV1.4B — Auth controller migration (từng route một, có cờ rollback):** chuyển `AuthController` sang inject use-case mới (bắt đầu route rủi ro thấp như `session`/`logout`/`refresh`), giữ path + response shape (đặc biệt login response thủ công + Google redirect query), khôi phục parity **lockout counter** (mở rộng `UserEntity`+`IUserRepository`) & **UserStats** (event handler). Lưu ý: cần kernel sửa nợ `LEARNING_ACCESS_DATA` để app boot smoke-test được end-to-end.
+
+---
+
+## DEV1.4B Auth Parity Fix — Lockout + UserStats
+
+- **Date/time:** 2026-06-25
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Task:** Khôi phục parity cho 2 điểm lệch của use-case Auth Clean Architecture so với legacy **TRƯỚC** khi migrate controller: (1) login lockout counter, (2) UserStats cho user mới. **KHÔNG** chuyển controller, **KHÔNG** đổi route/response/runtime.
+
+### Files changed
+
+Modified (10):
+- `src/modules/auth/domain/entities/user.entity.ts` — thêm lockout fields + method domain.
+- `src/modules/auth/domain/interfaces/user.repository.ts` — thêm `updateLoginSecurityState`.
+- `src/modules/auth/domain/interfaces/index.ts` — export port UserStats provisioner.
+- `src/modules/auth/infrastructure/mapper/user.mapper.ts` — round-trip `failedLoginAttempts`/`lockedUntil`.
+- `src/modules/auth/infrastructure/persistence/mongo-user.repository.ts` — `updateLoginSecurityState` (explicit `$unset lockedUntil`).
+- `src/modules/auth/infrastructure/services/index.ts` — export provisioner adapter.
+- `src/modules/auth/application/services/login-user.service.ts` — **mirror lockout** (temp-lock check + record failed/success).
+- `src/modules/auth/application/services/register-user.service.ts` — gọi side-effect handler (UserStats parity).
+- `src/modules/auth/application/services/google-login.service.ts` — gọi side-effect handler cho Google user MỚI.
+- `src/modules/auth/auth.module.ts` — đăng ký provider provisioner + handler + token `USER_STATS_PROVISIONER`.
+
+New (4):
+- `src/modules/auth/domain/interfaces/user-stats-provisioner.port.ts` — port `IUserStatsProvisioner` + token.
+- `src/modules/auth/infrastructure/services/mongo-user-stats-provisioner.service.ts` — adapter (nơi DUY NHẤT scope auth chạm model `UserStats`).
+- `src/modules/auth/application/events/user-registered.handler.ts` — side-effect handler.
+- `src/modules/auth/application/events/index.ts` — barrel.
+
+### Lockout legacy behavior found (audit `AuthService.login` + `user.model`)
+
+- **Fields:** `failedLoginAttempts` (Number, default 0, min 0) + `lockedUntil` (Date). (`lockedAt`/`lockedReason` là admin-lock RIÊNG, không đụng.)
+- **Constants:** `MAX_LOGIN_ATTEMPTS = 5`; `LOGIN_LOCKOUT_MS = 15 * 60 * 1000` (15 phút).
+- **Thứ tự (quan trọng):**
+  1. `findOne({ email })`.
+  2. `!user || !user.passwordHash` → **dummy bcrypt compare** → `BadRequestError('Invalid email or password credentials.')`.
+  3. **Temp-lock check TRƯỚC compare:** `lockedUntil && lockedUntil > now` → `ForbiddenError('Account temporarily locked due to repeated failed login attempts. Try again in ${minutes} minute(s).')` (minutes = `ceil((lockedUntil - now)/60000)`).
+  4. `bcrypt.compare`. Sai → `attempts = (failedLoginAttempts ?? 0) + 1`; nếu `attempts >= 5` → `lockedUntil = now + 15ph`, **reset `failedLoginAttempts = 0`**, `save`, `logger.warn`, `ForbiddenError('Account locked for 15 minutes after too many failed attempts.')`; nếu chưa đạt → `save`, `BadRequestError('Invalid email or password credentials.')`.
+  5. Đúng password → `assertUserCanAuthenticate` (inactive→`'User account is inactive.'`, lockedAt→`'User account is locked.'`) → `!isVerified`→`ForbiddenError('Please verify your email before logging in.')` → **reset `failedLoginAttempts=0` + clear `lockedUntil` + set `lastLoginAt`** → sign tokens → lưu refresh raw → response thủ công.
+- **Increment counter:** CHỈ khi sai password (bước 4). User không tồn tại = dummy compare, KHÔNG increment. Inactive/locked/unverified check SAU khi password đúng ⇒ KHÔNG increment.
+- **Logger:** legacy có `logger.warn('Account locked: <email> ...')`. **Bỏ logger ở application** để giữ layer sạch (application không import `configs/logger`). → caveat. Không log dữ liệu nhạy cảm.
+
+### Domain changes (`user.entity.ts`)
+
+- `UserProps` có `failedLoginAttempts?`/`lockedUntil?` (đúng tên field model).
+- Thêm method (nhận `maxAttempts`/`lockDurationMs` từ use-case, KHÔNG hardcode trong domain):
+  - `isTemporarilyLocked(now?)` + getter `lockedUntil`.
+  - `recordFailedLogin({maxAttempts, lockDurationMs, now?})` → tăng counter; chạm ngưỡng thì set `lockedUntil` + reset counter; trả `true` nếu vừa bị khoá.
+  - `recordSuccessfulLogin(now?)` → reset counter + clear `lockedUntil` + set `lastLoginAt`.
+- KHÔNG đổi `lock()/unlock()` (admin lock) hiện có.
+
+### Port changes (`user.repository.ts`)
+
+- Thêm `updateLoginSecurityState(entity): Promise<UserEntity>` — persist trạng thái lockout, nhận/trả Entity, KHÔNG dùng FilterQuery/UpdateQuery.
+
+### Infrastructure changes
+
+- `UserMapper`: round-trip đầy đủ `failedLoginAttempts`/`lockedUntil` (vẫn strip-undefined để không clobber field legacy).
+- `MongoUserRepository.updateLoginSecurityState`: `$set failedLoginAttempts` (mặc định 0) + `$set lastLoginAt` (khi có); `lockedUntil` → `$set` khi còn hạn, `$unset` khi đã clear (login thành công) ⇒ tránh "khoá dính" do mapper strip-undefined.
+- `MongoUserStatsProvisionerService`: adapter port UserStats — **upsert idempotent** `$setOnInsert {userId, xp:0, level:1}` (an toàn khi retry, KHÔNG ghi đè stats hiện có). Nơi DUY NHẤT scope auth import model `UserStats`.
+
+### Application changes
+
+- `LoginUserService`: chèn temp-lock check (đúng thứ tự, trước compare); sai password → `recordFailedLogin` + `updateLoginSecurityState`, ném đúng error (Forbidden khi vừa khoá, BadRequest khi chưa); thành công → `recordSuccessfulLogin` + `updateLoginSecurityState` (thay cho `updateLastLogin`, để reset counter như legacy). `LoginUserResult` shape KHÔNG đổi.
+- `RegisterUserService` & `GoogleLoginService`: gọi `UserRegisteredHandler.onUserRegistered(userId)` (Google chỉ khi tạo user MỚI) thay vì import model UserStats.
+
+### UserStats legacy behavior found
+
+- Model: `src/modules/gamification/models/user-stats.model.ts` → re-export `infrastructure/persistence/schemas/user-stats.schema.ts`.
+- Legacy tạo ở `AuthService.register` (L70) và `AuthService.createGoogleUser` (L532): `UserStats.create({ userId, xp:0, level:1 })`. Field khác (`currentStreak`/`highestStreak`/`quizzesCompleted`/`coursesCompleted`/`totalLessonsCompleted`=0, `level`=1, `lastActiveDate`=now) lấy default schema. (Cũng có ở `AdminService.createStudent` — ngoài scope phase này.)
+
+### UserStats parity design
+
+- **Port** `IUserStatsProvisioner` (token `USER_STATS_PROVISIONER`) ở `domain/interfaces`: `ensureForUser(userId)`.
+- **Adapter** `MongoUserStatsProvisionerService` (infrastructure): upsert idempotent mirror default legacy.
+- **Handler** `UserRegisteredHandler` (application/events): `onUserRegistered(userId)` (gọi trực tiếp từ use-case) + `handle(UserRegisteredEvent)` (sẵn cho event bus sau).
+- Use-case → handler → port → adapter. Application KHÔNG import model UserStats.
+
+### AuthModule provider changes
+
+- Thêm `MongoUserStatsProvisionerService` (adapter), `UserRegisteredHandler` (handler), mapping `{ provide: USER_STATS_PROVISIONER, useExisting: MongoUserStatsProvisionerService }`. Giữ nguyên provider cũ, controller, exports.
+
+### What was intentionally NOT changed
+
+- AuthController, AuthService legacy, EmailService legacy, models, validators, Swagger, route path, response shape, login response thủ công, refresh-token raw storage, Google OAuth runtime, SMTP behavior, `.env`. KHÔNG commit. KHÔNG sửa lỗi kernel `LEARNING_ACCESS_DATA`.
+
+### Runtime compatibility
+
+- Request thật vẫn chạy 100% qua legacy `AuthController` → `AuthService`. Use-case mới ở DI graph nhưng CHƯA vào request flow ⇒ không đổi hành vi runtime.
+
+### API compatibility
+
+- Không thêm/sửa/xoá route. Response shape giữ nguyên.
+
+### Security compatibility
+
+- Không log token/password/secret/SMTP_PASS/Google token. Provisioner không log dữ liệu user. `DUMMY_PASSWORD_HASH` là hằng cố ý không hợp lệ (không phải secret). Lockout mirror đúng anti-bruteforce legacy. Refresh token vẫn raw.
+
+### Build result
+
+- `npm run build` (`nest build`): ✅ PASS (0 lỗi).
+
+### Lint result
+
+- `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope DEV1 (lessons presenter ×2, quiz-attempts handler ×2, quiz.facade ×3). `eslint src/modules/auth` sạch (0 warning ở file mới/sửa).
+
+### Test result
+
+- `npm test`: ✅ 13/13 pass (`bugfix-regression.spec.ts`). Chưa có test riêng DEV1.
+
+### Self-check result
+
+- `auth/domain`: ✅ chỉ match trong comment/prose, KHÔNG có import cấm.
+- `auth/application`: ✅ KHÔNG import mongoose/model/schema/utils/infrastructure. Mọi `AuthService`/`EmailService` là comment hoặc tên class (`VerifyEmailService`…). `UserStats`/`gamification` chỉ là tên **port**/comment — KHÔNG import model thật.
+- `auth/infrastructure`: ✅ KHÔNG dùng guard/decorator/ApiResponse/api-handler.
+- `auth/controllers`: ✅ KHÔNG inject/use use-case mới (controller chưa migrate).
+
+### App boot/smoke
+
+- Không chạy `start:dev` ở lượt này (pre-existing kernel `LEARNING_ACCESS_DATA` ở EnrollmentsModule chặn boot — xác minh KHÔNG do AuthModule, không sửa trong phase này). DI AuthModule compile sạch qua `nest build`; provider mới (provisioner/handler/token) đã wire đầy đủ ⇒ không phát sinh lỗi DI mới liên quan AuthModule.
+
+### Known issues / caveats
+
+1. **Không có event bus** (`@nestjs/event-emitter` chưa cài) ⇒ use-case gọi `UserRegisteredHandler` **trực tiếp** như application side-effect service. Khi có event bus ở cleanup, đổi sang subscribe `UserRegisteredEvent` (interface giữ nguyên). `UserRegisteredEvent` hiện CHƯA được publish (handler có sẵn `handle(event)`).
+2. **Logger lock bị bỏ ở application** (legacy `logger.warn` khi khoá) để giữ layer sạch — chấp nhận mất 1 dòng log cảnh báo; không ảnh hưởng hành vi/bảo mật.
+3. **Provisioner idempotent (upsert)** khác legacy (`create` ném khi trùng `userId`). An toàn hơn khi retry; default value giữ nguyên parity.
+4. **Lỗi provisioning hiện KHÔNG được nuốt** trong use-case (await thẳng) — nếu UserStats lỗi sẽ làm fail register/google. (Legacy cũng await thẳng nên parity tương đương.) Khi wire controller cân nhắc try/catch nếu muốn không chặn luồng auth.
+5. Parity chỉ áp cho **use-case mới**; runtime thật vẫn legacy cho tới khi controller migrate.
+
+### Next recommended task
+
+- **DEV1.4C — Auth controller migration (từng route, có rollback):** chuyển `AuthController` sang inject use-case mới, bắt đầu route rủi ro thấp (`session`/`logout`/`refresh`) rồi `login`/`register`/`google`. Giữ path + response shape (login thủ công + Google redirect query). Cần kernel sửa nợ `LEARNING_ACCESS_DATA` để smoke-test end-to-end.

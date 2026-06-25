@@ -23,6 +23,10 @@ export interface UserProps {
   isActive: boolean;
   lockedAt?: Date;
   lockedReason?: string;
+  /** Đếm số lần đăng nhập sai liên tiếp (lockout tạm thời từ login). */
+  failedLoginAttempts?: number;
+  /** Thời điểm hết khoá tạm thời do sai mật khẩu nhiều lần (KHÁC `lockedAt` admin-lock). */
+  lockedUntil?: Date;
   lastLoginAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -143,6 +147,44 @@ export class UserEntity {
   /** Ghi nhận thời điểm đăng nhập gần nhất (mirror set `lastLoginAt`). */
   recordLogin(at: Date = new Date()): void {
     this.props.lastLoginAt = at;
+  }
+
+  /** Đang bị khoá tạm thời do sai mật khẩu nhiều lần? (mirror `lockedUntil > now`). */
+  isTemporarilyLocked(now: Date = new Date()): boolean {
+    return !!this.props.lockedUntil && this.props.lockedUntil.getTime() > now.getTime();
+  }
+
+  /** Thời điểm hết khoá tạm thời (để use-case tính số phút còn lại cho message). */
+  get lockedUntil(): Date | undefined {
+    return this.props.lockedUntil;
+  }
+
+  /**
+   * Ghi nhận 1 lần đăng nhập sai. Mirror legacy:
+   * tăng `failedLoginAttempts`; nếu đạt `maxAttempts` thì set `lockedUntil = now + lockDurationMs`
+   * và RESET counter về 0. Trả về `true` nếu vừa bị khoá (để use-case ném đúng error lock).
+   * `maxAttempts`/`lockDurationMs` do use-case truyền (KHÔNG hardcode trong domain).
+   */
+  recordFailedLogin(input: { maxAttempts: number; lockDurationMs: number; now?: Date }): boolean {
+    const now = input.now ?? new Date();
+    const attempts = (this.props.failedLoginAttempts ?? 0) + 1;
+    this.props.failedLoginAttempts = attempts;
+    if (attempts >= input.maxAttempts) {
+      this.props.lockedUntil = new Date(now.getTime() + input.lockDurationMs);
+      this.props.failedLoginAttempts = 0;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Ghi nhận đăng nhập thành công. Mirror legacy: reset `failedLoginAttempts = 0`,
+   * clear `lockedUntil`, set `lastLoginAt = now`.
+   */
+  recordSuccessfulLogin(now: Date = new Date()): void {
+    this.props.failedLoginAttempts = 0;
+    this.props.lockedUntil = undefined;
+    this.props.lastLoginAt = now;
   }
 
   /** Snapshot bất biến cho mapper/presenter (không lộ tham chiếu nội bộ). */
