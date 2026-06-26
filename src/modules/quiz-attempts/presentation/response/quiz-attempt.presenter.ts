@@ -1,8 +1,24 @@
 import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
 import { Quiz } from '../../../quiz/domain/entities/quiz.entity';
 
+/** Field quiz tuỳ chọn để bù legacy field khi trình bày 1 attempt. */
+interface QuizPropsForAttempt {
+  passingScorePercent?: number;
+  xpReward?: number;
+}
+
+/** Kết quả use-case nộp bài (UC41) — shape do controller trả cho FE. */
+interface SubmitAttemptResult {
+  attempt: QuizAttempt;
+  score: number;
+  passed: boolean;
+  xpRewarded: number;
+  passingScorePercent: number;
+  isTimeout: boolean;
+}
+
 export class QuizAttemptPresenter {
-  static toResponse(attempt: QuizAttempt, quizProps: any = {}) {
+  static toResponse(attempt: QuizAttempt, quizProps: QuizPropsForAttempt = {}) {
     const p = attempt.toProps();
     return {
       _id: p.id,
@@ -23,6 +39,18 @@ export class QuizAttemptPresenter {
 
   static toList(attempts: QuizAttempt[]) {
     return attempts.map((a) => QuizAttemptPresenter.toResponse(a));
+  }
+
+  /** UC41 — gom shape response nộp bài về 1 chỗ (controller chỉ gọi, không tự nặn). */
+  static toSubmitResult(result: SubmitAttemptResult) {
+    return {
+      attempt: QuizAttemptPresenter.toResponse(result.attempt),
+      score: result.score,
+      passed: result.passed,
+      xpRewarded: result.xpRewarded,
+      passingScorePercent: result.passingScorePercent,
+      isTimeout: result.isTimeout,
+    };
   }
 
   /** Lọc quiz response cho học viên (ẩn đáp án) */
