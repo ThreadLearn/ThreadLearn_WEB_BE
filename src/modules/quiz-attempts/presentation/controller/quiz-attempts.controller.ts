@@ -7,7 +7,10 @@ import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { QuizAttemptsService } from '../../application/services/quiz-attempts.facade';
+import { SubmitAttemptService } from '../../application/services/submit-attempt.service';
+import { GetAttemptService } from '../../application/services/get-attempt.service';
+import { GetMyAttemptsService } from '../../application/services/get-my-attempts.service';
+import { GetStudentQuizByLessonService } from '../../application/services/get-student-quiz-by-lesson.service';
 import { quizSubmitSchema, QuizSubmitDto } from '../validators/quiz-attempt.validator';
 import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 
@@ -17,13 +20,16 @@ import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 @ApiBearerAuth('BearerAuth')
 export class QuizAttemptsController {
   constructor(
-    private readonly quizAttemptsService: QuizAttemptsService,
+    private readonly submitAttemptService: SubmitAttemptService,
+    private readonly getAttemptService: GetAttemptService,
+    private readonly getMyAttemptsService: GetMyAttemptsService,
+    private readonly getStudentQuizByLessonService: GetStudentQuizByLessonService,
   ) { }
 
   // ─── UC40: Học viên lấy quiz theo lesson (ẩn đáp án) ──────
   @Get('lesson/:lessonId')
   async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await this.quizAttemptsService.getQuizByLesson(lessonId);
+    const quiz = await this.getStudentQuizByLessonService.execute(lessonId);
     return ApiResponse.success({ message: 'Quiz fetched successfully.', data: QuizAttemptPresenter.toStudentQuizResponse(quiz) });
   }
 
@@ -34,7 +40,7 @@ export class QuizAttemptsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(quizSubmitSchema)) body: QuizSubmitDto,
   ) {
-    const result = await this.quizAttemptsService.submitAttempt(
+    const result = await this.submitAttemptService.execute(
       user.id, body.quizId, body.answers, body.startTime,
     );
 
@@ -56,7 +62,7 @@ export class QuizAttemptsController {
   // ─── UC43: Học viên xem lịch sử làm bài ──────────────────
   @Get('attempts/me')
   async getMyAttempts(@CurrentUser() user: AuthenticatedUser) {
-    const attempts = await this.quizAttemptsService.getMyAttempts(user.id);
+    const attempts = await this.getMyAttemptsService.execute(user.id);
     return ApiResponse.success({ message: 'Quiz attempts fetched successfully.', data: QuizAttemptPresenter.toList(attempts) });
   }
 
@@ -66,7 +72,7 @@ export class QuizAttemptsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('attemptId') attemptId: string,
   ) {
-    const attempt = await this.quizAttemptsService.getAttemptById(user.id, attemptId);
+    const attempt = await this.getAttemptService.execute(user.id, attemptId);
     return ApiResponse.success({ message: 'Quiz attempt details fetched successfully.', data: QuizAttemptPresenter.toResponse(attempt) });
   }
 }

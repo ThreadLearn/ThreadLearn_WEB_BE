@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { QuizModule } from '../quiz/quiz.module';
 import { QuizAttemptsController } from './presentation/controller/quiz-attempts.controller';
-import { QuizAttemptsService } from './application/services/quiz-attempts.facade';
 import { SubmitAttemptService } from './application/services/submit-attempt.service';
 import { GetAttemptService } from './application/services/get-attempt.service';
 import { GetMyAttemptsService } from './application/services/get-my-attempts.service';
@@ -22,7 +21,6 @@ import { DomainEventPublisher } from './application/events/domain-event.publishe
   ],
   controllers: [QuizAttemptsController],
   providers: [
-    QuizAttemptsService,
     SubmitAttemptService,
     GetAttemptService,
     GetMyAttemptsService,
@@ -34,9 +32,6 @@ import { DomainEventPublisher } from './application/events/domain-event.publishe
       provide: QUIZ_ATTEMPT_REPOSITORY,
       useExisting: QuizAttemptRepository,
     },
-  ],
-  exports: [
-    QuizAttemptsService,
   ],
 })
 export class QuizAttemptsModule {}
