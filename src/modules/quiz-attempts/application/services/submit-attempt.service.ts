@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DomainEventPublisher } from '../events/domain-event.publisher';
 import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
 import { IQuizRepository, QUIZ_REPOSITORY } from '../../../quiz/domain/interfaces/quiz.repository';
 import { IQuizAttemptRepository, QUIZ_ATTEMPT_REPOSITORY } from '../../domain/interfaces/quiz-attempt.repository';
@@ -19,7 +19,7 @@ export class SubmitAttemptService {
     private readonly quizAttemptRepository: IQuizAttemptRepository,
     @Inject(QUIZ_REPOSITORY)
     private readonly quizRepository: IQuizRepository,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly eventPublisher: DomainEventPublisher,
     private readonly quizGradingService: QuizGradingService,
   ) { }
 
@@ -69,13 +69,13 @@ export class SubmitAttemptService {
     // ─────────────────────────────────────────────────────────────
     // NON-CRITICAL ASYNCHRONOUS EVENTS
     // ─────────────────────────────────────────────────────────────
-    this.eventEmitter.emit(
+    this.eventPublisher.publish(
       'quiz.submitted',
       new QuizAttemptSubmittedEvent(userId, quizId, attemptId, grading.score, grading.passed),
     );
 
     if (grading.passed) {
-      this.eventEmitter.emit(
+      this.eventPublisher.publish(
         'quiz.passed',
         new QuizPassedEvent(
           userId,

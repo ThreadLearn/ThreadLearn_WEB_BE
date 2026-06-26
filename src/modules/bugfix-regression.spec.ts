@@ -25,6 +25,7 @@ import { CourseEntity } from './course/domain/entities/course.entity';
 import { QuizMapper } from './quiz/infrastructure/mapper/quiz.mapper';
 import { IQuizRepository } from './quiz/domain/interfaces/quiz.repository';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DomainEventPublisher } from './quiz-attempts/application/events/domain-event.publisher';
 
 describe('reported bug regressions', () => {
   const createQuizAttemptsService = () => {
@@ -40,7 +41,7 @@ describe('reported bug regressions', () => {
       update: jest.fn(),
     };
     return new QuizAttemptsService(
-      new SubmitAttemptService(attemptsRepo, quizRepo, new EventEmitter2(), new QuizGradingService()),
+      new SubmitAttemptService(attemptsRepo, quizRepo, new DomainEventPublisher(new EventEmitter2()), new QuizGradingService()),
       new GetAttemptService(attemptsRepo),
       new GetMyAttemptsService(attemptsRepo),
       { execute: jest.fn() } as any,
