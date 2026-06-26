@@ -4,9 +4,19 @@ export interface GradingResult {
   isTimeout: boolean;
 }
 
+/**
+ * Hợp đồng tối thiểu mà domain-service cần để chấm điểm.
+ * Dùng structural typing để KHÔNG phụ thuộc cứng vào entity Question của module quiz
+ * (Question của quiz thoả mãn interface này qua getter id + correctAnswerIndex).
+ */
+export interface GradableQuestion {
+  id: string;
+  correctAnswerIndex: number;
+}
+
 export class QuizGradingService {
   grade(
-    questions: any[],
+    questions: GradableQuestion[],
     answers: Record<string, number>,
     passingThreshold: number,
     startTime?: string,

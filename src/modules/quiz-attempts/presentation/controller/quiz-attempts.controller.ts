@@ -48,14 +48,7 @@ export class QuizAttemptsController {
       message: result.passed
         ? 'Congratulations! You passed the quiz successfully.'
         : `Attempt recorded. You did not reach the ${result.passingScorePercent}% passing threshold yet.`,
-      data: {
-        attempt: QuizAttemptPresenter.toResponse(result.attempt),
-        score: result.score,
-        passed: result.passed,
-        xpRewarded: result.xpRewarded,
-        passingScorePercent: result.passingScorePercent,
-        isTimeout: result.isTimeout,
-      },
+      data: QuizAttemptPresenter.toSubmitResult(result),
     });
   }
 

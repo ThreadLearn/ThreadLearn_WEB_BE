@@ -172,8 +172,8 @@ Trả về:
 |------|--------|-----|:---:|:---:|:---:|:---:|
 | B1 | quiz | 36–39 | ☑ | ☑ | ☑ | ☑ |
 | B2 | quiz-attempts | 40–43 | ☑ | ☑ | ☑ | ☑ |
-| B3 | gamification | 48–49 | ☑ | ☐ | ☐ | ☐ |
-| B4 | leaderboard | 50 | ☐ | ☐ | ☐ | ☐ |
+| B3 | gamification | 48–49 | ☑ | ☑ | ☑ | ☑ |
+| B4 | leaderboard | 50 | ☑ | ☑ | ☑ | ☑ |
 | B5 | subscription | 51–52 | ☐ | ☐ | ☐ | ☐ |
 
 > Quy tắc chốt: một bước chỉ được tick đủ khi Prompt#2 (model khác) trả PASS toàn bộ. Sau đó mới mở bước kế.
