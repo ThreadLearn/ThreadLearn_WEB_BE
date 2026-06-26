@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LessonsModule } from '../lessons/lessons.module';
 import { QuizController } from './presentation/controller/quiz.controller';
-import { QuizService } from './application/services/quiz.facade';
 import { CreateQuizService } from './application/services/create-quiz.service';
 import { UpdateQuizService } from './application/services/update-quiz.service';
 import { GetQuizService } from './application/services/get-quiz.service';
@@ -37,8 +36,6 @@ import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
     EditQuestionService,
     DeleteQuestionService,
     GetQuizByLessonService,
-    // ── Facade (backward-compat) ──
-    QuizService,
   ],
   exports: [QUIZ_REPOSITORY], // PORT
 })
