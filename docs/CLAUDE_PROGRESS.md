@@ -1220,3 +1220,86 @@ New (4):
 ### Next recommended task
 
 - **DEV1.4C-3 — Migrate `register` + `login`** (giữ register response `{ user, verificationRequired, message }` 201; **giữ login response thủ công** `{ user:{id,email,firstName,lastName,role}, accessToken, refreshToken }`), rồi **DEV1.4C-4** `google`/`google/callback` (giữ redirect query `accessToken`/`refreshToken`/`user`). Gỡ `AuthService` legacy chỉ ở Phase cleanup sau khi route cuối migrate.
+
+---
+
+## DEV1.4C-3 AuthController Migration — Register/Login
+
+- **Date/time:** 2026-06-26
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/controllers/auth.controller.ts` — inject thêm 2 use-case + migrate 2 route.
+- `docs/CLAUDE_PROGRESS.md`, `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn).
+
+### Routes migrated
+
+- `POST /api/v1/auth/register` → `RegisterUserService.execute({ email, password, firstName, lastName })`.
+- `POST /api/v1/auth/login` → `LoginUserService.execute({ email, password })`.
+
+### Routes intentionally NOT migrated (vẫn gọi `AuthService` tĩnh)
+
+- `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`.
+
+### Legacy behavior found
+
+- **Register:** `POST /register`, **status 201** (không `@HttpCode` ⇒ default POST 201), body `{ email, password, firstName, lastName }` (`registerSchema`: email valid, password min 6, firstName/lastName min 1). `AuthService.register(body)` → `{ user: sanitizeUser, verificationRequired: true, message: 'Please verify your email before logging in.' }`. Response `ApiResponse.success({ message: 'User registered successfully.', data: result, statusCode: 201 })` ⇒ `data` chứa **cả** `{ user, verificationRequired, message }`. **KHÔNG** trả accessToken/refreshToken (không auto-login). Có gửi verification email + tạo UserStats. Email trùng → `BadRequestError('Email address is already in use.')`.
+- **Login:** `POST /login`, `@HttpCode(200)`, body `{ email, password }` (`loginSchema`: email valid, password min 1). `AuthService.login(body)` → response **thủ công** `{ user: { id, email, firstName, lastName, role }, accessToken, refreshToken }`. Bọc `ApiResponse.success({ message: 'Login successful.', data: result })`. User object **chỉ** 5 field (KHÔNG avatarUrl/isVerified/isActive/createdAt/updatedAt). Lockout: 5 lần sai/15 phút (`failedLoginAttempts` + `lockedUntil`), reset khi login thành công. Errors: sai email/password → `BadRequestError('Invalid email or password credentials.')` (kèm dummy-compare chống enumeration); temp-lock → `ForbiddenError('Account temporarily locked … Try again in N minute(s).')`; khoá khi vừa chạm ngưỡng → `ForbiddenError('Account locked for 15 minutes after too many failed attempts.')`; inactive → `ForbiddenError('User account is inactive.')`; admin-locked (`lockedAt`) → `ForbiddenError('User account is locked.')`; chưa verify → `ForbiddenError('Please verify your email before logging in.')`.
+
+### Controller changes
+
+- Constructor inject thêm `RegisterUserService`/`LoginUserService` (giữ 7 service DEV1.4C-1/2). 2 route đổi thân hàm sang `this.<service>.execute(body)`. Body type cụ thể hoá `unknown` → `{ email, password, firstName, lastName }` / `{ email, password }` cho khớp DTO use-case (validator giữ nguyên `registerSchema`/`loginSchema`). Giữ nguyên decorator/method/path/status (register 201, login `@HttpCode(200)`)/message/data wrapper. `AuthService` **vẫn import** — chỉ còn 2 route Google dùng (tĩnh).
+
+### Use cases used
+
+- `RegisterUserService`, `LoginUserService` (provider từ DEV1.4A; lockout + UserStats parity từ DEV1.4B).
+
+### Register response compatibility
+
+- `data: { user: SafeAuthUser, verificationRequired: true, message }` — khớp legacy (`sanitizeUser` whitelist trùng `SafeAuthUser`). Outer message `'User registered successfully.'` + status 201 giữ nguyên. Không trả token. Không lộ passwordHash/tokenHash.
+
+### Login response compatibility
+
+- `data: { user: { id, email, firstName, lastName, role }, accessToken, refreshToken }` — **đúng shape thủ công** legacy (use-case `LoginUserResult.user = LoginManualUser` chỉ 5 field). KHÔNG thêm avatarUrl/isVerified/isActive/createdAt/updatedAt. Message `'Login successful.'` + HTTP 200 giữ nguyên.
+
+### Lockout compatibility
+
+- `LoginUserService` (DEV1.4B) mirror đúng: `MAX_LOGIN_ATTEMPTS=5`, `LOGIN_LOCKOUT_MS=15ph`; temp-lock check trước compare; tăng counter khi sai; reset + clear `lockedUntil` khi thành công. Cùng message/status legacy. Không đổi token payload/raw refresh storage.
+
+### UserStats compatibility
+
+- `RegisterUserService` (DEV1.4B) gọi `UserRegisteredHandler.onUserRegistered(userId)` → `IUserStatsProvisioner` (upsert idempotent `xp:0, level:1`) — parity legacy, application KHÔNG import model UserStats.
+
+### API path compatibility
+
+- Không đổi path/method/HTTP code/validator.
+
+### Security compatibility
+
+- Không log password/accessToken/refreshToken/verification token. Dummy-compare chống enumeration giữ nguyên. Controller không hash password, không sign token, không gửi email, không query DB (đều qua use-case → port).
+
+### What was intentionally NOT changed
+
+- `auth.service.ts`, `email.service.ts`, models, validators, `auth.module.ts`, infrastructure, domain, route google/google-callback (Google OAuth runtime flow), `.env`. KHÔNG commit. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope. `npm test`: ✅ 13/13.
+
+### Self-check result
+
+- controller: ✅ KHÔNG import mongoose/model/schema/utils. ✅ KHÔNG inject `GoogleLoginService`. ✅ CÓ inject `RegisterUserService`/`LoginUserService`. `AuthService` còn lại chỉ phục vụ 2 route Google (`getGoogleAuthorizationUrl`/`loginWithGoogleCode`). domain/application: ✅ không import cấm.
+
+### App boot/smoke result
+
+- `node dist/main.js`: boot fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước AuthModule) ⇒ **KHÔNG có lỗi DI mới** của AuthController/use-case. Chưa smoke route HTTP do app chưa boot. Không sửa kernel (ngoài scope).
+
+### Known issues / caveats
+
+1. Không smoke register/login qua HTTP cho tới khi kernel `LEARNING_ACCESS_DATA` được sửa (pre-existing). Build + DI graph (`nest build`) xác nhận wiring hợp lệ.
+2. Chỉ còn 2 route Google dùng `AuthService` tĩnh; 9 route khác đã dùng use-case. Sau DEV1.4C-4 (Google) mới cân nhắc gỡ `AuthService` legacy ở Phase cleanup.
+
+### Next recommended task
+
+- **DEV1.4C-4 — Migrate `google` + `google/callback`** (cuối cùng): `GET /google` → build authorization URL qua use-case/port; `GET /google/callback` → exchange code (qua `GOOGLE_OAUTH` adapter) rồi `GoogleLoginService.execute({ profile })`. **Giữ redirect query** `accessToken`/`refreshToken`/`user=JSON.stringify(SafeUser)` + failure redirect. Lưu ý: callback dùng `@Res()` redirect (không `ApiResponse`) — giữ nguyên. Sau đó Phase cleanup: gỡ/`@deprecated` `AuthService` legacy khi không route nào còn gọi.

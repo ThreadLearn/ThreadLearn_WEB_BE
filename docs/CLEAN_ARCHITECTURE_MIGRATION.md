@@ -189,3 +189,7 @@ Chuẩn bị parity cho use-case Auth **trước** khi migrate controller (contr
 ## Tiến độ DEV1.4C-2 (2026-06-25) — AuthController migrate Verify/Resend/Forgot/Reset
 
 Inject thêm `VerifyEmailService`/`ResendVerificationEmailService`/`ForgotPasswordService`/`ResetPasswordService`; 4 route `POST /verify-email|/resend-verification|/forgot-password|/reset-password` đổi sang `this.<service>.execute(...)`. Giữ nguyên path/method/HTTP 200/validator/message/data (verify `{ user: SafeUser }`, 3 route còn lại chỉ message). Anti-enumeration (forgot) + revoke-all refresh token (reset) giữ nguyên. Còn lại register/login/google **vẫn legacy**. Build/lint/test xanh; boot vẫn fail ở nợ kernel `LEARNING_ACCESS_DATA` (pre-existing). Chi tiết: `docs/CLAUDE_PROGRESS.md` §DEV1.4C-2.
+
+## Tiến độ DEV1.4C-3 (2026-06-26) — AuthController migrate Register/Login
+
+Inject thêm `RegisterUserService`/`LoginUserService`; 2 route `POST /register` (201) và `POST /login` (200) đổi sang `this.<service>.execute(body)`. Giữ nguyên path/method/status/validator/message. **Register** giữ `data: { user, verificationRequired, message }` (không token); **Login** giữ **response thủ công** `{ user:{id,email,firstName,lastName,role}, accessToken, refreshToken }` (chỉ 5 field user). Lockout + UserStats parity (DEV1.4B) áp dụng qua use-case. Chỉ còn 2 route Google dùng `AuthService` tĩnh. Build/lint/test xanh; boot vẫn fail ở nợ kernel `LEARNING_ACCESS_DATA` (pre-existing). Chi tiết: `docs/CLAUDE_PROGRESS.md` §DEV1.4C-3.

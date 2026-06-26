@@ -16,6 +16,8 @@ import {
   ResendVerificationEmailService,
   ForgotPasswordService,
   ResetPasswordService,
+  RegisterUserService,
+  LoginUserService,
 } from '../application/services';
 import {
   forgotPasswordSchema,
@@ -34,8 +36,8 @@ export class AuthController {
   /**
    * DEV1.4C-1: session/logout/refresh → use-case.
    * DEV1.4C-2: verify-email/resend-verification/forgot-password/reset-password → use-case.
-   * Các route còn lại (register/login/google/google-callback) VẪN gọi `AuthService`
-   * tĩnh như cũ — chưa migrate trong phase này.
+   * DEV1.4C-3: register/login → use-case.
+   * Route Google (`google`/`google/callback`) VẪN gọi `AuthService` tĩnh — chưa migrate.
    */
   constructor(
     private readonly refreshTokenService: RefreshTokenService,
@@ -45,11 +47,16 @@ export class AuthController {
     private readonly resendVerificationEmailService: ResendVerificationEmailService,
     private readonly forgotPasswordService: ForgotPasswordService,
     private readonly resetPasswordService: ResetPasswordService,
+    private readonly registerUserService: RegisterUserService,
+    private readonly loginUserService: LoginUserService,
   ) {}
 
   @Post('register')
-  async register(@Body(new ZodValidationPipe(registerSchema)) body: unknown) {
-    const result = await AuthService.register(body);
+  async register(
+    @Body(new ZodValidationPipe(registerSchema))
+    body: { email: string; password: string; firstName: string; lastName: string }
+  ) {
+    const result = await this.registerUserService.execute(body);
     return ApiResponse.success({
       message: 'User registered successfully.',
       data: result,
@@ -140,8 +147,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body(new ZodValidationPipe(loginSchema)) body: unknown) {
-    const result = await AuthService.login(body);
+  async login(@Body(new ZodValidationPipe(loginSchema)) body: { email: string; password: string }) {
+    const result = await this.loginUserService.execute(body);
     return ApiResponse.success({
       message: 'Login successful.',
       data: result,
