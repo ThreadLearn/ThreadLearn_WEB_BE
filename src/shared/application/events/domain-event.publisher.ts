@@ -5,11 +5,11 @@ import { EventEmitter } from 'events';
 export class DomainEventPublisher {
   private readonly emitter = new EventEmitter();
 
-  publish(event: string, data: any) {
+  publish<T>(event: string, data: T): void {
     this.emitter.emit(event, data);
   }
 
-  subscribe(event: string, handler: (data: any) => void) {
+  subscribe<T>(event: string, handler: (data: T) => void | Promise<void>): void {
     this.emitter.on(event, handler);
   }
 }

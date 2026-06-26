@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { DomainEventPublisher } from '../events/domain-event.publisher';
+import { DomainEventPublisher } from '../../../../shared/application/events/domain-event.publisher';
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
 import { AwardXpService } from '../../../gamification/application/services/award-xp.service';
 import { UpdateStreakService } from '../../../gamification/application/services/update-streak.service';

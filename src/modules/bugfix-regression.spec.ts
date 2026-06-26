@@ -5,21 +5,65 @@ import { User } from './auth/models/user.model';
 import { Course } from './courses/models/course.model';
 import { Enrollment } from './enrollments/models/enrollment.model';
 import { EnrollmentsService } from './enrollments/services/enrollments.service';
-import { UserStats } from './gamification/models/user-stats.model';
 import { Note } from './notes/models/note.model';
 import { NotesService } from './notes/services/notes.service';
-import { Notification } from './notifications/models/notification.model';
-import { QuizAttempt } from './quiz-attempts/models/quiz-attempt.model';
 import { QuizAttemptsService } from './quiz-attempts/application/services/quiz-attempts.facade';
-import { Quiz } from './quiz/models/quiz.model';
+import { SubmitAttemptService } from './quiz-attempts/application/services/submit-attempt.service';
+import { GetAttemptService } from './quiz-attempts/application/services/get-attempt.service';
+import { GetMyAttemptsService } from './quiz-attempts/application/services/get-my-attempts.service';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
 import { CertificatesService } from './certificates/services/certificates.service';
 import { GamificationRewardsService } from './gamification/services/gamification-rewards.service';
 import { LeaderboardService } from './leaderboard/services/leaderboard.service';
 import { NotificationsService } from './notifications/services/notifications.service';
+import { DomainEventPublisher } from '../shared/application/events/domain-event.publisher';
 
 describe('reported bug regressions', () => {
+  const createQuizAttemptsService = (options: {
+    quiz?: any;
+    attempts?: any[];
+    attempt?: any;
+  } = {}) => {
+    const quiz = options.quiz
+      ? {
+          ...options.quiz,
+          title: options.quiz.title ?? 'Quiz',
+          passingScorePercent: options.quiz.passingScorePercent ?? options.quiz.passingScore,
+          timeLimitSeconds: options.quiz.timeLimitSeconds ?? options.quiz.timeLimit,
+          questions: (options.quiz.questions ?? []).map((question: any) => ({
+            ...question,
+            id: question.id ?? question._id,
+          })),
+        }
+      : null;
+
+    const quizRepo = {
+      findById: jest.fn().mockResolvedValue(quiz),
+    };
+    const attemptRepo = {
+      create: jest.fn().mockImplementation(async (entity) => entity),
+      findByUser: jest.fn().mockResolvedValue(options.attempts ?? []),
+      findByIdAndUser: jest.fn().mockResolvedValue(options.attempt ?? null),
+      deleteById: jest.fn().mockResolvedValue(undefined),
+    };
+    const eventPublisher = {
+      publish: jest.fn(),
+      subscribe: jest.fn(),
+    } as unknown as DomainEventPublisher;
+
+    return {
+      service: new QuizAttemptsService(
+        new SubmitAttemptService(attemptRepo as never, quizRepo as never, eventPublisher),
+        new GetAttemptService(attemptRepo as never),
+        new GetMyAttemptsService(attemptRepo as never),
+      ),
+      attemptRepo,
+      quizRepo,
+      eventPublisher,
+    };
+  };
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -172,12 +216,8 @@ describe('reported bug regressions', () => {
         { _id: 'question-b', correctAnswerIndex: 0 },
       ],
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
-    jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
-    jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
-
-    const result = await new QuizAttemptsService().submitAttempt('student', 'quiz', {
+    const { service } = createQuizAttemptsService({ quiz });
+    const result = await service.submitAttempt('student', 'quiz', {
       'question-a': 1,
       'question-b': 2,
     });
@@ -196,10 +236,8 @@ describe('reported bug regressions', () => {
         { _id: 'question-b', correctAnswerIndex: 0 },
       ],
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
-
-    const result = await new QuizAttemptsService().submitAttempt('student', 'quiz', {
+    const { service } = createQuizAttemptsService({ quiz });
+    const result = await service.submitAttempt('student', 'quiz', {
       0: 1,
       1: 2,
     });
@@ -218,14 +256,10 @@ describe('reported bug regressions', () => {
       ],
       timeLimit: 600, // 10 minutes
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
-    jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
-    jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
-
     // 1 minute ago
     const startTime = new Date(Date.now() - 60 * 1000).toISOString();
-    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+    const { service } = createQuizAttemptsService({ quiz });
+    const result = await service.submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
       'question-a': 1,
     }, startTime);
 
@@ -243,14 +277,10 @@ describe('reported bug regressions', () => {
       ],
       timeLimit: 600, // 10 minutes
     };
-    jest.spyOn(Quiz, 'findById').mockResolvedValue(quiz as never);
-    jest.spyOn(QuizAttempt, 'create').mockImplementation(async (data) => data as never);
-    jest.spyOn(UserStats, 'findOne').mockResolvedValue(null);
-    jest.spyOn(Notification, 'create').mockResolvedValue({} as never);
-
     // 11 minutes ago (exceeded 10 mins + 15s buffer)
     const startTime = new Date(Date.now() - 11 * 60 * 1000).toISOString();
-    const result = await new QuizAttemptsService().submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
+    const { service } = createQuizAttemptsService({ quiz });
+    const result = await service.submitAttempt('507f1f77bcf86cd799439011', 'quiz', {
       'question-a': 1,
     }, startTime);
 
@@ -261,22 +291,22 @@ describe('reported bug regressions', () => {
 
   it('retrieves user quiz attempts history successfully', async () => {
     const mockAttempts = [{ _id: 'attempt-1', score: 100 }];
-    const populateMock = jest.fn().mockResolvedValue(mockAttempts);
-    const sortMock = jest.fn().mockReturnValue({ populate: populateMock });
-    jest.spyOn(QuizAttempt, 'find').mockReturnValue({ sort: sortMock } as never);
 
-    const result = await new QuizAttemptsService().getMyAttempts('507f1f77bcf86cd799439011');
+    const { service, attemptRepo } = createQuizAttemptsService({ attempts: mockAttempts });
+    const result = await service.getMyAttempts('507f1f77bcf86cd799439011');
     expect(result).toEqual(mockAttempts);
-    expect(QuizAttempt.find).toHaveBeenCalledWith({ userId: '507f1f77bcf86cd799439011' });
+    expect(attemptRepo.findByUser).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
   });
 
   it('retrieves specific user quiz attempt by id successfully', async () => {
     const mockAttempt = { _id: 'attempt-1', userId: '507f1f77bcf86cd799439011', score: 100 };
-    const populateMock = jest.fn().mockResolvedValue(mockAttempt);
-    jest.spyOn(QuizAttempt, 'findOne').mockReturnValue({ populate: populateMock } as never);
 
-    const result = await new QuizAttemptsService().getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
+    const { service, attemptRepo } = createQuizAttemptsService({ attempt: mockAttempt });
+    const result = await service.getAttemptById('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012');
     expect(result).toEqual(mockAttempt);
-    expect(QuizAttempt.findOne).toHaveBeenCalledWith({ _id: '507f1f77bcf86cd799439012', userId: '507f1f77bcf86cd799439011' });
+    expect(attemptRepo.findByIdAndUser).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439012',
+      '507f1f77bcf86cd799439011',
+    );
   });
 });

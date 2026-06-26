@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DomainEventsModule } from '../../shared/application/events/domain-events.module';
 import { QuizModule } from '../quiz/quiz.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { QuizAttemptsController } from './presentation/controller/quiz-attempts.controller';
@@ -7,8 +8,6 @@ import { SubmitAttemptService } from './application/services/submit-attempt.serv
 import { GetAttemptService } from './application/services/get-attempt.service';
 import { GetMyAttemptsService } from './application/services/get-my-attempts.service';
 import { QuizGradingService } from './domain/services/quiz-grading.service';
-import { DomainEventPublisher } from './application/events/domain-event.publisher';
-import { NotificationEventHandler } from './application/event-handlers/notification.event-handler';
 import { LeaderboardEventHandler } from './application/event-handlers/leaderboard.event-handler';
 import { GamificationEventHandler } from './application/event-handlers/gamification.event-handler';
 import { QuizAttemptRepository } from './infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
@@ -19,6 +18,7 @@ import { QUIZ_ATTEMPT_REPOSITORY } from './domain/interfaces/quiz-attempt.reposi
  */
 @Module({
   imports: [
+    DomainEventsModule,
     QuizModule,
     GamificationModule,
   ],
@@ -29,8 +29,6 @@ import { QUIZ_ATTEMPT_REPOSITORY } from './domain/interfaces/quiz-attempt.reposi
     GetAttemptService,
     GetMyAttemptsService,
     QuizGradingService,
-    DomainEventPublisher,
-    NotificationEventHandler,
     LeaderboardEventHandler,
     GamificationEventHandler,
     QuizAttemptRepository,
@@ -41,7 +39,6 @@ import { QUIZ_ATTEMPT_REPOSITORY } from './domain/interfaces/quiz-attempt.reposi
   ],
   exports: [
     QuizAttemptsService,
-    DomainEventPublisher,
   ],
 })
 export class QuizAttemptsModule {}

@@ -4,7 +4,7 @@ import { IQuizRepository, QUIZ_REPOSITORY } from '../../../quiz/domain/interface
 import { IQuizAttemptRepository, QUIZ_ATTEMPT_REPOSITORY } from '../../domain/interfaces/quiz-attempt.repository';
 import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
 import { QuizGradingService } from '../../domain/services/quiz-grading.service';
-import { DomainEventPublisher } from '../events/domain-event.publisher';
+import { DomainEventPublisher } from '../../../../shared/application/events/domain-event.publisher';
 import { QuizAttemptSubmittedEvent } from '../../domain/events/quiz-attempt-submitted.event';
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
 
