@@ -26,6 +26,14 @@ export const listPlansQuerySchema = z.object({
   ),
 });
 
+export const purchasePlanSchema = z.object({
+  planId: planIdParamSchema,
+});
+
+export const paymentWebhookSchema = z.record(z.unknown());
+
 export type CreatePlanDto = z.infer<typeof createPlanSchema>;
 export type UpdatePlanDto = z.infer<typeof updatePlanSchema>;
 export type ListPlansQueryDto = z.infer<typeof listPlansQuerySchema>;
+export type PurchasePlanDto = z.infer<typeof purchasePlanSchema>;
+export type PaymentWebhookDto = z.infer<typeof paymentWebhookSchema>;
