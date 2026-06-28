@@ -17,3 +17,7 @@ A first-time lesson completion awards lesson XP; a final lesson also awards cour
 +## Module ownership
 
 Enrollments publishes facts. Gamification owns rewards, Certificates owns issuance, Notifications owns user messages, and Leaderboard owns cache invalidation.
+
++## Response compatibility
+
+`CompleteLessonService` continues returning enrollment progress plus `xpRewarded` and `stats`; event transport is an internal implementation detail.
