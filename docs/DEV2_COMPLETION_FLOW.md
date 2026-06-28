@@ -9,3 +9,7 @@ Move enrollment completion side effects onto the application-wide EventEmitter2 
 +## Acceptance criteria
 
 A first-time lesson completion awards lesson XP; a final lesson also awards course XP, issues one certificate, and sends one course notification.
+
++## Event payloads
+
+`lesson.completed` carries lesson identity, course identity, progress, first-completion state, and final-lesson state. `course.completed` carries the completed course summary.
