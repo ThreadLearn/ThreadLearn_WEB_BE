@@ -13,3 +13,7 @@ A first-time lesson completion awards lesson XP; a final lesson also awards cour
 +## Event payloads
 
 `lesson.completed` carries lesson identity, course identity, progress, first-completion state, and final-lesson state. `course.completed` carries the completed course summary.
+
++## Module ownership
+
+Enrollments publishes facts. Gamification owns rewards, Certificates owns issuance, Notifications owns user messages, and Leaderboard owns cache invalidation.
