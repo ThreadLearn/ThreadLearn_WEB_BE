@@ -25,6 +25,7 @@ import { NotificationsModule } from '../modules/notifications/notifications.modu
 import { NotesModule } from '../modules/notes/notes.module';
 import { QuizModule } from '../modules/quiz/quiz.module';
 import { QuizAttemptsModule } from '../modules/quiz-attempts/quiz-attempts.module';
+import { SubscriptionModule } from '../modules/subscription/subscription.module';
 import { UsersModule } from '../modules/users/users.module';
 import { AppController } from './app.controller';
 
@@ -53,6 +54,7 @@ import { AppController } from './app.controller';
     NotesModule,
     QuizModule,
     QuizAttemptsModule,
+    SubscriptionModule,
     UsersModule,
   ],
   controllers: [AppController],
