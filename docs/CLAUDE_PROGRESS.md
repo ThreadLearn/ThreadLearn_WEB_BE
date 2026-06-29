@@ -1527,3 +1527,142 @@ New (4):
 ### Next recommended task
 
 - **DEV1.5C / Deletion** (chỉ khi (1) kernel `LEARNING_ACCESS_DATA` đã fix và (2) smoke đủ 11 route): gỡ provider/export `AuthService` + xoá `auth.service.ts`; thêm port `INVITATION_EMAIL` (hoặc mở rộng `EMAIL_SENDER`) cho `AdminService` để cắt phụ thuộc static `EmailService`; sau đó mới hạ cấp/di dời `EmailService` legacy.
+
+---
+
+## DEV1.6A Profile / Avatar Baseline Audit
+
+- **Date/time:** 2026-06-29
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Scope:** AUDIT-ONLY. KHÔNG sửa runtime, KHÔNG tạo Clean Architecture code, KHÔNG đổi route/response/upload/storage.
+
+### Files changed
+
+- `docs/CLAUDE_PROGRESS.md` (section này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn). **KHÔNG** đụng `src/**`.
+
+### Endpoints found (UC09)
+
+Global prefix `api` (`main.ts:24 app.setGlobalPrefix('api')`); controller `@Controller('v1/users')`, class-level `@UseGuards(JwtAuthGuard)` + `@ApiBearerAuth('BearerAuth')` + `@ApiTags('Users')`.
+
+| # | Method | Full path | Handler | Body/Param | Upload field | Validator/Pipe | Response wrapper | Data shape | Status | Swagger |
+|---|--------|-----------|---------|------------|-------------|----------------|------------------|-----------|--------|---------|
+| 1 | GET | `/api/v1/users/profile` | `getMyProfile` | `@CurrentUser()` | — | — | `ApiResponse.success` | `{ user: sanitizeUser, stats }` | 200 | — |
+| 2 | PATCH | `/api/v1/users/profile` | `updateMyProfile` | body `{ firstName?, lastName?, avatarUrl? }` | — | `ZodValidationPipe(updateProfileSchema)` | `ApiResponse.success` | `sanitizeUser` | 200 | `@ApiOperation` |
+| 3 | POST | `/api/v1/users/avatar` | `uploadAvatar` | `@CurrentUser()` + file | **`avatar`** (`FileInterceptor`) | — (chỉ check `!file`) | `ApiResponse.success` | `sanitizeUser` | **201** (POST default) | `@ApiConsumes('multipart/form-data')` |
+
+Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` → `{ user: SafeUser }` (không stats).
+
+### Controllers / services / models involved
+
+- `src/modules/users/controllers/users.controller.ts` (legacy presentation; gọi `saveUploadedFile` + `UsersService` static).
+- `src/modules/users/services/users.service.ts` (legacy **static class**; `getProfile`/`updateProfile`/`updateAvatar`).
+- `src/modules/users/validators/users.validator.ts` (`updateProfileSchema`).
+- `src/modules/users/users.module.ts` (providers/exports `UsersService`).
+- `src/configs/upload.ts` (`saveUploadedFile` — local disk).
+- Model dùng chung: `src/modules/auth/models/user.model.ts` (`User`), `src/modules/gamification/models/user-stats.model.ts` (`UserStats`).
+- Helper dùng chung: `src/modules/auth/utils/user-sanitizer.ts` (`sanitizeUser`, `assertUserCanAuthenticate`).
+
+### Current update profile behavior
+
+- **Field cho update:** CHỈ `firstName`, `lastName`, `avatarUrl`. KHÔNG có username/bio/phone/githubId/planType (các field này phần lớn không tồn tại trên model; `planType`/`githubId` có trên model nhưng KHÔNG cho update qua route này).
+- **email:** KHÔNG cho update.
+- **Validate trùng email/username:** KHÔNG (không có field unique nào được update).
+- **Trim/normalize:** CÓ — zod `.trim()` cho cả 3 field, `min(1)`; `.refine` bắt buộc ≥1 field.
+- **Chặn inactive/locked:** CÓ — `assertUserCanAuthenticate(user)` (`isActive===false`→Forbidden; `lockedAt`→Forbidden). Lưu ý dùng `lockedAt`, KHÔNG dùng `lockedUntil`.
+- **Sanitize response:** CÓ — `sanitizeUser`.
+- **Timestamps:** CÓ — Mongoose `{ timestamps: true }` tự cập nhật `updatedAt` khi `user.save()`.
+- **Ghi chú:** `avatarUrl` set được trực tiếp qua PATCH profile (string tuỳ ý) — tức có **2 đường ghi avatar** (PATCH profile + POST avatar upload).
+
+### Current avatar upload behavior
+
+- **Storage:** **local disk** qua `saveUploadedFile(file, 'avatars')`. `FileInterceptor` mặc định = **memory storage** (dùng `file.buffer`), sau đó ghi file ra `${cwd}/${UPLOAD_DIR}/avatars/`.
+- **Field name:** `avatar`.
+- **Accept mime type:** **KHÔNG validate mime** (nhận mọi loại file).
+- **Limit size:** `MAX_FILE_SIZE_MB` (default **10MB**), check **sau khi** buffer trong `saveUploadedFile` → `BadRequestError` nếu vượt. KHÔNG có limit ở tầng multer.
+- **Field lưu:** `avatarUrl`.
+- **Xoá avatar cũ:** KHÔNG.
+- **Public URL:** CÓ — trả `/uploads/avatars/<Date.now()>-<baseName><ext>`; phục vụ static qua `main.ts:27 app.use('/uploads', express.static(UPLOAD_DIR))`. Lưu ý URL ở `/uploads/...`, **KHÔNG** có prefix `/api`.
+- **Default avatar:** KHÔNG.
+- **Error file thiếu/invalid:** `!file`→`BadRequestError('No avatar file provided in FormData.')`; lỗi parse multipart → bọc `BadRequestError('Failed to parse multipart/form-data for avatar upload.')`. Tên file: `Date.now()-baseName.ext`, baseName sanitize `[^a-zA-Z0-9]→_`.
+- **Storage system:** chỉ **local static file**. KHÔNG có Cloudinary/S3 ở bất kỳ đâu (grep `cloudinary`/`S3` không có; chỉ 1 false-positive comment chữ "storage" ở refresh-token mapper).
+
+### Current response shape
+
+- `sanitizeUser` whitelist: `{ id, email, firstName, lastName, avatarUrl, role, isVerified, isActive, lastLoginAt, createdAt, updatedAt }`.
+- GET profile thêm `stats` (`UserStats` hoặc fallback `{ xp:0, level:1, currentStreak:0, highestStreak:0 }`).
+- **KHÔNG expose** `passwordHash`/`googleId`/`githubId`/`tokenHash`/`planType`/`subscriptionExpiresAt`/`emailVerifiedAt` (whitelist không gồm; `passwordHash` còn bị `.select('-passwordHash')` ở query).
+
+### Current validation / security behavior
+
+- Tất cả route yêu cầu JWT (class-level `JwtAuthGuard`). `userId` lấy từ `@CurrentUser()` (token) — không nhận từ body/param ⇒ user chỉ sửa được chính mình.
+- `assertUserCanAuthenticate` áp dụng ở cả 3 service method.
+- Avatar upload KHÔNG validate mime/extension ⇒ rủi ro upload file tuỳ ý (xem caveat).
+
+### Storage behavior
+
+- Local FS: `UPLOAD_DIR` default `./public/uploads`; folder con `avatars/` tạo `recursive` nếu chưa có; serve qua `express.static`. Util `saveUploadedFile` dùng chung cho course/lesson attachment + avatar.
+
+### Coupling / layer issues
+
+- **Controller chứa logic storage:** `uploadAvatar` gọi trực tiếp `saveUploadedFile` (orchestrate save-file → update-user trong presentation).
+- **Controller KHÔNG query DB trực tiếp** (đi qua `UsersService`) — OK.
+- **Service legacy static** import thẳng Mongoose model: `User` (auth), `UserStats` (gamification) ⇒ **import chéo module** users→auth + users→gamification ở tầng service.
+- **Duplicated "safe user" shape:** legacy `SafeUser` (`auth/utils/user-sanitizer.ts`) vs Clean `SafeAuthUser` (`auth/application/dto`) — 2 shape song song; users module đang xài bản legacy.
+- **`AuthenticatedUser` KHÔNG bị duplicate** — single source `common/api-handler.ts` (reuse tốt).
+- **Users module hoàn toàn legacy** (chưa có domain/application/infrastructure), trong khi User aggregate (entity/repo/mapper) đã tồn tại Clean Arch nhưng nằm trong **auth module**.
+- **2 đường ghi avatar** (PATCH `avatarUrl` string + POST upload) — không thống nhất.
+
+### Shared code available for reuse
+
+- Domain (auth): `UserEntity` có `setAvatarUrl()`, `toProps()`, `fromPersistence`/`createNew` — **thiếu** method `updateProfile(firstName,lastName)` và `removeAvatar()`.
+- Port: `IUserRepository`/`USER_REPOSITORY` có `findById` + `update` ⇒ **đủ** cho update profile/avatar (không cần thêm method).
+- Infra: `MongoUserRepository` implements `findById`/`update` ⇒ đủ; `user.mapper.ts` có sẵn.
+- Presentation shared: `JwtAuthGuard`, `CurrentUser`, `AuthenticatedUser`, `ApiResponse`, `ZodValidationPipe`, `custom-error` — reuse, KHÔNG tạo trùng.
+- `saveUploadedFile` (configs/upload) — sẽ wrap sau port storage thay vì gọi trực tiếp ở controller.
+
+### Proposed Clean Architecture target (CHƯA code)
+
+**Domain (User aggregate đang ở auth module):**
+- Thêm `UserEntity.updateProfile({ firstName?, lastName? })` (mutate có guard rỗng) + tái dùng `setAvatarUrl()` cho changeAvatar; optional `removeAvatar()` (set avatarUrl undefined) — **legacy KHÔNG có remove endpoint** ⇒ `RemoveAvatarService` KHÔNG cần cho parity.
+- KHÔNG cần value-object AvatarUrl cho parity (giữ `string`).
+
+**Application (đặt ở users module):**
+- `GetMyProfileService` — trả `{ user, stats }`; stats là concern gamification ⇒ cần port đọc stats (`IUserStatsReader`/`USER_STATS_READER`) thay vì import model.
+- `UpdateMyProfileService` — input `{ userId, firstName?, lastName?, avatarUrl? }` → `repo.findById` → `assertCanAuthenticate` → `updateProfile`/`setAvatarUrl` → `repo.update` → SafeUser.
+- `UploadAvatarService` — input `{ userId, file }` → `AVATAR_STORAGE.save(file,'avatars')` → `setAvatarUrl` → `repo.update` → SafeUser.
+- DTO: `UpdateMyProfileInput`, `MyProfileResult` (`{ user, stats }`), `UploadAvatarResult`, `SafeProfileUser` (tái dùng `SafeAuthUser` nếu hợp).
+- Ports: `USER_REPOSITORY` (đủ), **mới** `AVATAR_STORAGE`/`FILE_STORAGE` (wrap `saveUploadedFile`), optional `USER_STATS_READER`. `FILE_VALIDATOR`: giữ ở presentation (Nest pipe/interceptor) để mirror legacy (legacy chỉ check size trong util, không mime).
+
+**Infrastructure:**
+- `MongoUserRepository` đủ (không thêm method).
+- **Mới** `LocalAvatarStorageService implements IAvatarStorage` wrap `saveUploadedFile` (giữ local-disk parity; KHÔNG thêm Cloudinary/S3).
+- Optional `MongoUserStatsReaderService` (đọc `UserStats`) cho GetMyProfile.
+
+**Presentation:**
+- Migrate **`UsersController`** (đúng owner UC09) inject use-cases; giữ `FileInterceptor('avatar')`, `@ApiConsumes`, guard/decorator, response shape, status (200/200/201).
+- Reuse guard/decorator/wrapper shared (không tạo trùng).
+- **Quyết định kiến trúc/caveat:** User aggregate hiện nằm trong auth module ⇒ UC09 ở users cần (a) `UsersModule` import `AuthModule` & dùng lại `USER_REPOSITORY` + `UserEntity`, hoặc (b) tách User aggregate sang shared module. Đề xuất (a) cho thay đổi tối thiểu; (b) là hướng dài hạn.
+
+### What was intentionally NOT changed
+
+- Toàn bộ `src/**`, `src/common/**`, `src/utils/**`, `package.json`, `.env` — KHÔNG đụng. KHÔNG đổi route/response/upload/storage. KHÔNG xoá legacy. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`. KHÔNG commit.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope. `npm test`: ✅ 13/13.
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước UsersModule) ⇒ KHÔNG có lỗi mới do Auth/Profile. Chưa smoke HTTP.
+
+### Known issues / caveats
+
+1. **Security:** avatar upload KHÔNG validate mime/extension; size check chỉ chạy sau khi đã buffer toàn bộ file vào RAM (memory storage) ⇒ rủi ro upload file tuỳ ý + DoS bộ nhớ. (Ghi nhận, KHÔNG sửa phase này.)
+2. **2 đường ghi avatar** (PATCH `avatarUrl` string tuỳ ý + POST upload) — cân nhắc thống nhất khi migrate.
+3. **User aggregate ở auth module** ⇒ migrate UC09 cần cross-module wiring (đề xuất (a)).
+4. Avatar cũ KHÔNG bị xoá ⇒ rác file tích luỹ trên disk.
+5. Chưa smoke HTTP do nợ kernel `LEARNING_ACCESS_DATA` (pre-existing, ngoài scope).
+
+### Next recommended task
+
+- **DEV1.6B — Profile/Avatar domain + ports (no controller swap)**: thêm `UserEntity.updateProfile()` (+ optional `removeAvatar`), định nghĩa port `AVATAR_STORAGE` (và `USER_STATS_READER` nếu migrate GetProfile), tạo adapter `LocalAvatarStorageService` wrap `saveUploadedFile` — CHƯA đổi controller. Sau đó **DEV1.6C** mới wire `UsersController` sang use-cases, giữ nguyên path/response/upload field/status.
