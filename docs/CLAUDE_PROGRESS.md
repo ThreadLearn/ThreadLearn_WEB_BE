@@ -1462,3 +1462,68 @@ New (4):
 ### Next recommended task
 
 - **DEV1.5B / Deletion phase** — sau khi kernel `LEARNING_ACCESS_DATA` được sửa + smoke đủ 11 route auth: gỡ provider/export `AuthService` khỏi `AuthModule`, cân nhắc xoá `auth.service.ts`; tạo port `INVITATION_EMAIL`/dùng `EMAIL_SENDER` cho `AdminService` để gỡ phụ thuộc static `EmailService`, rồi mới hạ cấp `EmailService` legacy.
+
+---
+
+## DEV1.5B Auth Migration — Final Verification Checklist (audit-only)
+
+- **Date/time:** 2026-06-29
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Scope:** chỉ audit/verify — KHÔNG sửa runtime, KHÔNG xoá legacy, KHÔNG đổi route/response.
+
+### 1. AuthController KHÔNG còn dùng AuthService — ✅
+
+- `grep AuthService` trong `auth.controller.ts`: chỉ **1 dòng comment** (line 42), KHÔNG import, KHÔNG reference symbol.
+
+### 2. 11 Auth routes đều gọi use-case — ✅
+
+| # | Route | Method | Use-case |
+|---|-------|--------|----------|
+| 1 | `/register` | POST | `registerUserService.execute` |
+| 2 | `/verify-email` | POST | `verifyEmailService.execute` |
+| 3 | `/resend-verification` | POST | `resendVerificationEmailService.execute` |
+| 4 | `/forgot-password` | POST | `forgotPasswordService.execute` |
+| 5 | `/reset-password` | POST | `resetPasswordService.execute` |
+| 6 | `/google` | GET | `getGoogleAuthUrlService.execute` |
+| 7 | `/google/callback` | GET | `handleGoogleCallbackService.execute` |
+| 8 | `/login` | POST | `loginUserService.execute` |
+| 9 | `/refresh` | POST | `refreshTokenService.execute` |
+| 10 | `/logout` | POST | `logoutService.execute` |
+| 11 | `/session` | GET | `getSessionService.execute` |
+
+→ **11/11** route đi qua application use-case; 0 route gọi `AuthService` tĩnh.
+
+### 3. AuthService chỉ còn provider/export legacy — ✅
+
+- Import thật duy nhất: `auth.module.ts:3` (+ provider line 70, export line 117).
+- Static call thật (`AuthService.x`): **KHÔNG còn** — mọi match là comment/JSDoc (dto, application/**, infrastructure/**). Self-reference trong `auth.service.ts` (class + default export).
+- → dead runtime code, đã `@deprecated` (DEV1.5A).
+
+### 4. EmailService consumer active — ✅ (còn active, KHÔNG xoá được)
+
+- **Active:** `infrastructure/services/smtp-email-sender.service.ts:33,42` (`sendVerificationEmail`/`sendPasswordResetEmail` qua port `EMAIL_SENDER` — runtime thật) + `admin/services/admin.service.ts:88` (`sendStudentInvitationEmail` — cross-module, chưa có port).
+- **Dead:** `auth.service.ts:447,466` (gọi từ `AuthService` đã dead).
+- (`auth.controller.ts:75,86` là tên class `verifyEmailService`/`resendVerificationEmailService` — substring, không liên quan.)
+
+### 5. Build / Lint / Test — ✅
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài auth. `npm test`: ✅ 13/13.
+
+### 6. App boot — ✅ fail đúng pre-existing, KHÔNG do Auth
+
+- `node dist/main.js`: fail ở `Symbol(LEARNING_ACCESS_DATA)` trong `EnrollInCourseService`/`EnrollmentsModule` (abort trước AuthModule). KHÔNG có lỗi DI Auth. (Không sửa — ngoài scope DEV1.)
+
+### Remaining legacy files
+
+- `src/modules/auth/services/auth.service.ts` (`@deprecated`, dead runtime, giữ rollback).
+- `src/modules/auth/services/email.service.ts` (legacy SMTP impl, **còn active** sau port + AdminService).
+
+### Deletion blockers
+
+1. Kernel `LEARNING_ACCESS_DATA` chặn app boot ⇒ chưa smoke HTTP 11 route ⇒ chưa đủ điều kiện xoá `AuthService`/gỡ provider.
+2. `AdminService` còn gọi static `EmailService.sendStudentInvitationEmail` (chưa có port) ⇒ EmailService chưa thể xoá.
+3. `EmailService` còn là implementation thật sau `SmtpEmailSenderService` (port `EMAIL_SENDER`).
+
+### Next recommended task
+
+- **DEV1.5C / Deletion** (chỉ khi (1) kernel `LEARNING_ACCESS_DATA` đã fix và (2) smoke đủ 11 route): gỡ provider/export `AuthService` + xoá `auth.service.ts`; thêm port `INVITATION_EMAIL` (hoặc mở rộng `EMAIL_SENDER`) cho `AdminService` để cắt phụ thuộc static `EmailService`; sau đó mới hạ cấp/di dời `EmailService` legacy.
