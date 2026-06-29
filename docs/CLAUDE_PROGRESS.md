@@ -1666,3 +1666,84 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.6B — Profile/Avatar domain + ports (no controller swap)**: thêm `UserEntity.updateProfile()` (+ optional `removeAvatar`), định nghĩa port `AVATAR_STORAGE` (và `USER_STATS_READER` nếu migrate GetProfile), tạo adapter `LocalAvatarStorageService` wrap `saveUploadedFile` — CHƯA đổi controller. Sau đó **DEV1.6C** mới wire `UsersController` sang use-cases, giữ nguyên path/response/upload field/status.
+
+---
+
+## DEV1.6B Profile / Avatar Domain + Ports + Infrastructure Adapter
+
+- **Date/time:** 2026-06-29
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `users` (+ 1 method trên `auth/domain` User aggregate)
+- **Task:** Chuẩn bị Clean Architecture foundation cho UC09 (Update Profile / Upload Avatar / Get Profile sau). Tạo domain method + ports + infrastructure adapter. **KHÔNG** migrate `UsersController`, **KHÔNG** đổi runtime/route/response/upload behavior.
+
+### Files created
+
+- `src/modules/users/domain/interfaces/avatar-storage.port.ts` — port `IAvatarStorage` + token `AVATAR_STORAGE` + type `AvatarUploadFile`/`AvatarStorageResult`.
+- `src/modules/users/domain/interfaces/user-stats-reader.port.ts` — port `IUserStatsReader` + token `USER_STATS_READER` + type `UserProfileStats`.
+- `src/modules/users/domain/interfaces/index.ts` — barrel.
+- `src/modules/users/infrastructure/services/local-avatar-storage.service.ts` — adapter `LocalAvatarStorageService implements IAvatarStorage`.
+- `src/modules/users/infrastructure/services/mongo-user-stats-reader.service.ts` — adapter `MongoUserStatsReaderService implements IUserStatsReader`.
+- `src/modules/users/infrastructure/services/index.ts` — barrel.
+
+> Lưu ý: domain ports + `UserEntity.updateProfile()` đã được tạo trong một phiên trước (uncommitted) đúng scope DEV1.6B; phiên này audit-giữ chúng + bổ sung 2 adapter infrastructure + barrel + docs + quality gates.
+
+### Files changed
+
+- `src/modules/auth/domain/entities/user.entity.ts` — thêm method `updateProfile()` (xem Domain changes); mở rộng comment cho `setAvatarUrl()` (reuse cho upload UC09). KHÔNG đổi method cũ.
+- `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### Domain changes
+
+- `UserEntity.updateProfile({ firstName?, lastName?, avatarUrl? })` — mirror `UsersService.updateProfile`: field `undefined` ⇒ KHÔNG đổi; string ⇒ `.trim()` (idempotent với zod `updateProfileSchema` đã trim cả 3 field). CHỈ cho phép đúng tập field legacy; KHÔNG đụng email/role/planType; KHÔNG validate unique/email; KHÔNG dựng response; KHÔNG hardcode `/uploads`. Thuần — không import NestJS/Mongoose/model/utils.
+- `setAvatarUrl(avatarUrl)` đã tồn tại từ DEV1.3D (validate non-empty, KHÔNG xoá avatar cũ) ⇒ **reuse cho upload avatar**, KHÔNG thêm method mới trùng.
+
+### Ports created
+
+- `IAvatarStorage` / `AVATAR_STORAGE` — `saveAvatar(file: AvatarUploadFile): Promise<AvatarStorageResult>`. Type thuần domain: `AvatarUploadFile { originalname, buffer, size, mimetype? }` (KHÔNG phụ thuộc `Express.Multer`), `AvatarStorageResult { url, filename?, path?, size? }`. KHÔNG validate mime ở port.
+- `IUserStatsReader` / `USER_STATS_READER` — `getStatsByUserId(userId): Promise<UserProfileStats | null>`. `UserProfileStats` mirror field UserStats + index signature cho `_id`/`userId`/timestamps/`__v` passthrough (parity JSON), KHÔNG kéo type Mongoose vào domain.
+
+### Infrastructure adapters created
+
+- `LocalAvatarStorageService` (`@Injectable`, implements `IAvatarStorage`) — wrap `saveUploadedFile(file, 'avatars')` (`src/configs/upload`). Giữ ĐÚNG: subdir `avatars`, URL `/uploads/avatars/<timestamp>-<name>`, local disk, size limit `MAX_FILE_SIZE_MB` (check sau buffer) → propagate `BadRequestError`, KHÔNG validate mime, KHÔNG xoá avatar cũ, KHÔNG log buffer, KHÔNG lộ absolute path (chỉ trả URL + filename suy từ đuôi URL). Cast `AvatarUploadFile` qua `Parameters<typeof saveUploadedFile>[0]` để khỏi nêu `Express.Multer` ở adapter.
+- `MongoUserStatsReaderService` (`@Injectable`, implements `IUserStatsReader`) — `UserStats.findOne({ userId }).lean()` → trả khi có, `null` khi chưa có. Mirror legacy `UsersService.getProfile` (KHÔNG tự tạo stats, KHÔNG mutate). Nơi DUY NHẤT (scope users) chạm model `UserStats` của gamification.
+
+### Provider wiring if any
+
+- **KHÔNG wire** provider vào `UsersModule` ở phase này (ưu tiên giữ runtime/DI nguyên trạng vì controller chưa migrate, không consumer nào inject adapter). `nest build` (tsc) vẫn compile/type-check file mới dù chưa nằm trong DI graph. Wiring `{ provide: AVATAR_STORAGE, useExisting: LocalAvatarStorageService }` + `{ provide: USER_STATS_READER, useExisting: MongoUserStatsReaderService }` để DEV1.6C (khi migrate controller).
+
+### Legacy behavior preserved
+
+- API path/method/status, response shape (`GET {user,stats}` / `PATCH SafeUser` / `POST avatar SafeUser`), upload field `avatar`, `FileInterceptor` memory, `saveUploadedFile('avatars')` local disk, URL format, size limit 10MB sau buffer, KHÔNG validate mime, KHÔNG xoá avatar cũ, static `/uploads` — **tất cả nguyên trạng** (controller/service legacy không bị đụng).
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa `UsersController`, `UsersService` legacy, `users.validator.ts`, `users.module.ts`, model, `src/configs/upload.ts`, `src/common/**`, `src/utils/**`, `.env`, `package.json`.
+- KHÔNG migrate route / đổi response / đổi upload field / đổi storage runtime. KHÔNG xoá legacy code. KHÔNG sửa nợ kernel `LEARNING_ACCESS_DATA` (ngoài scope DEV1). KHÔNG commit tự động.
+
+### API / Upload / Security compatibility
+
+- **API:** 0 route thêm/sửa/xoá; adapter chưa nằm trong request flow ⇒ behavior do controller/service legacy quyết.
+- **Upload/storage:** behavior y hệt (adapter chỉ wrap helper hiện tại, chưa được gọi runtime).
+- **Security:** không file mới log buffer/token/secret; KHÔNG lộ absolute server path (chỉ URL public); KHÔNG expose field nhạy cảm. Port domain thuần không kéo Multer/Mongoose.
+
+### Build / Lint / Test / Self-check result
+
+- `npm run build` (`nest build`): ✅ PASS (0 lỗi).
+- `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (lessons presenter ×2, quiz-attempts handler ×2, quiz.facade ×3); 0 warning ở file mới.
+- `npm test`: ✅ 13/13 pass (`bugfix-regression.spec.ts`).
+- Self-check: ✅ auth/domain & users/domain KHÔNG có import cấm (match grep trong users/domain chỉ là **comment/prose** JSDoc, không phải import). users/infrastructure KHÔNG import guard/decorator/ApiResponse/api-handler — chỉ `@nestjs/common`(`@Injectable`) + `configs/upload` + domain interface + gamification model (đúng layer infra). users/controllers chưa dùng CA service/`AVATAR_STORAGE` (chưa migrate).
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước UsersModule) ⇒ KHÔNG có lỗi DI mới do file/adapter mới (chưa wire vào module nào). Chưa smoke HTTP.
+
+### Known issues / caveats
+
+1. Adapter + ports CHƯA nằm trong DI graph runtime (chưa wire `UsersModule`) — chỉ được compile, chưa được inject. Wiring + controller swap để DEV1.6C.
+2. `MongoUserStatsReaderService` dùng `.lean()` (legacy dùng doc hydrated) — parity JSON giữ vì model UserStats không có `toJSON` transform (cả 2 đều gồm `_id`/`userId`/`__v`/timestamps). Cần re-verify khi smoke GET profile thật.
+3. User aggregate ở **auth module** ⇒ DEV1.6C migrate UC09 cần cross-module wiring (UsersModule import `USER_REPOSITORY` từ auth).
+4. Nợ kernel `LEARNING_ACCESS_DATA` vẫn chặn boot/smoke HTTP (pre-existing, ngoài scope DEV1).
+
+### Next recommended task
+
+- **DEV1.6C — Users application use-cases + controller wiring:** tạo `UpdateMyProfileService`/`UploadAvatarService`/`GetMyProfileService` (application), DTO + presenter (giữ `SafeUser`/`{user,stats}`), wire `UsersModule` (`AVATAR_STORAGE`→`LocalAvatarStorageService`, `USER_STATS_READER`→`MongoUserStatsReaderService`, `USER_REPOSITORY` từ auth), rồi migrate `UsersController` sang use-cases — **giữ nguyên** path/method/status/response/upload field `avatar`/storage behavior.

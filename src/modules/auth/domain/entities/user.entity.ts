@@ -136,12 +136,31 @@ export class UserEntity {
     this.props.googleId = googleId;
   }
 
-  /** Đặt avatar (mirror Google: chỉ set khi profile có ảnh). */
+  /** Đặt avatar (mirror Google: chỉ set khi profile có ảnh). Dùng lại cho upload avatar (UC09). */
   setAvatarUrl(avatarUrl: string): void {
     if (!avatarUrl) {
       throw new Error('avatarUrl is required.');
     }
     this.props.avatarUrl = avatarUrl;
+  }
+
+  /**
+   * Cập nhật profile cá nhân (UC09 — mirror `UsersService.updateProfile`).
+   * CHỈ cho phép đúng tập field legacy: `firstName`, `lastName`, `avatarUrl`.
+   * Quy tắc: field `undefined` ⇒ KHÔNG đổi; string ⇒ trim (mirror zod `.trim()` hiện tại).
+   * KHÔNG validate unique/email, KHÔNG đụng email/role/planType… (legacy không cho update).
+   * KHÔNG dựng response — presenter/use-case lo. KHÔNG hardcode `/uploads` ở domain.
+   */
+  updateProfile(input: { firstName?: string; lastName?: string; avatarUrl?: string }): void {
+    if (input.firstName !== undefined) {
+      this.props.firstName = input.firstName.trim();
+    }
+    if (input.lastName !== undefined) {
+      this.props.lastName = input.lastName.trim();
+    }
+    if (input.avatarUrl !== undefined) {
+      this.props.avatarUrl = input.avatarUrl.trim();
+    }
   }
 
   /** Ghi nhận thời điểm đăng nhập gần nhất (mirror set `lastLoginAt`). */
