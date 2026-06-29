@@ -1747,3 +1747,96 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.6C — Users application use-cases + controller wiring:** tạo `UpdateMyProfileService`/`UploadAvatarService`/`GetMyProfileService` (application), DTO + presenter (giữ `SafeUser`/`{user,stats}`), wire `UsersModule` (`AVATAR_STORAGE`→`LocalAvatarStorageService`, `USER_STATS_READER`→`MongoUserStatsReaderService`, `USER_REPOSITORY` từ auth), rồi migrate `UsersController` sang use-cases — **giữ nguyên** path/method/status/response/upload field `avatar`/storage behavior.
+
+---
+
+## DEV1.6C Profile / Avatar Application Use Cases + DI Wiring
+
+- **Date/time:** 2026-06-29
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `users` (application + DI) — KHÔNG migrate controller.
+- **Task:** Tạo application use-cases UC09 (`GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService`) + DTO + presenter, và wire provider (`UsersModule` import `AuthModule`, token mapping `AVATAR_STORAGE`/`USER_STATS_READER`, export `USER_REPOSITORY` từ `AuthModule`). **KHÔNG** đụng `UsersController`/`UsersService` runtime, route, response shape, upload/storage behavior.
+
+### Files created (9)
+
+- `src/modules/users/application/dto/profile-use-case.dto.ts` — `ProfileSafeUser`/`ProfileStats` + In/Result types.
+- `src/modules/users/application/dto/index.ts` — barrel.
+- `src/modules/users/application/presenters/profile-user.presenter.ts` — `ProfileUserPresenter` (entity→safe user).
+- `src/modules/users/application/presenters/index.ts` — barrel.
+- `src/modules/users/application/services/get-my-profile.service.ts`
+- `src/modules/users/application/services/update-my-profile.service.ts`
+- `src/modules/users/application/services/upload-avatar.service.ts`
+- `src/modules/users/application/services/index.ts` — barrel.
+- `src/modules/users/application/index.ts` — barrel.
+
+### Files changed (4)
+
+- `src/modules/users/users.module.ts` — `imports: [AuthModule]`; đăng ký 3 use-case + 2 adapter (DEV1.6B) + 2 token mapping (`useExisting`). Giữ `UsersService` legacy provider/export, KHÔNG đổi controller.
+- `src/modules/auth/auth.module.ts` — thêm `USER_REPOSITORY` vào `exports` (1 dòng) để UsersModule inject cùng adapter `MongoUserRepository`. KHÔNG đổi provider/controller auth.
+- `docs/CLAUDE_PROGRESS.md` (file này), `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### Legacy behavior audited (mirror 1:1)
+
+- **getProfile:** `userId` từ `@CurrentUser` (guard); `User.findById` thiếu ⇒ `NotFoundError('User profile not found.')`; `assertUserCanAuthenticate` (inactive ⇒ `ForbiddenError('User account is inactive.')`, `lockedAt` ⇒ `'User account is locked.'`); `stats = UserStats.findOne({userId})`; data = `{ user: sanitizeUser, stats: stats || {xp:0,level:1,currentStreak:0,highestStreak:0} }`.
+- **updateProfile:** body `{firstName?,lastName?,avatarUrl?}` (zod `.trim().min(1)` mỗi field + refine ≥1 field); `findById` thiếu ⇒ `NotFoundError('User not found.')`; assert; gán field `!== undefined`; `save`; data = `sanitizeUser` (phẳng).
+- **uploadAvatar:** field `avatar` (`FileInterceptor` memory); `!file` ⇒ `BadRequestError('No avatar file provided in FormData.')`; `saveUploadedFile(file,'avatars')` (size ≤ `MAX_FILE_SIZE_MB` check sau buffer, KHÔNG mime, KHÔNG xoá avatar cũ, URL `/uploads/avatars/<timestamp>-<name>`); `findById` thiếu ⇒ `NotFoundError('User not found.')`; assert; set avatarUrl; `save`; data = `sanitizeUser` (phẳng).
+- `sanitizeUser` whitelist: `id,email,firstName,lastName,avatarUrl,role,isVerified,isActive,lastLoginAt,createdAt,updatedAt` (KHÔNG lockedAt/passwordHash/googleId/githubId/planType).
+
+### DTO/result types created
+
+- `ProfileSafeUser` (mirror `sanitizeUser`), `ProfileStats` (= `UserProfileStats` từ port). `GetMyProfileInput{userId}` → `GetMyProfileResult{user, stats}` (stats LUÔN non-null, đã áp fallback). `UpdateMyProfileInput{userId,firstName?,lastName?,avatarUrl?}` → `UpdateMyProfileResult = ProfileSafeUser` (phẳng, mirror `data`). `UploadAvatarInput{userId,file?:AvatarUploadFile}` → `UploadAvatarResult = ProfileSafeUser`.
+
+### Presenter created
+
+- `ProfileUserPresenter.toSafeUser(UserEntity): ProfileSafeUser` — pure mapping qua `entity.toProps()`, mirror `sanitizeUser` (firstName/lastName fallback `''` như `GetSessionService.toSafeUser`). KHÔNG I/O, KHÔNG import mongoose/model/infrastructure/utils.
+
+### Use cases created (mỗi class 1 `execute()`)
+
+- `GetMyProfileService` (inject `USER_REPOSITORY` + `USER_STATS_READER`) — findById→assert→stats→`{user,stats||fallback}`. KHÔNG tự tạo stats.
+- `UpdateMyProfileService` (inject `USER_REPOSITORY`) — findById→assert→`UserEntity.updateProfile`→`repo.update`→safe user.
+- `UploadAvatarService` (inject `USER_REPOSITORY` + `AVATAR_STORAGE`) — `!file`→BadRequest; `saveAvatar` **trước** findById (mirror đúng thứ tự controller legacy: ghi file trước, rồi tra user)→assert→`setAvatarUrl`→`repo.update`→safe user.
+
+### Ports used
+
+- `USER_REPOSITORY` (auth domain — `findById`/`update`), `AVATAR_STORAGE` (`saveAvatar`), `USER_STATS_READER` (`getStatsByUserId`). Tất cả inject qua Symbol token; KHÔNG query DB trực tiếp; KHÔNG import model.
+
+### Provider wiring
+
+- `UsersModule`: `imports: [AuthModule]`; providers thêm `GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService` + `LocalAvatarStorageService`/`MongoUserStatsReaderService` + `{provide: AVATAR_STORAGE, useExisting: LocalAvatarStorageService}` + `{provide: USER_STATS_READER, useExisting: MongoUserStatsReaderService}`. `UsersService` legacy giữ provider/export. Controller constructor KHÔNG đổi.
+- **Verify DI:** isolated `NestFactory.create(UsersModule)` resolve thành công cả 3 use-case (gồm cross-module `USER_REPOSITORY`). KHÔNG circular dependency (AuthModule không import UsersModule).
+
+### AuthModule export changes
+
+- Thêm `USER_REPOSITORY` vào `exports` (ngoài `AuthService`/`EmailService`). KHÔNG thêm/sửa provider, controller, route. Đây là sửa **tối thiểu bắt buộc** để UsersModule dùng chung adapter User.
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa `UsersController` (method body/constructor/route/Swagger/`FileInterceptor`/validator/`ApiResponse`) — vẫn dùng `UsersService` legacy.
+- KHÔNG sửa `UsersService` legacy, model, `src/configs/upload.ts`, `src/common/**`, `src/utils/**`, `.env`, `package.json`. KHÔNG xoá legacy. KHÔNG sửa nợ kernel `LEARNING_ACCESS_DATA`. KHÔNG commit tự động.
+
+### API / Upload / Security compatibility
+
+- **API:** 0 route thêm/sửa/xoá; use-case CHƯA trong request flow ⇒ behavior do controller/service legacy quyết. Result types khớp 1-1 `data` legacy để DEV1.6D migrate giữ shape (GET `{user,stats}`, PATCH/POST safe user phẳng).
+- **Upload/storage:** giữ field `avatar`, memory interceptor, `saveUploadedFile('avatars')`, URL format, size limit, no-mime, no-delete-old, static `/uploads` (adapter wrap; chưa chạy runtime).
+- **Security:** presenter whitelist (không lộ passwordHash/token/secret/googleId); không log file buffer/absolute path; DTO/use-case không import Express/Multer/Mongoose.
+
+### Build / Lint / Test / Self-check result
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (0 ở file mới). `npm test`: ✅ 13/13.
+- Self-check: ✅ auth/domain & users/domain không import cấm; users/application **không** import mongoose/model/schema/utils/infrastructure/legacy-service (match grep chỉ là **comment JSDoc**, đã verify mọi hit là dòng `*`); users/infrastructure không guard/decorator/ApiResponse; users/controllers chưa dùng CA service.
+
+### App boot/smoke result
+
+- Full-app `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` (`EnrollmentsModule`, abort trước khi smoke HTTP) — KHÔNG do UsersModule.
+- Isolated `NestFactory.create(UsersModule)` (throwaway, đã xoá): ✅ DI resolve, 3 use-case + cross-module port instantiate OK ⇒ wiring mới KHÔNG gây lỗi DI.
+
+### Known issues / caveats
+
+1. Use-cases CHƯA trong request flow (controller chưa migrate) — runtime UC09 vẫn do `UsersService` legacy. Migrate ở DEV1.6D.
+2. **Thứ tự upload:** use-case `saveAvatar` **trước** findById/assert (mirror đúng legacy) ⇒ giữ side-effect ghi file kể cả khi user missing/inactive (edge case hiếm vì JWT đã xác thực). Có thể đảo thứ tự ở cleanup nếu muốn tránh orphan file — sẽ là behavior change, KHÔNG làm phase này.
+3. `MongoUserStatsReaderService.lean()` parity với doc hydrated — re-verify khi smoke GET profile thật (chặn bởi kernel debt).
+4. Nợ kernel `LEARNING_ACCESS_DATA` vẫn chặn smoke HTTP (pre-existing, ngoài scope DEV1).
+
+### Next recommended task
+
+- **DEV1.6D — Migrate `UsersController` sang use-cases:** inject `GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService`; 3 route đổi sang `this.<service>.execute(...)` (`data: result` uniform), giữ nguyên path/method/status/guard/Swagger/validator/`FileInterceptor('avatar')`/`ApiResponse`. Sau đó cân nhắc `@deprecated` `UsersService` legacy (DEV1.6E cleanup) sau khi smoke đủ route (cần kernel `LEARNING_ACCESS_DATA` được sửa trước).
