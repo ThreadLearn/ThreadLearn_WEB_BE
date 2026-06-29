@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { env } from '../../../../configs/env';
+import { BadRequestError } from '../../../../common/custom-error';
 import { IGoogleOAuth } from '../../domain/interfaces/google-oauth.port';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -30,7 +31,9 @@ export interface GoogleProfile {
 export class GoogleOAuthService implements IGoogleOAuth {
   private assertConfigured(): void {
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      throw new Error('Google OAuth is not configured.');
+      // Mirror legacy `assertGoogleOAuthConfigured` → BadRequestError (HTTP 400),
+      // không phải Error thuần (sẽ thành 500). Giữ đúng status route `GET /google`.
+      throw new BadRequestError('Google OAuth is not configured.');
     }
   }
 

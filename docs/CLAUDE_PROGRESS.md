@@ -1303,3 +1303,162 @@ New (4):
 ### Next recommended task
 
 - **DEV1.4C-4 — Migrate `google` + `google/callback`** (cuối cùng): `GET /google` → build authorization URL qua use-case/port; `GET /google/callback` → exchange code (qua `GOOGLE_OAUTH` adapter) rồi `GoogleLoginService.execute({ profile })`. **Giữ redirect query** `accessToken`/`refreshToken`/`user=JSON.stringify(SafeUser)` + failure redirect. Lưu ý: callback dùng `@Res()` redirect (không `ApiResponse`) — giữ nguyên. Sau đó Phase cleanup: gỡ/`@deprecated` `AuthService` legacy khi không route nào còn gọi.
+
+---
+
+## DEV1.4C-4 AuthController Migration — Google OAuth
+
+- **Date/time:** 2026-06-27
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/controllers/auth.controller.ts` — inject 2 Google use-case; migrate 2 route; **bỏ import/usage `AuthService`** (toàn bộ request flow không còn gọi legacy).
+- `src/modules/auth/application/services/get-google-auth-url.service.ts` *(mới)* — UC build Google auth URL.
+- `src/modules/auth/application/services/handle-google-callback.service.ts` *(mới)* — UC exchange code → map profile → `GoogleLoginService`.
+- `src/modules/auth/application/services/index.ts` — export 2 service mới.
+- `src/modules/auth/application/dto/auth-use-case.dto.ts` — thêm `GetGoogleAuthUrlResult`, `HandleGoogleCallbackInput`.
+- `src/modules/auth/domain/interfaces/google-oauth.port.ts` — refine port: `buildAuthUrl()`/`verifyCallback()` thành **required + typed** (`GoogleOAuthProfile`).
+- `src/modules/auth/infrastructure/services/google-oauth.service.ts` — `assertConfigured` ném `BadRequestError` (thay `Error`) để mirror status 400 legacy.
+- `src/modules/auth/auth.module.ts` — đăng ký 2 provider use-case mới.
+- `docs/CLAUDE_PROGRESS.md`, `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn).
+
+### Routes migrated
+
+- `GET /api/v1/auth/google` → `GetGoogleAuthUrlService.execute()` → `response.redirect(url)`.
+- `GET /api/v1/auth/google/callback` → `HandleGoogleCallbackService.execute({ code })` → build success redirect / failure redirect.
+
+### Legacy Google behavior found
+
+- **`GET /google`:** `@Get('google')` + `@Res()`, redirect tới `AuthService.getGoogleAuthorizationUrl()`. URL params: `client_id`, `redirect_uri` (= `GOOGLE_CALLBACK_URL` || `http://localhost:<PORT>/api/v1/auth/google/callback`), `response_type=code`, `scope='openid email profile'`, `access_type=offline`, `prompt=select_account`. **KHÔNG có `state`.** Thiếu config → `BadRequestError('Google OAuth is not configured.')` (HTTP 400, không redirect).
+- **`GET /google/callback`:** `@Get('google/callback')` + `@Res()`, query `{ code?, error? }` (`googleOAuthCallbackSchema`). Thứ tự: `query.error` → failure redirect `error='Google OAuth failed: <error>'`; `!query.code` → failure redirect `error='Google OAuth authorization code is required.'`; else `try { AuthService.loginWithGoogleCode(code) } catch (err) { failure redirect error=err.message||'Google OAuth failed.' }`. `loginWithGoogleCode`: exchange code (token + userinfo) → validate (email/sub missing, `email_verified===false`) → tìm user theo email → tạo/link googleId/verify/avatar → ký token → lưu refresh raw → `createAuthResponse` = `{ user: sanitizeUser, accessToken, refreshToken }`. **Success redirect:** `URL(FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback')` + query `accessToken`, `refreshToken`, `user=JSON.stringify(sanitizeUser)`. **Failure redirect** (`redirectGoogleFailure`): `URL(FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3000/login')` + query `error=<message>`. Dùng `res.redirect`, KHÔNG `ApiResponse`. KHÔNG log code/token/profile.
+
+### Application services created
+
+- **`GetGoogleAuthUrlService`** — inject `GOOGLE_OAUTH`; `execute(): { url }` = `buildAuthUrl()`. KHÔNG import infra/env/utils.
+- **`HandleGoogleCallbackService`** — inject `GOOGLE_OAUTH` + `GoogleLoginService`; `execute({ code })`: `verifyCallback({code})` → map raw Google (`sub→googleId`, `email_verified→emailVerified`, `given_name/family_name→firstName/lastName`, `picture`) → `GoogleProfileInput` → `GoogleLoginService.execute({ profile })` → `GoogleLoginResult`. Validate email/sub/verified do `GoogleLoginService` đảm nhận (mirror đúng message + thứ tự legacy: email → sub → verified). KHÔNG import infra/env/utils.
+
+### Controller changes
+
+- Constructor inject thêm `GetGoogleAuthUrlService`/`HandleGoogleCallbackService` (tổng 11 use-case). `googleAuth` → redirect `url` từ use-case. `googleCallback` giữ NGUYÊN: check `error`/`!code` → failure redirect; happy path gọi use-case → build success redirect query (`accessToken`/`refreshToken`/`user=JSON.stringify`); catch → failure redirect `err.message`. **Redirect URL + env + `@Res()` vẫn ở controller** (presentation concern). **Đã bỏ import `AuthService`** — controller không còn tham chiếu legacy.
+
+### Use cases / ports used
+
+- `GetGoogleAuthUrlService`, `HandleGoogleCallbackService`, `GoogleLoginService`; port `GOOGLE_OAUTH` (adapter `GoogleOAuthService`).
+
+### Success redirect compatibility
+
+- Giữ NGUYÊN: base `FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'`, query `accessToken`/`refreshToken`/`user=JSON.stringify(SafeUser)`. `GoogleLoginResult.user` = `SafeAuthUser` (whitelist trùng `sanitizeUser`).
+
+### Failure redirect compatibility
+
+- Giữ NGUYÊN: base `FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3000/login'`, query `error=<message>`. Message mirror: error-query `'Google OAuth failed: <error>'`, missing-code `'Google OAuth authorization code is required.'`, exchange/profile/validate giữ đúng chuỗi legacy (adapter + `GoogleLoginService`) — vì callback catch dùng `err.message` nên class lỗi không ảnh hưởng redirect.
+
+### API path compatibility
+
+- Không đổi path/method/redirect behavior/query shape.
+
+### Security compatibility
+
+- KHÔNG log Google code/token/profile/secret/accessToken/refreshToken. Controller không exchange code/sign token/tạo refresh trực tiếp (qua use-case + port). `accessToken`/`refreshToken` chỉ là field để build redirect query, không phải log.
+
+### AuthService usage after migration
+
+- **AuthController KHÔNG còn dùng `AuthService`** (đã bỏ import + mọi reference). `AuthService`/`EmailService` vẫn là provider + export của AuthModule (KHÔNG xoá — có thể còn module khác dùng; cleanup ở phase sau).
+
+### What was intentionally NOT changed
+
+- `auth.service.ts`, `email.service.ts`, models, validators, `src/common/**`, `.env`. KHÔNG xoá legacy service/model. KHÔNG đổi Google OAuth runtime contract với FE. KHÔNG commit. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope (0 ở file auth). `npm test`: ✅ 13/13.
+
+### Self-check result
+
+- domain: ✅ chỉ match comment (port docstring) — port refine vẫn type thuần, không import cấm. application: ✅ không import mongoose/model/schema/infra/utils; `AuthService`/`EmailService` chỉ xuất hiện trong **comment** (mirror docs) hoặc **tên class** (`VerifyEmailService`…) — KHÔNG phải import. controller: ✅ không import mongoose/model/utils; `AuthService` chỉ còn ở **1 comment** (dòng "KHÔNG còn gọi AuthService legacy"), không import/usage. ✅ controller dùng `GetGoogleAuthUrlService`/`HandleGoogleCallbackService`. `accessToken`/`refreshToken` trong controller chỉ để set redirect query, không log.
+
+### App boot/smoke result
+
+- `node dist/main.js`: boot fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước AuthModule) ⇒ **KHÔNG có lỗi DI mới** của AuthController/Google provider. Chưa smoke route HTTP do app chưa boot. Không sửa kernel (ngoài scope).
+
+### Known issues / caveats
+
+1. Không smoke Google routes qua HTTP cho tới khi kernel `LEARNING_ACCESS_DATA` được sửa (pre-existing). Build + DI graph (`nest build`) xác nhận wiring hợp lệ.
+2. **Domain port refine** (`buildAuthUrl`/`verifyCallback` từ optional → required + typed `GoogleOAuthProfile`) — thay đổi tối thiểu, bắt buộc để wire flow Google sạch type; adapter cũ structurally vẫn thoả interface (không sửa logic adapter).
+3. **Infra fix tối thiểu:** `GoogleOAuthService.assertConfigured` đổi `Error` → `BadRequestError` để giữ status 400 của `GET /google` khi thiếu config (mirror legacy). Các lỗi exchange/userinfo giữ `Error` (callback catch theo message nên không ảnh hưởng redirect).
+4. `AuthService`/`EmailService` vẫn là provider/export legacy — chưa cleanup (đúng yêu cầu phase).
+
+### Next recommended task
+
+- **DEV1.4C-5 / Cleanup** — xác minh không module nào còn import `AuthService`/`EmailService` của auth (grep toàn repo); nếu sạch, `@deprecated` rồi gỡ provider/export legacy + cân nhắc gỡ `getGoogleAuthorizationUrl`/`loginWithGoogleCode`/… khỏi `AuthService`. Thêm presenter cho Google `SafeAuthUser` nếu muốn tách shape khỏi use-case. Cập nhật Swagger nếu cần. Đợi kernel `LEARNING_ACCESS_DATA` được sửa để smoke end-to-end toàn bộ 11 route auth.
+
+---
+
+## DEV1.5A Auth Post-Migration Cleanup Audit + Deprecation
+
+- **Date/time:** 2026-06-29
+- **Branch:** `refactor/dev1-clean-architecture`
+
+### Files changed
+
+- `src/modules/auth/services/auth.service.ts` — thêm JSDoc `@deprecated` trên class (KHÔNG đổi logic/signature/error message/SMTP/Google/refresh).
+- `src/modules/auth/services/email.service.ts` — thêm JSDoc legacy-status (KHÔNG deprecated-for-removal; vẫn là impl thật sau port `EMAIL_SENDER` + còn `AdminService` dùng trực tiếp).
+- `src/modules/auth/auth.module.ts` — sửa **comment block** lỗi thời (vẫn nói controller chưa migrate) → mô tả đúng DEV1.4C/1.5A. KHÔNG đổi providers/exports.
+- `docs/CLAUDE_PROGRESS.md`, `docs/CLEAN_ARCHITECTURE_MIGRATION.md` (note ngắn).
+
+### AuthService usage audit
+
+- **Import thật:** chỉ `auth.module.ts` (import + provider + `exports`). Không module nào khác import.
+- **Static call thật:** KHÔNG còn (`AuthService.x` chỉ xuất hiện trong chính `auth.service.ts`).
+- **Controller:** KHÔNG import/reference — chỉ còn **1 dòng comment** (line 42) mô tả đúng trạng thái.
+- **Còn lại:** toàn bộ là **comment/JSDoc** mirror-docs ở `application/**`, `infrastructure/**`, dto. ⇒ `AuthService` là **dead runtime code**, an toàn `@deprecated`.
+
+### EmailService usage audit
+
+- **Import thật (4):** `admin/services/admin.service.ts` (gọi `sendStudentInvitationEmail` — cross-module, **active**), `infrastructure/services/smtp-email-sender.service.ts` (adapter wrap `sendVerificationEmail`/`sendPasswordResetEmail` qua port `EMAIL_SENDER` — **active runtime**), `auth.module.ts` (provider/export), `services/auth.service.ts` (legacy nội bộ, nay dead).
+- **SmtpEmailSenderService** vẫn wrap/call EmailService tĩnh ⇒ EmailService là implementation thật phía sau port. **KHÔNG deprecated-for-removal, KHÔNG gỡ provider.**
+- Matches `VerifyEmailService`/`ResendVerificationEmailService` là **tên class** (substring) — không liên quan EmailService legacy.
+
+### Controller cleanup
+
+- Không cần sửa: controller đã sạch (không import `AuthService`), comment line 42 chính xác. KHÔNG đổi route/decorator/response wrapper/redirect/DTO.
+
+### Deprecation markers added
+
+- `AuthService` class: JSDoc `@deprecated` (đã migrate sang use-cases; giữ tạm cho rollback tới DEV1.5B+; không thêm tính năng mới). KHÔNG runtime log.
+- `EmailService` class: JSDoc legacy-status (giữ sau port `EMAIL_SENDER`, còn AdminService dùng) — **không** đánh dấu xoá.
+
+### AuthModule provider/export decision
+
+- **GIỮ NGUYÊN** providers `AuthService`/`EmailService` + `exports: [AuthService, EmailService]`. Chỉ sửa comment mô tả. Lý do: chưa smoke HTTP được (nợ kernel `LEARNING_ACCESS_DATA`); `EmailService` còn active; cleanup deletion để phase sau.
+
+### What was intentionally NOT changed
+
+- KHÔNG xoá file/provider/export `AuthService`/`EmailService`; KHÔNG xoá models/validators; KHÔNG đổi logic legacy; KHÔNG sửa `.env`; KHÔNG sửa kernel `LEARNING_ACCESS_DATA`; KHÔNG commit.
+
+### Runtime / API / Security compatibility
+
+- Chỉ thêm JSDoc + sửa comment ⇒ **zero runtime change**. API path/method/response/redirect/SMTP/refresh raw/token payload không đổi. Không expose secret/token/password trong code/docs.
+
+### Build / Lint / Test
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, 7 warning pre-existing ngoài scope (0 ở auth). `npm test`: ✅ 13/13.
+
+### Self-check result
+
+- controller: chỉ 1 comment `AuthService`, không import. Real `AuthService` import duy nhất ở `auth.module.ts`. Real `EmailService` import: admin/smtp-adapter/module/legacy (đã phân loại). application/domain/controller layer: ✅ CLEAN (không import cấm).
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` ở `EnrollInCourseService`/`EnrollmentsModule` (abort trước AuthModule) ⇒ **KHÔNG có lỗi DI mới** do cleanup. Chưa smoke HTTP.
+
+### Known issues / caveats
+
+1. `AdminService` còn gọi `EmailService.sendStudentInvitationEmail` trực tiếp (chưa có port riêng) ⇒ EmailService chưa thể deprecated-for-removal.
+2. `AuthService` export hiện không có module nào ngoài auth dùng, nhưng giữ export tới khi smoke HTTP đầy đủ rồi mới gỡ (DEV1.5B+).
+3. Chưa smoke route do nợ kernel `LEARNING_ACCESS_DATA` (pre-existing, ngoài scope DEV1).
+
+### Next recommended task
+
+- **DEV1.5B / Deletion phase** — sau khi kernel `LEARNING_ACCESS_DATA` được sửa + smoke đủ 11 route auth: gỡ provider/export `AuthService` khỏi `AuthModule`, cân nhắc xoá `auth.service.ts`; tạo port `INVITATION_EMAIL`/dùng `EMAIL_SENDER` cho `AdminService` để gỡ phụ thuộc static `EmailService`, rồi mới hạ cấp `EmailService` legacy.

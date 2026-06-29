@@ -35,6 +35,15 @@ type GoogleUserInfo = {
   picture?: string;
 };
 
+/**
+ * @deprecated DEV1.5A — Auth request flow đã migrate hoàn toàn sang Clean Architecture
+ * use-cases (`src/modules/auth/application/services/*`). `AuthController` KHÔNG còn gọi
+ * service này; không module nào khác import nó (chỉ còn provider/export trong `AuthModule`).
+ *
+ * File được GIỮ TẠM cho rollback/compatibility tới final cleanup phase (DEV1.5B+).
+ * KHÔNG thêm tính năng mới ở đây — mọi logic auth mới phải đi qua use-case + port.
+ * Không đổi logic/signature/error message/SMTP/Google/refresh behavior ở phase này.
+ */
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
     const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
