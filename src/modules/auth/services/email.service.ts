@@ -20,6 +20,15 @@ type StudentInvitationEmailPayload = {
   temporaryPassword: string;
 };
 
+/**
+ * Legacy SMTP implementation (nodemailer). DEV1.5A — KHÔNG deprecated-for-removal:
+ * vẫn là implementation thật phía sau port `EMAIL_SENDER`. `SmtpEmailSenderService`
+ * (adapter EmailSender) wrap `sendVerificationEmail`/`sendPasswordResetEmail` tĩnh;
+ * `AdminService` còn gọi trực tiếp `sendStudentInvitationEmail` (chưa có port riêng).
+ *
+ * Giữ nguyên SMTP/mock/env-detection/log/link behavior. Khi cần, các caller sẽ dần
+ * chuyển sang inject port `EMAIL_SENDER` thay vì gọi static — cleanup ở phase sau.
+ */
 export class EmailService {
   static async sendVerificationEmail(payload: VerificationEmailPayload) {
     if (!this.hasSmtpConfig()) {

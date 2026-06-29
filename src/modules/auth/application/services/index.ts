@@ -8,3 +8,5 @@ export * from './refresh-token.service';
 export * from './logout.service';
 export * from './get-session.service';
 export * from './google-login.service';
+export * from './get-google-auth-url.service';
+export * from './handle-google-callback.service';

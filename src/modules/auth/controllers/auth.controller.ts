@@ -7,7 +7,6 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
 import { env } from '../../../configs/env';
-import { AuthService } from '../services/auth.service';
 import {
   RefreshTokenService,
   LogoutService,
@@ -18,6 +17,8 @@ import {
   ResetPasswordService,
   RegisterUserService,
   LoginUserService,
+  GetGoogleAuthUrlService,
+  HandleGoogleCallbackService,
 } from '../application/services';
 import {
   forgotPasswordSchema,
@@ -37,7 +38,8 @@ export class AuthController {
    * DEV1.4C-1: session/logout/refresh → use-case.
    * DEV1.4C-2: verify-email/resend-verification/forgot-password/reset-password → use-case.
    * DEV1.4C-3: register/login → use-case.
-   * Route Google (`google`/`google/callback`) VẪN gọi `AuthService` tĩnh — chưa migrate.
+   * DEV1.4C-4: google/google-callback → use-case.
+   * Toàn bộ request flow của AuthController KHÔNG còn gọi `AuthService` legacy.
    */
   constructor(
     private readonly refreshTokenService: RefreshTokenService,
@@ -49,6 +51,8 @@ export class AuthController {
     private readonly resetPasswordService: ResetPasswordService,
     private readonly registerUserService: RegisterUserService,
     private readonly loginUserService: LoginUserService,
+    private readonly getGoogleAuthUrlService: GetGoogleAuthUrlService,
+    private readonly handleGoogleCallbackService: HandleGoogleCallbackService,
   ) {}
 
   @Post('register')
@@ -111,7 +115,8 @@ export class AuthController {
   @Get('google')
   @ApiOperation({ summary: 'Start Google OAuth authentication.' })
   async googleAuth(@Res() response: any) {
-    return response.redirect(AuthService.getGoogleAuthorizationUrl());
+    const { url } = this.getGoogleAuthUrlService.execute();
+    return response.redirect(url);
   }
 
   @Get('google/callback')
@@ -130,7 +135,7 @@ export class AuthController {
     }
 
     try {
-      const result = await AuthService.loginWithGoogleCode(query.code);
+      const result = await this.handleGoogleCallbackService.execute({ code: query.code });
       const redirectUrl = new URL(
         env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'
       );

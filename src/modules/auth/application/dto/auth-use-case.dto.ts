@@ -231,3 +231,23 @@ export interface GoogleLoginResult {
   accessToken: string;
   refreshToken: string;
 }
+
+// ----- Google auth URL (start) -----
+
+/** Mirror `AuthService.getGoogleAuthorizationUrl()` → URL redirect tới Google. */
+export interface GetGoogleAuthUrlResult {
+  url: string;
+}
+
+// ----- Google callback (exchange code → login) -----
+
+/**
+ * Input callback Google. `code` do controller lấy từ query (đã validate). `error`
+ * giữ để mirror nhánh Google trả lỗi (controller xử lý trước nên thường không vào đây).
+ * KHÔNG mang Google access token / secret.
+ */
+export interface HandleGoogleCallbackInput {
+  code: string;
+  state?: string;
+  error?: string;
+}

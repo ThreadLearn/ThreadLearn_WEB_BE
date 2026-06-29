@@ -45,6 +45,8 @@ import {
   LogoutService,
   GetSessionService,
   GoogleLoginService,
+  GetGoogleAuthUrlService,
+  HandleGoogleCallbackService,
 } from './application/services';
 
 // --- Application: side-effect handler (DEV1.4B — UserStats parity) ---
@@ -53,13 +55,15 @@ import { UserRegisteredHandler } from './application/events';
 /**
  * AuthModule.
  *
- * DEV1.4A — chỉ WIRE provider Clean Architecture mới để DI compile/khởi tạo được.
- * Runtime auth vẫn chạy qua legacy `AuthController` → `AuthService` (tĩnh) như cũ;
- * `AuthController` CHƯA inject use-case mới (controller migration là phase sau).
+ * DEV1.4C — `AuthController` đã migrate TOÀN BỘ request flow sang Clean Architecture
+ * use-cases (DEV1.4C-1…4). Controller KHÔNG còn gọi `AuthService` legacy.
  *
- * Legacy providers `AuthService`/`EmailService` được GIỮ NGUYÊN (vẫn export) để
- * không đổi runtime/Google/SMTP behavior. `SmtpEmailSenderService` gọi `EmailService`
- * tĩnh nên không cần inject — `EmailService` vẫn là provider sẵn có.
+ * DEV1.5A — `AuthService` được đánh dấu `@deprecated` (không module nào khác import).
+ * Tuy vậy provider/export `AuthService`/`EmailService` VẪN GIỮ NGUYÊN ở phase này:
+ * - `EmailService` còn là implementation thật sau port `EMAIL_SENDER`
+ *   (`SmtpEmailSenderService` wrap static) và còn được `AdminService` gọi trực tiếp.
+ * - `AuthService` giữ tạm cho rollback/compatibility tới final cleanup (DEV1.5B+),
+ *   sau khi smoke HTTP đầy đủ (hiện app chưa boot do nợ kernel `LEARNING_ACCESS_DATA`).
  */
 @Module({
   controllers: [AuthController],
@@ -109,6 +113,8 @@ import { UserRegisteredHandler } from './application/events';
     LogoutService,
     GetSessionService,
     GoogleLoginService,
+    GetGoogleAuthUrlService,
+    HandleGoogleCallbackService,
   ],
   exports: [AuthService, EmailService],
 })
