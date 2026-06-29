@@ -116,6 +116,8 @@ import { UserRegisteredHandler } from './application/events';
     GetGoogleAuthUrlService,
     HandleGoogleCallbackService,
   ],
-  exports: [AuthService, EmailService],
+  // `USER_REPOSITORY` được export để UsersModule (UC09 use-cases DEV1.6C) tái sử dụng
+  // cùng adapter `MongoUserRepository` — User aggregate hiện thuộc auth module.
+  exports: [AuthService, EmailService, USER_REPOSITORY],
 })
 export class AuthModule {}
