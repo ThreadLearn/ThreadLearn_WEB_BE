@@ -40,6 +40,10 @@ Self-check (chạy từ repo root) — xem REFACTOR_PLAN_DEV1.md §10 (`npx tsc 
 
 Admin student management UC10-UC13 now has application DTO/result types, an admin safe-user presenter, active-admin/student access helper, five use-case services, and `AdminModule` DI wiring via `AuthModule` exports (`USER_REPOSITORY`, `PASSWORD_HASHER`, `USER_STATS_PROVISIONER`) plus the existing `INVITATION_EMAIL` adapter. `AdminController` was intentionally not migrated, so API routes, response shape, HTTP status, and authorization behavior remain unchanged.
 
+## DEV1.7D Note (2026-06-30)
+
+The five Admin student management routes now call Clean Architecture use-cases from `AdminController`: add, list, update, lock, and unlock student. Route decorators, validators, response messages, flat SafeUser/list data shapes, list meta, class-level admin authorization, and HTTP status behavior were preserved. Admin stats/dashboard/execute routes were intentionally left on their existing legacy paths for later bounded phases.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:

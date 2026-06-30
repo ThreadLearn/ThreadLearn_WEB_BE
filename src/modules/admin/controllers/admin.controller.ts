@@ -14,6 +14,13 @@ import { AnalyticsService } from '../../analytics/services/analytics.service';
 import { Course } from '../../courses/models/course.model';
 import { Enrollment } from '../../enrollments/models/enrollment.model';
 import { QuizAttempt } from '../../quiz-attempts/models/quiz-attempt.model';
+import {
+  AddStudentService,
+  GetStudentListService,
+  LockStudentService,
+  UnlockStudentService,
+  UpdateStudentInfoService,
+} from '../application/services';
 import { AdminService } from '../services/admin.service';
 import {
   createStudentSchema,
@@ -36,7 +43,14 @@ const executeSchema = z.object({
 @Roles('ADMIN')
 @ApiBearerAuth('BearerAuth')
 export class AdminController {
-  constructor(private readonly codeExecution: CodeExecutionService) {}
+  constructor(
+    private readonly codeExecution: CodeExecutionService,
+    private readonly addStudentService: AddStudentService,
+    private readonly lockStudentService: LockStudentService,
+    private readonly unlockStudentService: UnlockStudentService,
+    private readonly getStudentListService: GetStudentListService,
+    private readonly updateStudentInfoService: UpdateStudentInfoService
+  ) {}
 
   @Post('students')
   @ApiOperation({ summary: 'Create a student account.' })
@@ -45,13 +59,18 @@ export class AdminController {
     @Body(new ZodValidationPipe(createStudentSchema))
     body: { email: string; password?: string; firstName: string; lastName: string }
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const result = await AdminService.createStudent(body);
+    const result = await this.addStudentService.execute({
+      adminId: this.getAdminId(admin),
+      email: body.email,
+      password: body.password,
+      firstName: body.firstName,
+      lastName: body.lastName,
+    });
     return ApiResponse.success({
       message: result.temporaryPasswordSent
         ? 'Student created successfully. Temporary password was sent by email.'
         : 'Student created successfully.',
-      data: result.student,
+      data: result.user,
       statusCode: 201,
     });
   }
@@ -63,11 +82,17 @@ export class AdminController {
     @Query(new ZodValidationPipe(listStudentsQuerySchema))
     query: { page: number; limit: number; search?: string; isActive?: boolean; isVerified?: boolean }
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const result = await AdminService.listStudents(query);
+    const result = await this.getStudentListService.execute({
+      adminId: this.getAdminId(admin),
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      isActive: query.isActive,
+      isVerified: query.isVerified,
+    });
     return ApiResponse.success({
       message: 'Students retrieved successfully.',
-      data: result.items,
+      data: result.students,
       meta: result.meta,
     });
   }
@@ -80,11 +105,17 @@ export class AdminController {
     @Body(new ZodValidationPipe(updateStudentSchema))
     body: { firstName?: string; lastName?: string; avatarUrl?: string; isVerified?: boolean }
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const student = await AdminService.updateStudent(studentId, body);
+    const result = await this.updateStudentInfoService.execute({
+      adminId: this.getAdminId(admin),
+      studentId,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      avatarUrl: body.avatarUrl,
+      isVerified: body.isVerified,
+    });
     return ApiResponse.success({
       message: 'Student updated successfully.',
-      data: student,
+      data: result.user,
     });
   }
 
@@ -96,11 +127,14 @@ export class AdminController {
     @Body(new ZodValidationPipe(lockStudentSchema))
     body: { lockedReason?: string }
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const student = await AdminService.lockStudent(studentId, body.lockedReason);
+    const result = await this.lockStudentService.execute({
+      adminId: this.getAdminId(admin),
+      studentId,
+      lockedReason: body.lockedReason,
+    });
     return ApiResponse.success({
       message: 'Student locked successfully.',
-      data: student,
+      data: result.user,
     });
   }
 
@@ -110,11 +144,13 @@ export class AdminController {
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id', new ZodValidationPipe(objectIdParamSchema)) studentId: string
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const student = await AdminService.unlockStudent(studentId);
+    const result = await this.unlockStudentService.execute({
+      adminId: this.getAdminId(admin),
+      studentId,
+    });
     return ApiResponse.success({
       message: 'Student unlocked successfully.',
-      data: student,
+      data: result.user,
     });
   }
 
@@ -169,10 +205,14 @@ export class AdminController {
   }
 
   private async ensureAdminCanManageStudents(admin?: AuthenticatedUser) {
+    const adminId = this.getAdminId(admin);
+    await AdminService.ensureActiveAdmin(adminId);
+  }
+
+  private getAdminId(admin?: AuthenticatedUser) {
     if (!admin) {
       throw new BadRequestError('Admin context not found.');
     }
-
-    await AdminService.ensureActiveAdmin(admin.id);
+    return admin.id;
   }
 }
