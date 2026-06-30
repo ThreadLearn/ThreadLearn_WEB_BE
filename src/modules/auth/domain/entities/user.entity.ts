@@ -74,6 +74,30 @@ export class UserEntity {
     });
   }
 
+  /**
+   * Tạo student do admin tạo (UC10 — mirror `AdminService.createStudent`).
+   * Reuse `createNew` (role=STUDENT, isActive=true, trim/lowercase) rồi `markEmailVerified`
+   * ⇒ `isVerified=true` + `emailVerifiedAt=now`. `passwordHash` đã hash sẵn ở adapter
+   * (KHÔNG bcrypt trong domain). KHÔNG generate password / gửi email / dựng response ở domain.
+   */
+  static createVerifiedStudent(input: {
+    email: string;
+    passwordHash: string;
+    firstName?: string;
+    lastName?: string;
+    now?: Date;
+  }): UserEntity {
+    const student = UserEntity.createNew({
+      email: input.email,
+      passwordHash: input.passwordHash,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      role: 'STUDENT',
+    });
+    student.markEmailVerified(input.now ?? new Date());
+    return student;
+  }
+
   get id(): string {
     return this.props.id;
   }
@@ -110,6 +134,29 @@ export class UserEntity {
     this.props.isActive = true;
     this.props.lockedAt = undefined;
     this.props.lockedReason = undefined;
+  }
+
+  /**
+   * Admin khoá student (UC11 — mirror `AdminService.lockStudent`). Reuse `lock`:
+   * set `isActive=false` + `lockedAt` + `lockedReason?`. KHÔNG đụng `lockedUntil`/
+   * `failedLoginAttempts` (admin-lock TÁCH BIỆT temporary login lock).
+   */
+  lockByAdmin(reason?: string, now: Date = new Date()): void {
+    this.lock(reason, now);
+  }
+
+  /**
+   * Admin mở khoá student (UC11 — mirror `AdminService.unlockStudent`). Reuse `unlock`:
+   * set `isActive=true` + clear `lockedAt`/`lockedReason`. KHÔNG đụng `lockedUntil`/
+   * `failedLoginAttempts`.
+   */
+  unlockByAdmin(): void {
+    this.unlock();
+  }
+
+  /** Đối tượng có thể được admin quản lý như student? (enforce role STUDENT ở application). */
+  canBeManagedAsStudent(): boolean {
+    return this.props.role === 'STUDENT';
   }
 
   deactivate(): void {
@@ -160,6 +207,39 @@ export class UserEntity {
     }
     if (input.avatarUrl !== undefined) {
       this.props.avatarUrl = input.avatarUrl.trim();
+    }
+  }
+
+  /**
+   * Admin cập nhật thông tin student (UC13 — mirror `AdminService.updateStudent`).
+   * CHỈ field legacy: `firstName`/`lastName`/`avatarUrl`/`isVerified`. `undefined` ⇒ KHÔNG đổi;
+   * string ⇒ trim (mirror zod `.trim()`). KHÔNG đụng `email`/`role`/`isActive`/`password`/`planType`.
+   * `isVerified=true` ⇒ set verified + `emailVerifiedAt=now` nếu trước đó chưa có (giữ giá trị cũ);
+   * `isVerified=false` ⇒ set unverified + clear `emailVerifiedAt` (mirror legacy đặt `undefined`).
+   */
+  updateStudentInfo(
+    input: { firstName?: string; lastName?: string; avatarUrl?: string; isVerified?: boolean },
+    now: Date = new Date()
+  ): void {
+    if (input.firstName !== undefined) {
+      this.props.firstName = input.firstName.trim();
+    }
+    if (input.lastName !== undefined) {
+      this.props.lastName = input.lastName.trim();
+    }
+    if (input.avatarUrl !== undefined) {
+      this.props.avatarUrl = input.avatarUrl.trim();
+    }
+    if (input.isVerified !== undefined) {
+      if (input.isVerified) {
+        this.props.isVerified = true;
+        if (!this.props.emailVerifiedAt) {
+          this.props.emailVerifiedAt = now;
+        }
+      } else {
+        this.props.isVerified = false;
+        this.props.emailVerifiedAt = undefined;
+      }
     }
   }
 
