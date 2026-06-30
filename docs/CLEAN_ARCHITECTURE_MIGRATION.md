@@ -52,6 +52,10 @@ AdminService cleanup was limited to audit plus method-level deprecation markers 
 
 Admin dashboard/statistics UC14 was audited only. Current endpoints are `GET /api/v1/admin/stats` (controller-level direct model counts) and `GET /api/v1/admin/dashboard/statistics` (static `AnalyticsService` with summary counts and monthly chart aggregates). `AnalyticsController` has no routes. No runtime code changed; detailed baseline and proposed Clean Architecture target are documented in `docs/DEV1_ADMIN_DASHBOARD_AUDIT.md`.
 
+## DEV1.8B Note (2026-06-30)
+
+Admin dashboard/statistics now has an additive domain reader port, exact query/result interfaces, and a Mongo infrastructure reader registered in `AdminModule` through `ADMIN_DASHBOARD_STATS_READER`. The reader mirrors the current `/stats` counts and `/dashboard/statistics` summary/chart aggregation data sources, but `AdminController`, `AnalyticsService`, route behavior, response shapes, auth, and validators were intentionally not migrated or changed in this phase.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:
