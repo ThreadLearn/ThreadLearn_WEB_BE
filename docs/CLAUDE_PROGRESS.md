@@ -1,5 +1,33 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.8A Admin Dashboard / Statistics Baseline Audit
+
+- **Date/time:** 2026-06-30 15:18:41 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files changed:**
+  - `docs/DEV1_ADMIN_DASHBOARD_AUDIT.md`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Endpoints found:**
+  - `GET /api/v1/admin/stats` -> `AdminController.getStats`, class-level `JwtAuthGuard` + `@Roles('ADMIN')` + `@ApiBearerAuth('BearerAuth')`, no query/body/param, no method-level Swagger, default 200, wraps with `ApiResponse.success`.
+  - `GET /api/v1/admin/dashboard/statistics` -> `AdminController.getDashboardStatistics`, same class-level auth, `@ApiOperation({ summary: 'Get admin dashboard statistics and chart data.' })`, query `{ from?, to?, months }` through `dashboardStatisticsQuerySchema`, default 200, wraps with `ApiResponse.success`.
+  - `AnalyticsController` exists at `/api/v1/analytics` but currently has no routes.
+- **Controllers/services/models involved:** `AdminController`, `AdminService.ensureActiveAdmin`, static `AnalyticsService`, direct models `User`, `Course`, `Enrollment`, `QuizAttempt` in `/stats`; `User`, `AIHistory`, `Course`, `Enrollment`, `Lesson`, `Notification`, `QuizAttempt` in `AnalyticsService`.
+- **Current dashboard/statistics behavior:** `/stats` directly counts users/courses/enrollments/quiz attempts in the controller. `/dashboard/statistics` re-checks active admin then calls `AnalyticsService.getAdminDashboardStatistics(query)`, which resolves a date range, counts summary totals, aggregates monthly chart counts, fills missing months with zero, and computes quiz average/pass rate.
+- **Current data sources:** See `docs/DEV1_ADMIN_DASHBOARD_AUDIT.md` for field-by-field mapping. No `UserStats`, CodeSubmission, Payment/Plan, or Quiz model is used by the current UC14 dashboard response.
+- **Current response shapes:** `/stats` returns `{ totalUsers, totalCourses, totalEnrollments, totalQuizAttempts }`. `/dashboard/statistics` returns `{ summary: { totalUsers, totalStudents, totalAdmins, activeStudents, lockedStudents, verifiedUsers, unverifiedUsers, newUsersThisMonth, totalCourses, totalLessons, totalEnrollments, totalQuizAttempts, totalAiRequests, totalNotifications, averageQuizScore, quizPassRate, activeUsersThisMonth }, charts: { newUsersByMonth, enrollmentsByMonth, quizAttemptsByMonth, coursesCreatedByMonth, lessonsCreatedByMonth } }`, where chart items are `{ month: 'YYYY-MM', count }`.
+- **Current validation/security behavior:** Both routes use class-level `JwtAuthGuard` and `@Roles('ADMIN')`; both call `ensureAdminCanManageStudents` -> `AdminService.ensureActiveAdmin`. `/dashboard/statistics` validates optional dates and `months` with Zod; `/stats` has no query/body validation.
+- **Coupling/layer issues:** `/stats` queries DB models directly in the controller. `AnalyticsService` imports many models and owns aggregation logic. Static service calls bypass DI/use-case boundaries. `getPlatformStats()` and `getUserProgress()` exist but have no current controller caller. Active-admin checking is repeated in addition to guard/role auth.
+- **Shared code available for reuse:** `JwtAuthGuard`, `Roles`, `CurrentUser`, `ApiResponse`, `BadRequestError`/`ForbiddenError`, `ZodValidationPipe`, existing `USER_REPOSITORY` for active-admin checks, and existing Admin student access helper pattern.
+- **Proposed Clean Architecture target:** Add `GetAdminStatsService` and `GetAdminDashboardStatisticsService`; add result DTOs mirroring exact current shapes; add a reader port such as `ADMIN_DASHBOARD_STATS_READER`; implement Mongo reader in infrastructure for counts/aggregates; keep controller decorators, validators, response messages, data shapes, and default status behavior unchanged. Migrate `/stats` first, then `/dashboard/statistics`.
+- **What was intentionally NOT changed:** No runtime code changed; no controller/service/model/validator route behavior changed; no `.env` or package metadata changed; no kernel/MongoDB issue addressed.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/dashboard scope (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB.
+- **Known issues/caveats:** Full HTTP smoke could not run because app boot did not complete. `/stats` still queries models directly and `AnalyticsService` remains static/model-coupled by design for this audit-only phase.
+- **Next recommended task:** DEV1.8B create dashboard/statistics domain/application DTO + reader port + infrastructure adapter without migrating controller yet, or migrate `/stats` first as the smallest bounded step.
+
 ## DEV1.7E AdminService Cleanup Audit + Partial Deprecation
 
 - **Date/time:** 2026-06-30 15:12:15 +07:00
