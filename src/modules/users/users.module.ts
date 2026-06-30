@@ -25,14 +25,17 @@ import {
  * và import `AuthModule` để dùng `USER_REPOSITORY` (User aggregate thuộc auth module).
  * AuthModule KHÔNG import UsersModule ⇒ KHÔNG circular dependency.
  *
- * GIỮ NGUYÊN runtime: `UsersController` vẫn dùng `UsersService` legacy (chưa migrate);
- * provider mới được đăng ký nhưng CHƯA inject vào controller (chuẩn bị cho DEV1.6D).
+ * DEV1.6D — `UsersController` đã migrate 3 route UC09 sang use-cases; KHÔNG còn dùng
+ * `UsersService` legacy trong request flow.
+ * DEV1.6E — `UsersService` được đánh dấu `@deprecated` nhưng GIỮ provider/export tạm cho
+ * rollback/compatibility (chưa boot smoke HTTP do nợ kernel `LEARNING_ACCESS_DATA`).
+ * Deletion provider/export để phase cleanup cuối.
  */
 @Module({
   imports: [AuthModule],
   controllers: [UsersController],
   providers: [
-    // Legacy (đang chạy thật — KHÔNG đổi)
+    // Legacy (@deprecated DEV1.6E — KHÔNG còn trong request flow; giữ tạm cho rollback)
     UsersService,
 
     // Infrastructure concrete adapters (DEV1.6B)
@@ -43,7 +46,7 @@ import {
     { provide: AVATAR_STORAGE, useExisting: LocalAvatarStorageService },
     { provide: USER_STATS_READER, useExisting: MongoUserStatsReaderService },
 
-    // Application use-cases (đăng ký provider; CHƯA inject vào controller)
+    // Application use-cases (đã inject vào UsersController từ DEV1.6D)
     GetMyProfileService,
     UpdateMyProfileService,
     UploadAvatarService,

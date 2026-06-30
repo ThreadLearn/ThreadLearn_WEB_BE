@@ -5,7 +5,7 @@
 - Date/time: 2026-06-30
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `users`
-- Task: **DEV1.6D Profile / Avatar UsersController Migration** (migrate 3 route UC09 — `GET /profile`, `PATCH /profile`, `POST /avatar` — sang use-cases `GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService`; giữ nguyên path/method/status/response shape/upload field; KHÔNG xoá `UsersService` legacy). Xem section §DEV1.6D. (Trước đó: DEV1.6A Audit, DEV1.6B Domain/Ports/Adapter, DEV1.6C Application Use-cases + DI.)
+- Task: **DEV1.6E UsersService Cleanup Audit + Deprecation** (audit toàn repo xác nhận `UsersController` không còn dùng `UsersService`/`saveUploadedFile`/model; thêm JSDoc `@deprecated` cho `UsersService`; sửa comment sai lệch trong `users.module.ts`; GIỮ provider/export cho rollback — KHÔNG xoá gì). Xem section §DEV1.6E. (Trước đó: DEV1.6A Audit, DEV1.6B Domain/Ports/Adapter, DEV1.6C Application Use-cases + DI, DEV1.6D Controller Migration.)
 
 ## Current Status
 
@@ -1921,3 +1921,81 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.6E — Deprecate/cleanup `UsersService` legacy:** thêm JSDoc `@deprecated`, cân nhắc gỡ provider/export sau khi smoke đủ 3 route UC09 (yêu cầu kernel `LEARNING_ACCESS_DATA` được sửa để boot + verify end-to-end).
+
+## DEV1.6E UsersService Cleanup Audit + Deprecation
+
+- **Date/time:** 2026-06-30
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `users` — audit + cleanup nhẹ + deprecation. **KHÔNG** xoá file/provider/export `UsersService`. Audit + deprecation only, KHÔNG phải deletion phase.
+
+### Files changed (4)
+
+- `src/modules/users/services/users.service.ts` — thêm JSDoc `@deprecated` trên class `UsersService` (KHÔNG đổi logic/signature/import/error message/response shape).
+- `src/modules/users/users.module.ts` — sửa **comment sai lệch** (module-doc + inline) phản ánh đúng trạng thái sau DEV1.6D/6E. **KHÔNG** đổi provider/export/imports thật.
+- `docs/CLAUDE_PROGRESS.md` (file này).
+- `docs/CLEAN_ARCHITECTURE_MIGRATION.md` — note ngắn DEV1.6E.
+
+### UsersService usage audit (`rg "UsersService" src`)
+
+- **Import/usage THẬT:** chỉ `users.module.ts` — `import` (L4) + provider (L36) + `exports` (L51). Giữ nguyên cho rollback.
+- **Self-definition:** `users.service.ts` (class L18 + `export default` L63).
+- **Chỉ comment/JSDoc (không phải usage):** `users.controller.ts` (1 dòng mô tả migration), `application/services/{get-my-profile,update-my-profile,upload-avatar}.service.ts` (JSDoc "mirror"), `infrastructure/services/mongo-user-stats-reader.service.ts`, `domain/interfaces/user-stats-reader.port.ts`, `auth/domain/entities/user.entity.ts` (JSDoc "mirror").
+- **`UsersController`:** KHÔNG còn import/reference thật (chỉ 1 comment). ✅
+- **Module khác:** KHÔNG có module nào ngoài `UsersModule` import `UsersService`. ✅ ⇒ deprecation an toàn.
+
+### Upload/helper usage audit (`rg "saveUploadedFile|FileInterceptor|MAX_FILE_SIZE_MB"`)
+
+- `saveUploadedFile` định nghĩa ở `src/configs/upload.ts`. **UsersController KHÔNG gọi trực tiếp** (chỉ 1 comment). ✅
+- `LocalAvatarStorageService` (infrastructure) **wrap** `saveUploadedFile(file, 'avatars')` — đúng layer. ✅
+- Consumer khác của `saveUploadedFile`: `lessons.controller.ts`, `course.controller.ts` — **ngoài scope DEV1**, KHÔNG đụng.
+- `FileInterceptor('avatar')` giữ ở controller; upload vẫn local disk; `MAX_FILE_SIZE_MB` enforce trong helper. KHÔNG đổi behavior.
+
+### Direct model import audit (`rg "UserModel|UserStats|models/user.model|gamification" src/modules/users`)
+
+- `users.service.ts` legacy: import `User` (auth/models) + `UserStats` (gamification/models) — hợp lệ cho legacy, **đã đánh dấu `@deprecated`**.
+- **Application:** KHÔNG import model thật — chỉ import port type (`IUserStatsReader`/`USER_STATS_READER` từ domain) + comment nhắc `UserStats`. ✅
+- **Infrastructure:** `MongoUserStatsReaderService` import `UserStats` model — nơi DUY NHẤT (scope users) chạm model gamification, đúng layer. ✅
+- **Controller:** KHÔNG import model (chỉ comment). ✅
+
+### Controller cleanup
+
+- KHÔNG sửa `users.controller.ts`: đã sạch từ DEV1.6D (không import `UsersService`/`saveUploadedFile`/model). Comment L36 mô tả ĐÚNG việc controller KHÔNG còn làm (không sai lệch) ⇒ giữ nguyên làm migration note.
+
+### Deprecation markers added
+
+- JSDoc `@deprecated` trên class `UsersService` (ghi rõ UC09 đã migrate sang use-cases DEV1.6D, giữ tạm cho rollback, KHÔNG còn consumer request flow).
+- Comment `users.module.ts`: module-doc cập nhật trạng thái DEV1.6D/6E; inline provider `UsersService` đánh dấu `@deprecated DEV1.6E`; comment use-cases sửa "CHƯA inject" → "đã inject từ DEV1.6D".
+
+### UsersModule provider/export decision
+
+- **GIỮ NGUYÊN** provider + export `UsersService` (rollback/compatibility; chưa smoke HTTP được do kernel debt). Chỉ sửa comment sai lệch. KHÔNG gỡ provider/export trong phase này.
+
+### What was intentionally NOT changed
+
+- KHÔNG xoá `UsersService` file/provider/export/methods, model, validator. KHÔNG đổi logic/signature/import/error message của `UsersService`. KHÔNG đổi route/method/status/response shape/message. KHÔNG đổi upload field `avatar`/`FileInterceptor`/local storage/static `/uploads`/`MAX_FILE_SIZE_MB`. KHÔNG sửa Auth module/runtime, `src/common/**`, `src/utils/**`, `src/configs/upload.ts`, `.env`, `package.json`. KHÔNG sửa nợ kernel `LEARNING_ACCESS_DATA`. KHÔNG commit tự động. KHÔNG thêm runtime log.
+
+### Runtime / API / Upload / Security compatibility
+
+- **Runtime:** zero change — chỉ JSDoc/comment. Request flow UC09 vẫn qua use-cases (DEV1.6D).
+- **API:** path/method/status/response shape không đổi.
+- **Upload/storage:** field `avatar`, `FileInterceptor` memory, local disk `/uploads/avatars/...`, no-mime/no-delete-old không đổi.
+- **Security:** không thêm log; không lộ secret/token/password; presenter whitelist giữ nguyên.
+
+### Build / Lint / Test / Self-check result
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (0 ở file đổi). `npm test`: ✅ 13/13.
+- Self-check: ✅ `users.controller.ts` match `UsersService`/`saveUploadedFile` chỉ là **1 comment**, KHÔNG import model/`src/utils`. ✅ `users/application` không import mongoose/model/schema/infrastructure/`src/utils`/`UsersService`/`AuthService` thật (match là JSDoc + port symbol `IUserStatsReader`/`USER_STATS_READER`). ✅ `UsersService` import thật còn lại đúng 1 nơi: `users.module.ts` provider/export.
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` (`EnrollInCourseService`/`EnrollmentsModule`) — KHÔNG do Users cleanup. KHÔNG có lỗi DI mới. Smoke HTTP bị chặn (pre-existing, ngoài scope DEV1) — KHÔNG sửa kernel.
+
+### Known issues/caveats
+
+1. `UsersService` vẫn là provider/export dù `@deprecated` + không còn consumer request flow — dead-ish runtime, giữ cho rollback. Deletion để phase cleanup cuối.
+2. Smoke HTTP 3 route UC09 vẫn bị chặn bởi nợ kernel `LEARNING_ACCESS_DATA` (pre-existing) ⇒ chưa verify end-to-end trước khi deletion.
+3. `saveUploadedFile` vẫn được `lessons`/`course` controller gọi trực tiếp (ngoài scope DEV1) — KHÔNG đụng.
+
+### Next recommended task
+
+- **DEV1.6F (deletion, sau khi kernel `LEARNING_ACCESS_DATA` được sửa + smoke đủ 3 route UC09):** gỡ provider/export `UsersService` khỏi `UsersModule`, xoá `users.service.ts` legacy + clean import `User`/`UserStats` không còn dùng. Hoặc chuyển sang module DEV1 kế tiếp (admin/dashboard) nếu deletion còn bị chặn bởi kernel debt.
