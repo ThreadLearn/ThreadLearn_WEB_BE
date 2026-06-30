@@ -1,5 +1,34 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.7E AdminService Cleanup Audit + Partial Deprecation
+
+- **Date/time:** 2026-06-30 15:12:15 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files changed:**
+  - `src/modules/admin/services/admin.service.ts`
+  - `src/modules/admin/admin.module.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **AdminService usage audit:** `rg "AdminService" src` shows real runtime references in `AdminController` (`ensureActiveAdmin` only) and `AdminModule` provider/export. Other matches are the class/export itself or comments/JSDoc in auth/admin/domain/infra docs. The five UC10-UC13 student route methods no longer call `AdminService`.
+- **AdminController route usage audit:** Migrated routes `createStudent`, `listStudents`, `updateStudent`, `lockStudent`, and `unlockStudent` call DEV1.7C use-cases. Non-migrated routes `stats` and `dashboard/statistics` still call `ensureAdminCanManageStudents()`, which uses `AdminService.ensureActiveAdmin`. `execute` stays on `CodeExecutionService` and was not changed.
+- **Direct model import audit:** `AdminController` still imports `User`, `Course`, `Enrollment`, and `QuizAttempt` for the legacy `/stats` route only. `AdminService` still imports `User`, `UserStats`, `Course`, `EmailService`, bcrypt, and crypto for retained legacy/rollback methods. `admin/application` has no direct model/infra/legacy-service imports. `admin/infrastructure` uses `EmailService` only in the invitation adapter, which is the intended layer.
+- **Controller cleanup:** No controller cleanup was needed. `AdminService` import remains because non-migrated stats/dashboard admin checks still use `ensureActiveAdmin`. Student route logic was not changed in this phase.
+- **Deprecation markers added:** Added method-level `@deprecated` JSDoc to legacy student-management methods `createStudent`, `listStudents`, `updateStudent`, `lockStudent`, `unlockStudent`, plus student-only helpers `getStudentOrThrow`, `generateTemporaryPassword`, `escapeRegex`, and `toSafeStudent`. No runtime logic/signature/import/message changed.
+- **AdminModule provider/export decision:** Kept `AdminService` provider/export, student use-case providers, and `INVITATION_EMAIL` provider. Updated only the module comment to note that student routes are migrated while provider/export remains for non-migrated admin routes and rollback compatibility.
+- **What was intentionally NOT changed:** No route, response shape, auth decorator, validator, stats/dashboard/execute behavior, model, provider/export, `.env`, package metadata, `AdminService` logic, `EmailService`, or kernel `LEARNING_ACCESS_DATA` change.
+- **Runtime compatibility:** Runtime behavior is unchanged except for comments/JSDoc metadata. Deprecated legacy methods are retained for rollback.
+- **API compatibility:** No API path/status/message/shape changed.
+- **Authorization compatibility:** Admin authorization decorators are unchanged. `AdminService.ensureActiveAdmin` remains available for non-migrated routes.
+- **Email/UserStats compatibility:** Existing legacy email/stats code remains in deprecated rollback methods; active student route flow continues through use-cases/ports.
+- **Security compatibility:** No password/token/secret logging or exposure was added. No generated temporary password is documented or logged.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/auth (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** Student route names/use-case class names appear as expected. `AdminService` remains only for non-migrated admin checks/provider/export and comments. `admin/application` checks are clean. `admin/domain` matches are JSDoc/comment text in `INVITATION_EMAIL` port. `admin/infrastructure` guard/decorator/ApiResponse checks are clean.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB. Isolated `NestFactory.createApplicationContext(AdminModule)` on `dist` passed with `AdminModule context OK`.
+- **Known issues/caveats:** Full HTTP smoke still blocked by MongoDB connection timeout in this environment. `/stats` still queries models directly in `AdminController`; this is a known out-of-scope legacy caveat.
+- **Next recommended task:** Plan a bounded DEV1 admin stats/dashboard migration (UC14) or defer to cleanup after kernel/app boot smoke is stable.
+
 ## DEV1.7D AdminController Migration - Student Management UC10-UC13
 
 - **Date/time:** 2026-06-30 14:54:38 +07:00

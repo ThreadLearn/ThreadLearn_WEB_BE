@@ -56,6 +56,10 @@ export class AdminService {
     assertUserCanAuthenticate(admin);
   }
 
+  /**
+   * @deprecated Student management request flow has been migrated to Clean Architecture
+   * use-cases in DEV1.7D. Retained temporarily for rollback/compatibility until final cleanup.
+   */
   static async createStudent(data: CreateStudentData) {
     const existing = await User.findOne({ email: data.email });
     if (existing) {
@@ -98,6 +102,10 @@ export class AdminService {
     };
   }
 
+  /**
+   * @deprecated Student management request flow has been migrated to Clean Architecture
+   * use-cases in DEV1.7D. Retained temporarily for rollback/compatibility until final cleanup.
+   */
   static async listStudents(query: ListStudentsQuery) {
     const filter: any = { role: 'STUDENT' };
     if (query.isActive !== undefined) filter.isActive = query.isActive;
@@ -125,6 +133,10 @@ export class AdminService {
     };
   }
 
+  /**
+   * @deprecated Student management request flow has been migrated to Clean Architecture
+   * use-cases in DEV1.7D. Retained temporarily for rollback/compatibility until final cleanup.
+   */
   static async updateStudent(studentId: string, data: UpdateStudentData) {
     const student = await this.getStudentOrThrow(studentId);
 
@@ -140,6 +152,10 @@ export class AdminService {
     return this.toSafeStudent(student);
   }
 
+  /**
+   * @deprecated Student management request flow has been migrated to Clean Architecture
+   * use-cases in DEV1.7D. Retained temporarily for rollback/compatibility until final cleanup.
+   */
   static async lockStudent(studentId: string, lockedReason?: string) {
     const student = await this.getStudentOrThrow(studentId);
     student.isActive = false;
@@ -149,6 +165,10 @@ export class AdminService {
     return this.toSafeStudent(student);
   }
 
+  /**
+   * @deprecated Student management request flow has been migrated to Clean Architecture
+   * use-cases in DEV1.7D. Retained temporarily for rollback/compatibility until final cleanup.
+   */
   static async unlockStudent(studentId: string) {
     const student = await this.getStudentOrThrow(studentId);
     student.isActive = true;
@@ -193,6 +213,10 @@ export class AdminService {
     return true;
   }
 
+  /**
+   * @deprecated Only used by deprecated student-management legacy methods.
+   * Retained temporarily for rollback/compatibility until final cleanup.
+   */
   private static async getStudentOrThrow(studentId: string) {
     const student = await User.findById(studentId);
     if (!student) {
@@ -206,14 +230,26 @@ export class AdminService {
     return student;
   }
 
+  /**
+   * @deprecated Only used by deprecated student-management legacy methods.
+   * Retained temporarily for rollback/compatibility until final cleanup.
+   */
   private static generateTemporaryPassword() {
     return crypto.randomBytes(12).toString('base64url');
   }
 
+  /**
+   * @deprecated Only used by deprecated student-management legacy methods.
+   * Retained temporarily for rollback/compatibility until final cleanup.
+   */
   private static escapeRegex(value: string) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  /**
+   * @deprecated Only used by deprecated student-management legacy methods.
+   * Retained temporarily for rollback/compatibility until final cleanup.
+   */
   private static toSafeStudent(user: any) {
     return sanitizeUser(user);
   }
