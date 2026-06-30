@@ -1,5 +1,35 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.8D AdminController Migration - Dashboard / Statistics UC14
+
+- **Date/time:** 2026-06-30 15:46:28 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files changed:**
+  - `src/modules/admin/controllers/admin.controller.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Routes migrated:**
+  - `GET /api/v1/admin/stats`
+  - `GET /api/v1/admin/dashboard/statistics`
+- **Routes intentionally NOT migrated:** `POST /api/v1/admin/execute`, `POST /api/v1/admin/students`, `GET /api/v1/admin/students`, `PATCH /api/v1/admin/students/:id`, `PATCH /api/v1/admin/students/:id/lock`, `PATCH /api/v1/admin/students/:id/unlock`, analytics controller routes, and any other admin route outside UC14.
+- **Legacy controller behavior found:** `/stats` used `@Get('stats')`, no `@HttpCode`, default 200, `@CurrentUser()` + `getAdminId`, active-admin re-check through `AdminService.ensureActiveAdmin`, direct `User`/`Course`/`Enrollment`/`QuizAttempt.countDocuments`, message `Admin dashboard statistics retrieved.`, and flat data `{ totalUsers, totalCourses, totalEnrollments, totalQuizAttempts }`. `/dashboard/statistics` used `@Get('dashboard/statistics')`, `@ApiOperation`, `@Query(new ZodValidationPipe(dashboardStatisticsQuerySchema))`, default 200, active-admin re-check, `AnalyticsService.getAdminDashboardStatistics(query)`, same message, and data `{ summary, charts }`.
+- **Controller changes:** Injected `GetAdminBasicStatsService` and `GetAdminDashboardStatisticsService`. Replaced only the two UC14 route bodies to call those use-cases with `adminId: this.getAdminId(admin)` and existing query fields. Kept `ApiResponse.success`, messages, decorators, query pipe, and `getAdminId` behavior.
+- **Use cases used:** `GetAdminBasicStatsService` for `/stats`; `GetAdminDashboardStatisticsService` for `/dashboard/statistics`.
+- **Response shape compatibility:** `/stats` still returns flat `{ totalUsers, totalCourses, totalEnrollments, totalQuizAttempts }`. `/dashboard/statistics` still returns `{ summary, charts }`; no wrapper such as `{ stats }` or `{ statistics }` was added.
+- **API path/status compatibility:** Paths, HTTP methods, class-level decorators, and default 200 status behavior are unchanged.
+- **Query/validator compatibility:** `dashboardStatisticsQuerySchema` and `ZodValidationPipe` remain unchanged; query fields remain `{ from?, to?, months }` with existing defaults handled by the validator.
+- **Authorization compatibility:** Class-level `JwtAuthGuard`, `@Roles('ADMIN')`, `@ApiBearerAuth('BearerAuth')`, `@CurrentUser`, `getAdminId`, and active-admin re-check behavior are preserved through the new use-cases.
+- **AnalyticsService/AdminService usage after migration:** `AdminController` no longer imports or calls `AnalyticsService` or `AdminService`. The files/providers remain untouched for legacy/rollback and non-controller compatibility.
+- **Direct model import cleanup:** Removed `User`, `Course`, `Enrollment`, and `QuizAttempt` imports from `AdminController`; controller no longer calls `countDocuments` or aggregate/statics for UC14.
+- **What was intentionally NOT changed:** Did not modify `AdminService`, `AnalyticsService`, `AdminModule`, application services/DTOs, domain ports, infrastructure reader, validators, common shared code, models, `.env`, package metadata, or kernel/learning-access behavior.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/dashboard scope (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** Controller forbidden model/static-service search is empty; controller use-case search shows the two dashboard use-cases imported/injected/used. `admin/application` and `admin/infrastructure` checks are clean. `admin/domain` scan reports only existing comment prose in `invitation-email.port.ts` mentioning infrastructure/application.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB. Isolated built `AdminModule` DI smoke passed with `AdminModule context OK`.
+- **Known issues/caveats:** Full HTTP/manual route smoke remains blocked by MongoDB connection timeout in this environment. `AdminService` and `AnalyticsService` still exist by design; only controller usage for the two UC14 routes was removed.
+- **Next recommended task:** DEV1.8E cleanup audit/deprecation can reassess remaining legacy admin/dashboard code and decide whether `AnalyticsService`/legacy stats helpers are still needed after all callers are checked.
+
 ## DEV1.8C Admin Dashboard / Statistics Application Use Cases + DI Wiring
 
 - **Date/time:** 2026-06-30 15:35:46 +07:00

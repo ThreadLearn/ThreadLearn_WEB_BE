@@ -8,20 +8,16 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { User } from '../../auth/models/user.model';
 import { CodeExecutionService } from '../../code-execution/application/services/code-execution.service';
-import { AnalyticsService } from '../../analytics/services/analytics.service';
-import { Course } from '../../courses/models/course.model';
-import { Enrollment } from '../../enrollments/models/enrollment.model';
-import { QuizAttempt } from '../../quiz-attempts/models/quiz-attempt.model';
 import {
   AddStudentService,
+  GetAdminBasicStatsService,
+  GetAdminDashboardStatisticsService,
   GetStudentListService,
   LockStudentService,
   UnlockStudentService,
   UpdateStudentInfoService,
 } from '../application/services';
-import { AdminService } from '../services/admin.service';
 import {
   createStudentSchema,
   dashboardStatisticsQuerySchema,
@@ -49,7 +45,9 @@ export class AdminController {
     private readonly lockStudentService: LockStudentService,
     private readonly unlockStudentService: UnlockStudentService,
     private readonly getStudentListService: GetStudentListService,
-    private readonly updateStudentInfoService: UpdateStudentInfoService
+    private readonly updateStudentInfoService: UpdateStudentInfoService,
+    private readonly getAdminBasicStatsService: GetAdminBasicStatsService,
+    private readonly getAdminDashboardStatisticsService: GetAdminDashboardStatisticsService
   ) {}
 
   @Post('students')
@@ -156,22 +154,13 @@ export class AdminController {
 
   @Get('stats')
   async getStats(@CurrentUser() admin: AuthenticatedUser) {
-    await this.ensureAdminCanManageStudents(admin);
-    const [totalUsers, totalCourses, totalEnrollments, totalAttempts] = await Promise.all([
-      User.countDocuments(),
-      Course.countDocuments(),
-      Enrollment.countDocuments(),
-      QuizAttempt.countDocuments(),
-    ]);
+    const stats = await this.getAdminBasicStatsService.execute({
+      adminId: this.getAdminId(admin),
+    });
 
     return ApiResponse.success({
       message: 'Admin dashboard statistics retrieved.',
-      data: {
-        totalUsers,
-        totalCourses,
-        totalEnrollments,
-        totalQuizAttempts: totalAttempts,
-      },
+      data: stats,
     });
   }
 
@@ -182,8 +171,12 @@ export class AdminController {
     @Query(new ZodValidationPipe(dashboardStatisticsQuerySchema))
     query: { from?: string; to?: string; months: number }
   ) {
-    await this.ensureAdminCanManageStudents(admin);
-    const statistics = await AnalyticsService.getAdminDashboardStatistics(query);
+    const statistics = await this.getAdminDashboardStatisticsService.execute({
+      adminId: this.getAdminId(admin),
+      from: query.from,
+      to: query.to,
+      months: query.months,
+    });
     return ApiResponse.success({
       message: 'Admin dashboard statistics retrieved.',
       data: statistics,
@@ -202,11 +195,6 @@ export class AdminController {
       message: 'Code execution completed.',
       data: result,
     });
-  }
-
-  private async ensureAdminCanManageStudents(admin?: AuthenticatedUser) {
-    const adminId = this.getAdminId(admin);
-    await AdminService.ensureActiveAdmin(adminId);
   }
 
   private getAdminId(admin?: AuthenticatedUser) {
