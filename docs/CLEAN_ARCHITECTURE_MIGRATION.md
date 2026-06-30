@@ -36,6 +36,10 @@ Self-check (chạy từ repo root) — xem REFACTOR_PLAN_DEV1.md §10 (`npx tsc 
 
 ---
 
+## DEV1.7C Note (2026-06-30)
+
+Admin student management UC10-UC13 now has application DTO/result types, an admin safe-user presenter, active-admin/student access helper, five use-case services, and `AdminModule` DI wiring via `AuthModule` exports (`USER_REPOSITORY`, `PASSWORD_HASHER`, `USER_STATS_PROVISIONER`) plus the existing `INVITATION_EMAIL` adapter. `AdminController` was intentionally not migrated, so API routes, response shape, HTTP status, and authorization behavior remain unchanged.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:
