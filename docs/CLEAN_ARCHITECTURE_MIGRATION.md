@@ -48,6 +48,10 @@ The five Admin student management routes now call Clean Architecture use-cases f
 
 AdminService cleanup was limited to audit plus method-level deprecation markers for legacy student-management rollback methods. `AdminService` itself, its provider/export, stats/dashboard/execute behavior, and legacy model imports were retained because non-migrated admin routes still need existing compatibility. No API path, response shape, validator, or authorization behavior changed.
 
+## DEV1.8A Note (2026-06-30)
+
+Admin dashboard/statistics UC14 was audited only. Current endpoints are `GET /api/v1/admin/stats` (controller-level direct model counts) and `GET /api/v1/admin/dashboard/statistics` (static `AnalyticsService` with summary counts and monthly chart aggregates). `AnalyticsController` has no routes. No runtime code changed; detailed baseline and proposed Clean Architecture target are documented in `docs/DEV1_ADMIN_DASHBOARD_AUDIT.md`.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:
