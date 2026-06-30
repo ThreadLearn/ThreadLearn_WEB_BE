@@ -60,6 +60,10 @@ Admin dashboard/statistics now has an additive domain reader port, exact query/r
 
 Admin dashboard/statistics now has application DTO/result types plus two use-cases, `GetAdminBasicStatsService` and `GetAdminDashboardStatisticsService`, wired in `AdminModule`. Both use `USER_REPOSITORY` for active-admin lookup and `ADMIN_DASHBOARD_STATS_READER` for data reads. `AdminController`, `AdminService`, `AnalyticsService`, routes, validators, auth decorators, status behavior, and response shapes remain unchanged.
 
+## DEV1.8D Note (2026-06-30)
+
+AdminController now delegates `GET /api/v1/admin/stats` to `GetAdminBasicStatsService` and `GET /api/v1/admin/dashboard/statistics` to `GetAdminDashboardStatisticsService`. Route decorators, query validation, default status behavior, response messages, response shapes, and admin authorization behavior were preserved. Direct dashboard model counts plus `AnalyticsService`/`AdminService` calls were removed from the controller only.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:
