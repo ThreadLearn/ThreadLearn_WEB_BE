@@ -1,5 +1,38 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.7D AdminController Migration - Student Management UC10-UC13
+
+- **Date/time:** 2026-06-30 14:54:38 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files changed:**
+  - `src/modules/admin/controllers/admin.controller.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Routes migrated:**
+  - `POST /api/v1/admin/students`
+  - `GET /api/v1/admin/students`
+  - `PATCH /api/v1/admin/students/:id`
+  - `PATCH /api/v1/admin/students/:id/lock`
+  - `PATCH /api/v1/admin/students/:id/unlock`
+- **Routes intentionally NOT migrated:** `GET /api/v1/admin/stats`, `GET /api/v1/admin/dashboard/statistics`, `POST /api/v1/admin/execute`, and any other admin route outside UC10-UC13.
+- **Legacy controller behavior found:** Student routes had no method-level `@HttpCode`; `POST` therefore remains Nest default 201 and others remain 200. Validators/pipes are unchanged: `createStudentSchema`, `listStudentsQuerySchema`, `objectIdParamSchema`, `updateStudentSchema`, `lockStudentSchema`. Messages and shapes were: add `data: SafeUser` plus generated-password-dependent message, list `data: SafeUser[]` plus `meta { page, limit, total, totalPages }`, update/lock/unlock `data: SafeUser`.
+- **Controller changes:** Injected the five DEV1.7C use-cases and replaced only the five student route bodies. Added `getAdminId()` to keep `Admin context not found.` before calling use-cases. The existing `ensureAdminCanManageStudents()` remains for non-migrated stats/dashboard routes.
+- **Use cases used:** `AddStudentService`, `GetStudentListService`, `UpdateStudentInfoService`, `LockStudentService`, `UnlockStudentService`.
+- **Response shape compatibility:** Preserved flat SafeUser `data` for add/update/lock/unlock, list array `data`, and list `meta`.
+- **API path/status compatibility:** Controller path, method decorators, status behavior, validators, and Swagger decorators were preserved.
+- **Authorization compatibility:** Class-level `JwtAuthGuard`, `@Roles('ADMIN')`, and `@ApiBearerAuth('BearerAuth')` are unchanged. Active-admin re-check for migrated routes now happens inside the use-cases via `USER_REPOSITORY`.
+- **Email/UserStats compatibility:** Controller no longer touches email/stats for student routes; add-student behavior flows through `INVITATION_EMAIL` and `USER_STATS_PROVISIONER` in the use-case.
+- **Security compatibility:** Controller does not log or return generated passwords, does not hash password directly, and does not import email/stats/password utilities for migrated routes.
+- **AdminService usage after migration:** `AdminService` is no longer called by the five migrated student routes. It remains imported and used only by `ensureAdminCanManageStudents()` for non-migrated stats/dashboard routes.
+- **What was intentionally NOT changed:** `AdminService`, `EmailService`, `AdminModule`, domain/application/infrastructure code, auth/gamification/common/utils, validators, route decorators, messages, status behavior, `.env`, and package metadata.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/auth (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** Domain/application/infrastructure checks clean except existing comments/JSDoc in auth/admin domain. Direct controller check confirms the five use-cases are imported/injected/used. `AdminService` remains only for non-migrated stats/dashboard admin check. Controller model imports remain from the pre-existing `/stats` route, which was intentionally not migrated in this phase.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB in this environment. Isolated `NestFactory.createApplicationContext(AdminModule)` on `dist` passed with `AdminModule context OK`.
+- **Known issues/caveats:** Full HTTP smoke could not run because app boot did not complete before MongoDB connection timeout. `/stats` still queries models directly in the controller because it was explicitly out of scope for DEV1.7D.
+- **Next recommended task:** DEV1.7E cleanup audit/deprecate or plan the next bounded migration for admin stats/dashboard without changing API shape.
+
 ## DEV1.7C Admin Student Management Application Use Cases + DI Wiring
 
 - **Date/time:** 2026-06-30 14:35:06 +07:00
