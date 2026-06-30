@@ -9,6 +9,12 @@ type UpdateProfileData = {
   avatarUrl?: string;
 };
 
+/**
+ * @deprecated Profile/avatar request flow (UC09: GET/PATCH `/users/profile`, POST `/users/avatar`)
+ * đã migrate sang Clean Architecture use-cases (`GetMyProfileService`/`UpdateMyProfileService`/
+ * `UploadAvatarService`) ở DEV1.6D. Legacy service này được GIỮ tạm cho rollback/compatibility
+ * cho tới phase cleanup cuối (deletion). KHÔNG còn consumer nào trong request flow.
+ */
 export class UsersService {
   static async getProfile(userId: string) {
     const user = await User.findById(userId).select('-passwordHash');
