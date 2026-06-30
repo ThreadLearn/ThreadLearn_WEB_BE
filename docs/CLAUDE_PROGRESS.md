@@ -2,10 +2,10 @@
 
 ## Last Updated
 
-- Date/time: 2026-06-25
+- Date/time: 2026-06-30
 - Branch: `refactor/dev1-clean-architecture`
-- Module: DEV1 / `auth`
-- Task: **DEV1.4A AuthModule Provider Wiring Only** (đăng ký 4 repo adapter + 4 service adapter + 8 port token mapping + 10 use-case provider trong `auth.module.ts`; CHƯA chuyển controller; KHÔNG đổi runtime). Xem section cuối file. (Trước đó: DEV1.1 Skeleton, DEV1.2 Adapters, DEV1.3A Register/Login, DEV1.3B Verify/Resend/Forgot/Reset, DEV1.3C Refresh/Logout/Session, DEV1.3D Google Login.)
+- Module: DEV1 / `users`
+- Task: **DEV1.6D Profile / Avatar UsersController Migration** (migrate 3 route UC09 — `GET /profile`, `PATCH /profile`, `POST /avatar` — sang use-cases `GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService`; giữ nguyên path/method/status/response shape/upload field; KHÔNG xoá `UsersService` legacy). Xem section §DEV1.6D. (Trước đó: DEV1.6A Audit, DEV1.6B Domain/Ports/Adapter, DEV1.6C Application Use-cases + DI.)
 
 ## Current Status
 
@@ -1840,3 +1840,84 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.6D — Migrate `UsersController` sang use-cases:** inject `GetMyProfileService`/`UpdateMyProfileService`/`UploadAvatarService`; 3 route đổi sang `this.<service>.execute(...)` (`data: result` uniform), giữ nguyên path/method/status/guard/Swagger/validator/`FileInterceptor('avatar')`/`ApiResponse`. Sau đó cân nhắc `@deprecated` `UsersService` legacy (DEV1.6E cleanup) sau khi smoke đủ route (cần kernel `LEARNING_ACCESS_DATA` được sửa trước).
+
+## DEV1.6D Profile / Avatar UsersController Migration
+
+- **Date/time:** 2026-06-30
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `users` (controller) — migrate `UsersController` sang Clean Architecture use-cases (UC09). Legacy `UsersService` **không** xoá.
+
+### Files changed
+
+- `src/modules/users/controllers/users.controller.ts` — migrate 3 route sang use-cases.
+- `docs/CLAUDE_PROGRESS.md` (file này).
+- `docs/CLEAN_ARCHITECTURE_MIGRATION.md` — thêm note ngắn DEV1.6D.
+- (KHÔNG đổi `users.module.ts` — provider 3 use-case đã wire ở DEV1.6C, đủ để inject; build/boot không bắt buộc sửa.)
+
+### Routes migrated (3)
+
+- `GET   /api/v1/users/profile` → `GetMyProfileService.execute({ userId })`.
+- `PATCH /api/v1/users/profile` → `UpdateMyProfileService.execute({ userId, firstName, lastName, avatarUrl })`.
+- `POST  /api/v1/users/avatar`  → `UploadAvatarService.execute({ userId, file })`.
+
+### Legacy controller behavior found (mirror 1:1)
+
+- **GET /profile:** `@Get('profile')`, class-level `JwtAuthGuard` + `@ApiBearerAuth('BearerAuth')`; `@CurrentUser() user?` → `user.id`; `!user` ⇒ `BadRequestError('User context not found.')`; gọi `UsersService.getProfile(user.id)`; `ApiResponse.success({ message: 'Profile retrieved successfully.', data })`; data = `{ user: sanitizeUser, stats }`; status 200.
+- **PATCH /profile:** `@Patch('profile')` + `@ApiOperation`; body qua `ZodValidationPipe(updateProfileSchema)` → `{firstName?,lastName?,avatarUrl?}`; `!user` ⇒ `BadRequestError('User context not found.')`; gọi `UsersService.updateProfile(user.id, body)`; `ApiResponse.success({ message: 'Profile updated successfully.', data })`; data = `sanitizeUser` (phẳng); status 200.
+- **POST /avatar:** `@Post('avatar')` + `@UseInterceptors(FileInterceptor('avatar'))` + `@ApiConsumes('multipart/form-data')`; `@UploadedFile() file?`; toàn thân bọc `try/catch`: `!user` ⇒ `BadRequestError('User context not found.')`, `!file` ⇒ `BadRequestError('No avatar file provided in FormData.')`, `saveUploadedFile(file,'avatars')` → `UsersService.updateAvatar(user.id, fileUrl)`; `catch` re-throw `BadRequestError`/`BadRequestException` nguyên trạng, các lỗi khác ⇒ `BadRequestError('Failed to parse multipart/form-data for avatar upload.')`; `ApiResponse.success({ message: 'Avatar uploaded successfully.', data })`; data = `sanitizeUser` (phẳng); status 201.
+
+### Controller changes
+
+- Thêm `constructor` inject 3 use-case (`getMyProfileService`/`updateMyProfileService`/`uploadAvatarService`).
+- Body 3 route đổi sang `this.<service>.execute(...)` với `data: result` (use-case trả đúng shape legacy).
+- **PATCH:** truyền `firstName`/`lastName`/`avatarUrl` từ body (đúng tập field legacy) — không thêm field ngoài.
+- **POST avatar:** giữ nguyên `try/catch` wrapper legacy (preserve error-conversion); bỏ check `!file` trong controller vì use-case throw **đúng cùng** `BadRequestError('No avatar file provided in FormData.')` và được `try/catch` re-throw nguyên trạng; bỏ gọi `saveUploadedFile` trực tiếp (chuyển vào `AVATAR_STORAGE` adapter qua use-case).
+- **Imports removed:** `UsersService` (chỉ dùng static, không inject) + `saveUploadedFile`. **Imports added:** 3 use-case từ `../application/services`. Giữ `BadRequestError`/`BadRequestException`/`CurrentUser`/`JwtAuthGuard`/`ZodValidationPipe`/`updateProfileSchema`/`ApiResponse`/`AuthenticatedUser`/Swagger decorators.
+
+### Use cases used
+
+- `GetMyProfileService`, `UpdateMyProfileService`, `UploadAvatarService` (đã tạo + wire provider ở DEV1.6C).
+
+### Response shape compatibility
+
+- GET: `{ user: ProfileSafeUser, stats }` ≡ legacy `{ user: sanitizeUser, stats }`. PATCH & POST: `ProfileSafeUser` phẳng ≡ legacy `sanitizeUser` phẳng (không bọc `{ user }`). Message strings giữ nguyên từng route.
+
+### API path / status compatibility
+
+- Path/method/status không đổi: GET 200, PATCH 200, POST 201. Guard class-level + `@ApiBearerAuth` giữ nguyên. Validator/pipe `ZodValidationPipe(updateProfileSchema)` giữ nguyên.
+
+### Upload / storage compatibility
+
+- Field upload `avatar`, `FileInterceptor` memory, `@ApiConsumes('multipart/form-data')` giữ nguyên. Ghi disk local + URL `/uploads/avatars/<timestamp>-<filename>` qua `LocalAvatarStorageService` (wrap `saveUploadedFile`). KHÔNG validate mime, KHÔNG xoá avatar cũ, KHÔNG đổi static `/uploads`.
+
+### Security compatibility
+
+- Presenter whitelist (không lộ passwordHash/token/secret/googleId/githubId/lockedAt). Không log file buffer / absolute path. Controller không import model/schema/`src/utils`/infrastructure.
+
+### UsersService usage after migration
+
+- `UsersController` **không còn** tham chiếu `UsersService` (chỉ còn 1 dòng JSDoc nhắc tên — không phải import/usage). File/provider/export `UsersService` legacy **giữ nguyên** (deprecation/cleanup để phase sau). `UsersModule` không đổi.
+
+### What was intentionally NOT changed
+
+- KHÔNG xoá `UsersService` legacy (file/provider/export/methods), model, validator. KHÔNG đổi route/method/status/response shape/message. KHÔNG đổi upload field `avatar`/`FileInterceptor`/local storage/static `/uploads`. KHÔNG validate mime. KHÔNG xoá avatar cũ. KHÔNG sửa `src/common/**`/`src/utils/**`/`src/configs/upload.ts`/`.env`/`package.json`. KHÔNG sửa nợ kernel `LEARNING_ACCESS_DATA`. KHÔNG commit tự động.
+
+### Build / Lint / Test / Self-check result
+
+- `npm run build`: ✅ PASS. `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (0 ở file đổi). `npm test`: ✅ 13/13.
+- Self-check controller: ✅ KHÔNG import `mongoose`/`.model`/`.schema`/`src/utils`/`@/utils`/`saveUploadedFile`/`UserStats`/`UserModel` (match duy nhất là 1 dòng comment); ✅ inject/use cả 3 use-case; ✅ `UsersService` chỉ còn trong comment. Application/domain/infrastructure: giữ sạch như DEV1.6C (match grep chỉ là JSDoc).
+
+### App boot / smoke result
+
+- Full-app `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` (`EnrollInCourseService` trong `EnrollmentsModule`) — abort **trước** khi UsersModule resolve ⇒ KHÔNG do thay đổi UsersController/UsersModule/use-case. KHÔNG có lỗi DI mới.
+- Manual route smoke: KHÔNG chạy được do kernel debt chặn boot (pre-existing, ngoài scope DEV1) — KHÔNG sửa kernel để test.
+
+### Known issues / caveats
+
+1. Smoke HTTP 3 route vẫn bị chặn bởi nợ kernel `LEARNING_ACCESS_DATA` (pre-existing). Cần kernel được sửa trước khi verify response/upload thật end-to-end.
+2. **Thứ tự upload** (kế thừa DEV1.6C): use-case `saveAvatar` chạy **trước** findById/assert (mirror đúng legacy) ⇒ file được ghi kể cả khi user missing/inactive (edge hiếm vì JWT đã xác thực). Đảo thứ tự = behavior change, KHÔNG làm phase này.
+3. `UsersService` legacy vẫn là provider/export dù controller không còn dùng ⇒ dead-ish runtime; deprecation/cleanup để DEV1.6E.
+
+### Next recommended task
+
+- **DEV1.6E — Deprecate/cleanup `UsersService` legacy:** thêm JSDoc `@deprecated`, cân nhắc gỡ provider/export sau khi smoke đủ 3 route UC09 (yêu cầu kernel `LEARNING_ACCESS_DATA` được sửa để boot + verify end-to-end).
