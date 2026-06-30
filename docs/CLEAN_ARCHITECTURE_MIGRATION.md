@@ -56,6 +56,10 @@ Admin dashboard/statistics UC14 was audited only. Current endpoints are `GET /ap
 
 Admin dashboard/statistics now has an additive domain reader port, exact query/result interfaces, and a Mongo infrastructure reader registered in `AdminModule` through `ADMIN_DASHBOARD_STATS_READER`. The reader mirrors the current `/stats` counts and `/dashboard/statistics` summary/chart aggregation data sources, but `AdminController`, `AnalyticsService`, route behavior, response shapes, auth, and validators were intentionally not migrated or changed in this phase.
 
+## DEV1.8C Note (2026-06-30)
+
+Admin dashboard/statistics now has application DTO/result types plus two use-cases, `GetAdminBasicStatsService` and `GetAdminDashboardStatisticsService`, wired in `AdminModule`. Both use `USER_REPOSITORY` for active-admin lookup and `ADMIN_DASHBOARD_STATS_READER` for data reads. `AdminController`, `AdminService`, `AnalyticsService`, routes, validators, auth decorators, status behavior, and response shapes remain unchanged.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:

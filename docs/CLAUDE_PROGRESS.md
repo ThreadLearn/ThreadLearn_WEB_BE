@@ -1,5 +1,38 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.8C Admin Dashboard / Statistics Application Use Cases + DI Wiring
+
+- **Date/time:** 2026-06-30 15:35:46 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files created:**
+  - `src/modules/admin/application/dto/dashboard-statistics-use-case.dto.ts`
+  - `src/modules/admin/application/services/get-admin-basic-stats.service.ts`
+  - `src/modules/admin/application/services/get-admin-dashboard-statistics.service.ts`
+- **Files changed:**
+  - `src/modules/admin/application/dto/index.ts`
+  - `src/modules/admin/application/services/index.ts`
+  - `src/modules/admin/admin.module.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Legacy behavior audited:** Re-confirmed `GET /api/v1/admin/stats` has class-level `JwtAuthGuard`, `@Roles('ADMIN')`, `@ApiBearerAuth('BearerAuth')`, no method-level Swagger, no validator, default 200, active-admin re-check via `AdminService.ensureActiveAdmin`, message `Admin dashboard statistics retrieved.`, and data `{ totalUsers, totalCourses, totalEnrollments, totalQuizAttempts }`. Re-confirmed `GET /api/v1/admin/dashboard/statistics` has the same class-level auth, method `@ApiOperation`, query validator `dashboardStatisticsQuerySchema` with `{ from?, to?, months }`, default 200, active-admin re-check, same success message, and data `{ summary, charts }`.
+- **DTO/result types created:** Added `GetAdminBasicStatsInput`, `GetAdminBasicStatsResult`, `GetAdminDashboardStatisticsInput`, and `GetAdminDashboardStatisticsResult`, reusing the DEV1.8B reader result/query types to preserve exact field names.
+- **Use cases created:** Added `GetAdminBasicStatsService` and `GetAdminDashboardStatisticsService`, each with one public `execute()` method. Both find the admin through `USER_REPOSITORY`, reuse `assertActiveAdmin`, call `ADMIN_DASHBOARD_STATS_READER`, and return the legacy-compatible result shape.
+- **Ports used:** `USER_REPOSITORY`/`IUserRepository` from `AuthModule` for active-admin lookup; `ADMIN_DASHBOARD_STATS_READER`/`IAdminDashboardStatsReader` for basic stats and dashboard aggregate reads.
+- **Provider wiring:** Registered both new use-case services in `AdminModule`. Kept the DEV1.8B `MongoAdminDashboardStatsReaderService` provider and `ADMIN_DASHBOARD_STATS_READER` mapping unchanged.
+- **AuthModule export usage:** `AdminModule` already imports `AuthModule`; the new use-cases consume the exported `USER_REPOSITORY` token through DI.
+- **What was intentionally NOT changed:** Did not modify `AdminController` constructor, method bodies, route decorators, Swagger decorators, validators, `ApiResponse` wrapper, `AdminService`, `AnalyticsService`, domain ports, infrastructure reader, models, `.env`, package metadata, common shared code, or kernel/learning-access behavior.
+- **API compatibility:** No API path, HTTP method, default status, validator, or route behavior changed because controllers were not migrated in this phase.
+- **Authorization compatibility:** Class-level admin guard/role decorators and legacy active-admin re-check remain unchanged at runtime. New use-cases are prepared with the same active-admin helper for the future controller migration.
+- **Response shape compatibility:** New result types and use-cases mirror the exact `/stats` and `/dashboard/statistics` data shapes; no field names were added, removed, or renamed.
+- **Security compatibility:** No password/token/secret/env value is logged or documented. New use-cases only receive `adminId` and validated dashboard query fields.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/dashboard scope (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** `admin/application` and `admin/infrastructure` checks are clean. `admin/domain` scan reports only existing comment prose in `invitation-email.port.ts` mentioning infrastructure/application; no import or dependency violation was introduced. Controller scan confirms no `GetAdminBasicStatsService`, `GetAdminDashboardStatisticsService`, `ADMIN_DASHBOARD_STATS_READER`, or `MongoAdminDashboardStatsReaderService` usage yet.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB. Isolated built `AdminModule` DI smoke passed with `AdminModule context OK`.
+- **Known issues/caveats:** Full HTTP smoke remains blocked by MongoDB connection timeout in this environment. `/stats` still queries models directly in `AdminController`, and `/dashboard/statistics` still uses static `AnalyticsService`; both are intentional because DEV1.8C does not migrate the controller.
+- **Next recommended task:** DEV1.8D should migrate `AdminController` `/stats` and `/dashboard/statistics` to these use-cases while preserving route decorators, validation, messages, default statuses, auth behavior, and response shapes.
+
 ## DEV1.8B Admin Dashboard / Statistics Ports + Infrastructure Reader
 
 - **Date/time:** 2026-06-30 15:29:00 +07:00

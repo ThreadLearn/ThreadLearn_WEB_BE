@@ -15,6 +15,8 @@ import {
 } from './infrastructure/services';
 import {
   AddStudentService,
+  GetAdminBasicStatsService,
+  GetAdminDashboardStatisticsService,
   GetStudentListService,
   LockStudentService,
   UnlockStudentService,
@@ -52,6 +54,8 @@ import {
     UnlockStudentService,
     GetStudentListService,
     UpdateStudentInfoService,
+    GetAdminBasicStatsService,
+    GetAdminDashboardStatisticsService,
   ],
   exports: [AdminService],
 })
