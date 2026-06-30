@@ -1,8 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { User } from '../../models/user.model';
 import { UserEntity } from '../../domain/entities/user.entity';
-import { IUserRepository } from '../../domain/interfaces/user.repository';
+import {
+  IUserRepository,
+  StudentListQuery,
+  StudentListResult,
+} from '../../domain/interfaces/user.repository';
 import { UserMapper } from '../mapper/user.mapper';
+
+/** Escape regex (mirror legacy `AdminService.escapeRegex`) — chống ReDoS/ký tự đặc biệt trong search. */
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * Adapter Mongoose cho `IUserRepository`. Nơi DUY NHẤT (cùng các repo auth khác)
@@ -64,6 +73,72 @@ export class MongoUserRepository implements IUserRepository {
     } else {
       update.$unset = { lockedUntil: '' };
     }
+
+    const doc = await User.findByIdAndUpdate(entity.id, update, { new: true });
+    return UserMapper.toEntity(doc!);
+  }
+
+  /**
+   * Liệt kê student (UC12). Mirror legacy `AdminService.listStudents`: filter
+   * `role:'STUDENT'` + optional `isActive`/`isVerified`, search regex (escape) trên
+   * `$or:[email,firstName,lastName]`, sort `createdAt:-1`, skip/limit theo page.
+   * Trả `UserEntity[]` qua mapper — KHÔNG trả doc thô, KHÔNG lộ `passwordHash` (presenter lo).
+   */
+  async listStudents(query: StudentListQuery): Promise<StudentListResult> {
+    const filter: Record<string, unknown> = { role: 'STUDENT' };
+    if (query.isActive !== undefined) filter.isActive = query.isActive;
+    if (query.isVerified !== undefined) filter.isVerified = query.isVerified;
+    if (query.search) {
+      const searchRegex = new RegExp(escapeRegex(query.search), 'i');
+      filter.$or = [{ email: searchRegex }, { firstName: searchRegex }, { lastName: searchRegex }];
+    }
+
+    const skip = (query.page - 1) * query.limit;
+    const [docs, total] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit),
+      User.countDocuments(filter),
+    ]);
+
+    return {
+      students: docs.map((doc) => UserMapper.toEntity(doc)),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  /**
+   * Persist mutation admin student management (UC11 lock/unlock, UC13 update).
+   * Dùng `$set`/`$unset` rõ ràng: clear `lockedAt`/`lockedReason` (unlock) và
+   * `emailVerifiedAt` (set unverified) bằng `$unset` vì mapper strip-undefined không tự `$unset`.
+   * CHỈ chạm tập field student-management; KHÔNG đụng `lockedUntil`/`failedLoginAttempts`/
+   * `passwordHash`/`googleId`/`planType`/`lastLoginAt`.
+   */
+  async updateStudentManagementState(entity: UserEntity): Promise<UserEntity> {
+    const p = entity.toProps();
+    const set: Record<string, unknown> = {
+      firstName: p.firstName,
+      lastName: p.lastName,
+      role: p.role,
+      isActive: p.isActive,
+      isVerified: p.isVerified,
+    };
+    const unset: Record<string, string> = {};
+
+    // avatarUrl: chỉ `$set` khi có (legacy update không bao giờ clear avatar); KHÔNG `$unset`.
+    if (p.avatarUrl !== undefined) set.avatarUrl = p.avatarUrl;
+
+    // emailVerifiedAt / lockedAt / lockedReason: clearable ⇒ `$set` khi có, `$unset` khi entity clear.
+    if (p.emailVerifiedAt !== undefined) set.emailVerifiedAt = p.emailVerifiedAt;
+    else unset.emailVerifiedAt = '';
+    if (p.lockedAt !== undefined) set.lockedAt = p.lockedAt;
+    else unset.lockedAt = '';
+    if (p.lockedReason !== undefined) set.lockedReason = p.lockedReason;
+    else unset.lockedReason = '';
+
+    const update: Record<string, unknown> = { $set: set };
+    if (Object.keys(unset).length > 0) update.$unset = unset;
 
     const doc = await User.findByIdAndUpdate(entity.id, update, { new: true });
     return UserMapper.toEntity(doc!);

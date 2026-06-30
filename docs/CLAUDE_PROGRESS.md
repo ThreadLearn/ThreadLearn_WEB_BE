@@ -5,7 +5,7 @@
 - Date/time: 2026-06-30
 - Branch: `refactor/dev1-clean-architecture`
 - Module: DEV1 / `admin`
-- Task: **DEV1.7A Admin Student Management Baseline Audit** (audit-only UC10–UC13: Add / Lock / Unlock / List / Update Student trên `AdminController` + `AdminService` legacy static; KHÔNG sửa runtime, route, response shape, authorization, lock/unlock behavior). Xem section §DEV1.7A. (Trước đó: DEV1.6A–6E Profile/Avatar migration.)
+- Task: **DEV1.7B Admin Student Management Domain + Ports + Infrastructure** (mở rộng `UserEntity` + `USER_REPOSITORY`/`MongoUserRepository` cho student list/lock/unlock/update; tạo `INVITATION_EMAIL` port + adapter; wire `AdminModule` + export thêm token từ `AuthModule`. KHÔNG tạo use-cases, KHÔNG migrate `AdminController`, KHÔNG đổi runtime). Xem section §DEV1.7B. (Trước đó: §DEV1.7A Audit; DEV1.6A–6E Profile/Avatar migration.)
 
 ## Current Status
 
@@ -2175,3 +2175,109 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.7B (Domain + Ports + Infrastructure cho UC10–13, KHÔNG đổi controller):** thêm `UserEntity.createVerifiedStudent`/`updateStudentInfo`/`canBeManagedByAdmin`; mở rộng `USER_REPOSITORY`/`MongoUserRepository` (`listStudents`/`countStudents`); thêm `INVITATION_EMAIL` port + adapter wrap `sendStudentInvitationEmail`; reuse `PASSWORD_HASHER`/`USER_STATS_PROVISIONER`. Sau đó DEV1.7C (application use-cases) → DEV1.7D (migrate `AdminController` routes). Giữ path/response/status/authorization.
+
+---
+
+## DEV1.7B Admin Student Management Domain + Ports + Infrastructure
+
+- **Date/time:** 2026-06-30
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `admin` (+ `auth` domain/infra). **CHỈ** domain + ports + infrastructure + wiring tối thiểu. KHÔNG tạo application use-cases, KHÔNG migrate `AdminController`, KHÔNG đổi runtime/route/response/authorization/lock-unlock/add-student behavior.
+
+### Files created (5)
+
+- `src/modules/admin/domain/interfaces/invitation-email.port.ts` — port `IInvitationEmail` + `SendStudentInvitationInput` + token `INVITATION_EMAIL`.
+- `src/modules/admin/domain/interfaces/index.ts` — barrel.
+- `src/modules/admin/infrastructure/services/student-invitation-email.service.ts` — adapter `StudentInvitationEmailService` (wrap `EmailService.sendStudentInvitationEmail`).
+- `src/modules/admin/infrastructure/services/index.ts` — barrel.
+- (Không tạo `admin/domain/index.ts` / `admin/infrastructure/index.ts` — theo pattern UsersModule chỉ có `interfaces/index.ts` + `services/index.ts`.)
+
+### Files changed (5)
+
+- `src/modules/auth/domain/entities/user.entity.ts` — thêm domain methods (xem dưới).
+- `src/modules/auth/domain/interfaces/user.repository.ts` — thêm `StudentListQuery`/`StudentListResult` + 2 method port.
+- `src/modules/auth/infrastructure/persistence/mongo-user.repository.ts` — implement 2 method + helper `escapeRegex`.
+- `src/modules/auth/auth.module.ts` — export thêm `PASSWORD_HASHER` + `USER_STATS_PROVISIONER`.
+- `src/modules/admin/admin.module.ts` — đăng ký adapter + token `INVITATION_EMAIL`.
+- Docs: `docs/CLAUDE_PROGRESS.md` (file này) + `docs/CLEAN_ARCHITECTURE_MIGRATION.md`.
+
+### Domain changes (`UserEntity`)
+
+- **`static createVerifiedStudent({email, passwordHash, firstName?, lastName?, now?})`** (UC10) — **reuse** `createNew` (role=STUDENT, isActive=true, trim/lowercase) + `markEmailVerified(now)` ⇒ `isVerified=true` + `emailVerifiedAt=now`. `passwordHash` đã hash sẵn ở adapter (KHÔNG bcrypt/generate/email/response trong domain).
+- **`updateStudentInfo({firstName?,lastName?,avatarUrl?,isVerified?}, now?)`** (UC13) — mirror `AdminService.updateStudent`: `undefined`⇒giữ; string⇒trim; `isVerified=true`⇒verified + `emailVerifiedAt=now` nếu chưa có (giữ giá trị cũ); `isVerified=false`⇒unverified + clear `emailVerifiedAt`. KHÔNG đụng `email`/`role`/`isActive`/`password`/`planType`.
+- **`lockByAdmin(reason?, now?)` / `unlockByAdmin()`** (UC11) — **wrapper** delegate sang `lock`/`unlock` đã có (KHÔNG tạo trùng logic). lock: `isActive=false`+`lockedAt`+`lockedReason?`; unlock: `isActive=true`+clear `lockedAt`/`lockedReason`. **KHÔNG** đụng `lockedUntil`/`failedLoginAttempts` (admin-lock TÁCH BIỆT temporary login lock).
+- **`canBeManagedAsStudent(): boolean`** — `role === 'STUDENT'`, trả boolean (KHÔNG throw NestJS error trong domain; application sẽ ném `BadRequestError`). Reuse được cho enforce role ở DEV1.7C.
+- **Reuse, KHÔNG trùng:** `lock`/`unlock`/`createNew`/`markEmailVerified`/`updateProfile` giữ nguyên; method mới chỉ wrap/compose. KHÔNG import NestJS/Mongoose/model/`src/utils`/format response.
+
+### Repository port changes (`IUserRepository`)
+
+- Thêm type domain thuần `StudentListQuery {page, limit, search?, isActive?, isVerified?}` + `StudentListResult {students: UserEntity[], total, page, limit, totalPages}` (KHÔNG `FilterQuery`/Mongoose, KHÔNG presentation wrapper).
+- Thêm method:
+  - `listStudents(query): Promise<StudentListResult>` — gộp list+count trong 1 method (style đơn giản, KHÔNG tách `countStudents` riêng vì luôn dùng cặp).
+  - `updateStudentManagementState(entity): Promise<UserEntity>` — persist mutation lock/unlock/update với `$unset` rõ ràng cho field clearable.
+- **Audit method cũ:** `findById`/`findByEmail`/`create`/`update`/`updateLoginSecurityState` đã đủ cho Add Student (`create`) ⇒ KHÔNG thêm trùng. `update` thường **giữ nguyên** (auth flow dùng) — KHÔNG sửa.
+
+### Repository infrastructure changes (`MongoUserRepository`)
+
+- **`listStudents`** mirror legacy `AdminService.listStudents` chính xác: filter `role:'STUDENT'` + optional `isActive`/`isVerified`; search regex (escape) `$or:[email,firstName,lastName]`; sort `createdAt:-1`; `skip=(page-1)*limit`; `limit`; `total=countDocuments(filter)`; `totalPages=Math.ceil(total/limit)`. Trả `UserEntity[]` qua `UserMapper.toEntity` — KHÔNG raw doc, KHÔNG lộ `passwordHash`.
+- **`updateStudentManagementState`** — `$set` `firstName/lastName/role/isActive/isVerified` (+`avatarUrl` khi có); `$set` hoặc `$unset` cho `emailVerifiedAt`/`lockedAt`/`lockedReason` (clear khi entity đã clear — vì `UserMapper.toPersistence` strip-undefined KHÔNG tự `$unset`). **KHÔNG** đụng `lockedUntil`/`failedLoginAttempts`/`passwordHash`/`googleId`/`planType`/`lastLoginAt`.
+- Helper local `escapeRegex` (mirror legacy private) trong file repository — KHÔNG import từ `AdminService` (private legacy).
+- **`UserMapper` KHÔNG đổi:** round-trip đã đủ field (lockedAt/lockedReason/emailVerifiedAt/isVerified/isActive/failedLoginAttempts/lockedUntil). Việc clear field xử lý ở repository (`$unset`), đúng như note port `updateLoginSecurityState` đã làm cho `lockedUntil`.
+
+### Invitation email port
+
+- `IInvitationEmail.sendStudentInvitation({email, firstName, lastName, temporaryPassword}): Promise<void>` + token `INVITATION_EMAIL` (Symbol). Port RIÊNG cho invitation, KHÔNG thay thế `EMAIL_SENDER` (verification/reset). Domain thuần: KHÔNG import NestJS/`EmailService`/infrastructure/`src/utils`. JSDoc nhắc KHÔNG log/expose `temporaryPassword`.
+
+### Invitation email adapter
+
+- `StudentInvitationEmailService` `@Injectable()` implements `IInvitationEmail` — wrap `EmailService.sendStudentInvitationEmail({email, firstName, temporaryPassword})`. **Mirror legacy 100%:** SMTP/mock-log, fire-and-forget + backoff retry, swallow lỗi SMTP — đều nằm trong `EmailService` (KHÔNG đổi). Adapter chỉ forward, KHÔNG log/expose password. `lastName` nhận ở port (future) nhưng EmailService chưa dùng ⇒ chỉ forward `email/firstName/temporaryPassword` (KHÔNG đổi email content).
+
+### Provider wiring
+
+- `AdminModule.providers`: thêm `StudentInvitationEmailService` + `{ provide: INVITATION_EMAIL, useExisting: StudentInvitationEmailService }`. Adapter dùng `EmailService` **static** ⇒ KHÔNG cần inject/import AuthModule cho DI resolve. `AdminController` constructor + `AdminService` provider/export **KHÔNG đổi**. CHƯA có consumer (use-cases để DEV1.7C).
+
+### AuthModule export changes
+
+- `exports` thêm `PASSWORD_HASHER` + `USER_STATS_PROVISIONER` (ngoài `AuthService`/`EmailService`/`USER_REPOSITORY` đã có). **Chỉ** thêm `exports` — KHÔNG đổi provider/behavior/`AuthController`/`AuthService`. AdminModule sẽ `imports:[AuthModule]` ở **DEV1.7C** khi use-cases cần (chưa import phase này vì chưa có consumer).
+
+### Legacy behavior preserved
+
+- `AdminService` static (`createStudent`/`listStudents`/`updateStudent`/`lockStudent`/`unlockStudent`/`ensureActiveAdmin` + dead methods) **giữ nguyên** — vẫn là code chạy thật của route hiện tại.
+- `EmailService` (kể cả `sendStudentInvitationEmail`) **giữ nguyên** implementation.
+- `UserMapper`/`update`/`updateLoginSecurityState`/auth flow **giữ nguyên**.
+- Route/method/status/response shape/authorization/validator/Swagger **giữ nguyên** (controller chưa đụng).
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa `admin/controllers/**`, `admin/services/admin.service.ts`, `auth/services/auth.service.ts`, `auth/services/email.service.ts`, `auth/models/**`, `gamification/models/**`, `src/common/**`, `src/utils/**`, `package.json`, `.env`. KHÔNG tạo application use-cases (AddStudent/Lock/Unlock/GetStudentList/UpdateStudentInfo — để DEV1.7C). KHÔNG xoá legacy/`AdminService`/`EmailService`. KHÔNG tạo guard/decorator/helper/type trùng shared. KHÔNG sửa kernel `LEARNING_ACCESS_DATA`. KHÔNG commit tự động. KHÔNG expose secret/token/password.
+
+### API / Authorization / Email / UserStats / Security compatibility
+
+- **API:** zero change — controller/route/validator/response shape không đụng. Code mới chưa có consumer.
+- **Authorization:** `JwtAuthGuard` + `@Roles('ADMIN')` + `ensureActiveAdmin` không đổi.
+- **Email:** invitation vẫn qua `EmailService.sendStudentInvitationEmail` (adapter chỉ wrap, behavior/SMTP/mock/retry/swallow giữ nguyên).
+- **UserStats:** phase này KHÔNG tạo stats; `USER_STATS_PROVISIONER` (idempotent upsert `xp:0/level:1`, mirror legacy) chỉ **export** để DEV1.7C reuse. Legacy `AdminService` vẫn `UserStats.create` trực tiếp (không đụng).
+- **Security:** KHÔNG log/expose password/token/secret; `listStudents` trả Entity (presenter sẽ whitelist ở use-case); domain/port không lộ `passwordHash`.
+
+### Build / Lint / Test / Self-check result
+
+- `npm run build`: ✅ PASS.
+- `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (`lessons`/`quiz`/`quiz-attempts`) — 0 ở `admin`/`auth`.
+- `npm test`: ✅ 13/13.
+- **Self-check (rg thay `Select-String`):** ✅ `auth/domain` & `admin/domain` — match chỉ là **JSDoc/comment** (chữ "Mongoose"/"infrastructure"/"EmailService" trong mô tả), KHÔNG import cấm. ✅ `admin/application` chưa tồn tại (đúng — chưa có use-cases). ✅ `admin/infrastructure` KHÔNG dùng guard/decorator/`ApiResponse`/`api-handler`. ✅ `AdminController` KHÔNG reference `*Service` CA mới / `INVITATION_EMAIL` / `StudentInvitationEmailService`.
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` (`EnrollInCourseService`/`EnrollmentsModule`) — pre-existing, ngoài scope DEV1, KHÔNG sửa. **KHÔNG có lỗi DI mới** liên quan `AdminModule`/`INVITATION_EMAIL`/`StudentInvitationEmailService` (adapter không inject dep ⇒ DI trivially valid; build PASS). Kernel error abort trước khi resolve AdminModule ⇒ chưa smoke HTTP được.
+
+### Known issues / caveats
+
+1. App chưa boot (nợ kernel `LEARNING_ACCESS_DATA`, pre-existing) ⇒ chưa smoke HTTP / chưa verify end-to-end `listStudents`/`updateStudentManagementState` runtime.
+2. AdminModule **chưa** `imports:[AuthModule]` ⇒ DEV1.7C phải thêm import để inject `USER_REPOSITORY`/`PASSWORD_HASHER`/`USER_STATS_PROVISIONER` cho use-cases.
+3. `INVITATION_EMAIL`/adapter đã wire nhưng **chưa có consumer** (dead-until-1.7C) — có chủ đích.
+4. `updateStudentManagementState` là method mới, chưa được runtime gọi (use-case DEV1.7C sẽ dùng) — cần test end-to-end khi kernel fix.
+5. Legacy `AdminService` vẫn chạy thật song song — code CA mới chưa thay thế (đúng phase boundary).
+
+### Next recommended task
+
+- **DEV1.7C (Application use-cases UC10–13):** tạo `AddStudentService`/`LockStudentService`/`UnlockStudentService`/`GetStudentListService`/`UpdateStudentInfoService` + DTO/result + presenter (reuse `sanitizeUser`/`SafeUser`). `AdminModule` `imports:[AuthModule]` để inject `USER_REPOSITORY`/`PASSWORD_HASHER`/`USER_STATS_PROVISIONER` + dùng `INVITATION_EMAIL`. CHƯA migrate controller (để DEV1.7D). Giữ path/method/status/response shape/authorization/message.

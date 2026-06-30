@@ -118,6 +118,15 @@ import { UserRegisteredHandler } from './application/events';
   ],
   // `USER_REPOSITORY` được export để UsersModule (UC09 use-cases DEV1.6C) tái sử dụng
   // cùng adapter `MongoUserRepository` — User aggregate hiện thuộc auth module.
-  exports: [AuthService, EmailService, USER_REPOSITORY],
+  // DEV1.7B — export thêm `PASSWORD_HASHER` + `USER_STATS_PROVISIONER` để AdminModule
+  // (UC10 Add Student use-case DEV1.7C) tái sử dụng (hash password + provision UserStats).
+  // Chỉ thêm vào `exports` — KHÔNG đổi provider/behavior; AdminModule sẽ `imports:[AuthModule]` ở DEV1.7C.
+  exports: [
+    AuthService,
+    EmailService,
+    USER_REPOSITORY,
+    PASSWORD_HASHER,
+    USER_STATS_PROVISIONER,
+  ],
 })
 export class AuthModule {}
