@@ -1,5 +1,34 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.8B Admin Dashboard / Statistics Ports + Infrastructure Reader
+
+- **Date/time:** 2026-06-30 15:29:00 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files created:**
+  - `src/modules/admin/domain/interfaces/admin-dashboard-stats-reader.port.ts`
+  - `src/modules/admin/infrastructure/services/mongo-admin-dashboard-stats-reader.service.ts`
+- **Files changed:**
+  - `src/modules/admin/domain/interfaces/index.ts`
+  - `src/modules/admin/infrastructure/services/index.ts`
+  - `src/modules/admin/admin.module.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Legacy behavior re-audited:** Confirmed `GET /api/v1/admin/stats` still counts `User`, `Course`, `Enrollment`, and `QuizAttempt` directly in `AdminController`; confirmed `GET /api/v1/admin/dashboard/statistics` still calls static `AnalyticsService.getAdminDashboardStatistics(query)` after active-admin validation.
+- **Port created:** Added `ADMIN_DASHBOARD_STATS_READER` and `IAdminDashboardStatsReader` with `getBasicStats()` and `getDashboardStatistics(query)` plus exact result/query interfaces for the current `/stats` and `/dashboard/statistics` shapes.
+- **Infrastructure reader created:** Added `MongoAdminDashboardStatsReaderService`, which mirrors current dashboard count/aggregation behavior behind the new port without being consumed by controllers yet.
+- **Provider wiring:** Registered `MongoAdminDashboardStatsReaderService` in `AdminModule` and mapped `ADMIN_DASHBOARD_STATS_READER` to it with `useExisting`.
+- **Models/data sources used:** The infra reader uses existing `User`, `Course`, `Enrollment`, `QuizAttempt`, `AIHistory`, `Lesson`, and `Notification` models. No `UserStats`, CodeSubmission, Payment/Plan, or Quiz model was introduced.
+- **Legacy behavior preserved:** Controller code, route paths, auth decorators, validation, response messages, HTTP status behavior, and static `AnalyticsService` usage are unchanged. The new reader is additive infrastructure for the next migration step.
+- **What not changed:** Did not migrate `AdminController`, did not create application use-cases, did not alter `AdminService`, did not change `AnalyticsService`, did not change `.env`, package metadata, common guards/decorators, schemas, or existing model behavior.
+- **API/Auth/Response/Security compatibility:** `JwtAuthGuard`, `@Roles('ADMIN')`, `@CurrentUser`, `ApiResponse.success`, Zod query validation, active-admin checks, and exact response shapes remain as before. No password/token/secret logging or exposure was added.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/dashboard scope (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** `admin/application` and `admin/infrastructure` checks are clean. `admin/domain` scan reports only existing comment prose in `invitation-email.port.ts` mentioning infrastructure/application; no import or dependency violation was introduced. Controller scan confirms no `ADMIN_DASHBOARD_STATS_READER`, `MongoAdminDashboardStatsReaderService`, or dashboard stats use-case consumption yet.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB. Isolated built `AdminModule` DI smoke passed with `AdminModule context OK`.
+- **Caveats:** Full HTTP smoke remains blocked by MongoDB connection timeout in this environment. `/stats` still queries models directly in `AdminController`, and `/dashboard/statistics` still uses static `AnalyticsService`; both are intentional for DEV1.8B.
+- **Next recommended task:** DEV1.8C should add application use-cases/DTOs for basic stats and dashboard statistics, then migrate `AdminController` in a bounded route-preserving step.
+
 ## DEV1.8A Admin Dashboard / Statistics Baseline Audit
 
 - **Date/time:** 2026-06-30 15:18:41 +07:00

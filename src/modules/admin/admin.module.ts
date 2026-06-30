@@ -6,10 +6,13 @@ import { AdminController } from './controllers/admin.controller';
 import { AdminService } from './services/admin.service';
 
 // --- Domain port token (admin) ---
-import { INVITATION_EMAIL } from './domain/interfaces';
+import { ADMIN_DASHBOARD_STATS_READER, INVITATION_EMAIL } from './domain/interfaces';
 
 // --- Infrastructure adapter (DEV1.7B) ---
-import { StudentInvitationEmailService } from './infrastructure/services';
+import {
+  MongoAdminDashboardStatsReaderService,
+  StudentInvitationEmailService,
+} from './infrastructure/services';
 import {
   AddStudentService,
   GetStudentListService,
@@ -39,9 +42,11 @@ import {
 
     // Infrastructure concrete adapter (DEV1.7B)
     StudentInvitationEmailService,
+    MongoAdminDashboardStatsReaderService,
 
     // Domain port token → adapter (useExisting để tránh tạo instance trùng)
     { provide: INVITATION_EMAIL, useExisting: StudentInvitationEmailService },
+    { provide: ADMIN_DASHBOARD_STATS_READER, useExisting: MongoAdminDashboardStatsReaderService },
     AddStudentService,
     LockStudentService,
     UnlockStudentService,
