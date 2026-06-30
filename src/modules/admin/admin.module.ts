@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { CodeExecutionModule } from '../code-execution/code-execution.module';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
 import { AdminController } from './controllers/admin.controller';
@@ -9,6 +10,13 @@ import { INVITATION_EMAIL } from './domain/interfaces';
 
 // --- Infrastructure adapter (DEV1.7B) ---
 import { StudentInvitationEmailService } from './infrastructure/services';
+import {
+  AddStudentService,
+  GetStudentListService,
+  LockStudentService,
+  UnlockStudentService,
+  UpdateStudentInfoService,
+} from './application/services';
 
 /**
  * AdminModule.
@@ -17,9 +25,11 @@ import { StudentInvitationEmailService } from './infrastructure/services';
  * `StudentInvitationEmailService` (wrap `EmailService.sendStudentInvitationEmail`) + token
  * `INVITATION_EMAIL`. CHƯA có consumer (use-cases để DEV1.7C; controller chưa migrate) ⇒
  * KHÔNG đổi runtime: `AdminController`/`AdminService` legacy static giữ nguyên.
+ * DEV1.7C update: application use-case providers are now registered below; controller migration
+ * is intentionally left for the next phase.
  */
 @Module({
-  imports: [LearningAccessModule, CodeExecutionModule],
+  imports: [AuthModule, LearningAccessModule, CodeExecutionModule],
   controllers: [AdminController],
   providers: [
     // Legacy (static — KHÔNG đổi)
@@ -30,6 +40,11 @@ import { StudentInvitationEmailService } from './infrastructure/services';
 
     // Domain port token → adapter (useExisting để tránh tạo instance trùng)
     { provide: INVITATION_EMAIL, useExisting: StudentInvitationEmailService },
+    AddStudentService,
+    LockStudentService,
+    UnlockStudentService,
+    GetStudentListService,
+    UpdateStudentInfoService,
   ],
   exports: [AdminService],
 })

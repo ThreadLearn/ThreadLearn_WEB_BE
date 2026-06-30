@@ -1,5 +1,48 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.7C Admin Student Management Application Use Cases + DI Wiring
+
+- **Date/time:** 2026-06-30 14:35:06 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files created:**
+  - `src/modules/admin/application/dto/student-management-use-case.dto.ts`
+  - `src/modules/admin/application/dto/index.ts`
+  - `src/modules/admin/application/presenters/admin-user.presenter.ts`
+  - `src/modules/admin/application/presenters/index.ts`
+  - `src/modules/admin/application/services/admin-access.helper.ts`
+  - `src/modules/admin/application/services/add-student.service.ts`
+  - `src/modules/admin/application/services/lock-student.service.ts`
+  - `src/modules/admin/application/services/unlock-student.service.ts`
+  - `src/modules/admin/application/services/get-student-list.service.ts`
+  - `src/modules/admin/application/services/update-student-info.service.ts`
+  - `src/modules/admin/application/services/index.ts`
+  - `src/modules/admin/application/index.ts`
+- **Files changed:**
+  - `src/modules/admin/admin.module.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **Legacy behavior audited:** Re-checked `AdminController` and `AdminService`: UC10 body `{ email, password?, firstName, lastName }`, admin from `@CurrentUser()`, per-handler active-admin re-check, duplicate email message, generated password via `crypto.randomBytes(12).toString('base64url')`, bcrypt rounds 10 behavior via new hasher port, verified/active student creation, stats creation after user create, invitation only when password generated, list filter/search/sort/pagination/meta, update allowed fields and `isVerified`/`emailVerifiedAt`, lock/unlock `isActive`/`lockedAt`/`lockedReason`, not-found/non-student messages, and SafeUser response whitelist.
+- **DTO/result types created:** `AdminSafeUser`, `StudentListMeta`, `AddStudentInput/Result`, `LockStudentInput/Result`, `UnlockStudentInput/Result`, `GetStudentListInput/Result`, `UpdateStudentInfoInput/Result`. Add result includes `temporaryPasswordSent` so the next controller phase can preserve the existing success message while still returning SafeUser as flat `data`.
+- **Presenter created:** `AdminUserPresenter.toSafeUser(UserEntity)` mirrors the current safe-user whitelist: `id`, `email`, `firstName`, `lastName`, `avatarUrl`, `role`, `isVerified`, `isActive`, `lastLoginAt`, `createdAt`, `updatedAt`. It does not expose password hash, generated password, provider ids, plan fields, lockout fields, or admin-lock fields.
+- **Use cases created:** `AddStudentService`, `LockStudentService`, `UnlockStudentService`, `GetStudentListService`, `UpdateStudentInfoService`, each with one public `execute()` method.
+- **Ports used:** `USER_REPOSITORY`, `PASSWORD_HASHER`, `USER_STATS_PROVISIONER`, `INVITATION_EMAIL`.
+- **Provider wiring:** `AdminModule` now imports `AuthModule` and registers the five application use-case providers while keeping `AdminService`, `StudentInvitationEmailService`, and `{ provide: INVITATION_EMAIL, useExisting: StudentInvitationEmailService }`.
+- **AuthModule export usage:** Reuses the existing exported `USER_REPOSITORY`, `PASSWORD_HASHER`, and `USER_STATS_PROVISIONER`; no `AuthModule` provider/export changes were needed.
+- **Invitation email behavior:** `AddStudentService` sends invitation only when the password was generated, calls the invitation port in a detached/swallowed way so email failure does not fail the request, and does not log or return the generated password. Existing `EmailService` implementation was not changed.
+- **UserStats behavior:** `AddStudentService` calls `USER_STATS_PROVISIONER.ensureForUser(savedStudent.id)` after user creation to create initial stats through the existing port. It does not import the gamification model.
+- **What was intentionally NOT changed:** `AdminController`, `AdminService`, `EmailService`, auth services/models, gamification models, common guards/decorators/helpers, API routes, HTTP methods/status, response body shape, admin authorization decorators, legacy route runtime, `.env`, `package.json`, kernel `LEARNING_ACCESS_DATA`, and git commits.
+- **API compatibility:** No controller migration in this phase; existing runtime API path/method/status/body shape remains unchanged.
+- **Authorization compatibility:** Class-level `JwtAuthGuard` + `@Roles('ADMIN')` + `@ApiBearerAuth('BearerAuth')` remains unchanged. New use-cases mirror active-admin checks for the later controller phase.
+- **Email/UserStats compatibility:** Existing invitation adapter and stats provisioner are reused through ports; no legacy email/stats implementation changed.
+- **Security compatibility:** New application code does not expose password hashes, generated temporary passwords, token/secret values, provider ids, or plan fields. Generated password is only held long enough to hash and pass to the invitation port.
+- **Build result:** `npm run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/auth (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** Admin application/infrastructure/controller checks returned empty. Auth/admin domain checks only matched existing comments/JSDoc strings, not forbidden imports.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB in this environment, before DI errors could surface. Isolated `NestFactory.createApplicationContext(AdminModule)` on `dist` passed with `AdminModule context OK`.
+- **Known issues/caveats:** `AdminController` still uses legacy `AdminService` by design. Full app boot could not complete in this environment because MongoDB connection did not finish before timeout. Existing `EmailService` was left unchanged per scope.
+- **Next recommended task:** DEV1.7D migrate `AdminController` UC10-UC13 to these use-cases while preserving route decorators, validation, messages, status codes, and response shape.
+
 ## Last Updated
 
 - Date/time: 2026-06-30
