@@ -68,6 +68,10 @@ AdminController now delegates `GET /api/v1/admin/stats` to `GetAdminBasicStatsSe
 
 Cleanup audit confirmed `AdminController` no longer depends on dashboard models, `AdminService`, or `AnalyticsService` for UC14. `AnalyticsService` has no active controller consumer and `AdminService` has no active controller caller, but both providers/exports remain for rollback compatibility. Safe deprecation JSDoc was added to legacy analytics methods and `AdminService.ensureActiveAdmin`; no runtime logic, route behavior, API shape, validator, or authorization behavior changed.
 
+## DEV1.FINAL Note (2026-06-30) — Final verification + handoff
+
+All DEV1 UC01–UC14 routes are migrated to Clean Architecture use-cases and verified: `build` PASS, `lint` PASS (0 errors; 7 pre-existing warnings only in `lessons`/`quiz`/`quiz-attempts`), `test` 13/13 PASS. No DEV1 controller calls a legacy static service at runtime; the four dead legacy services (`AuthService`, `UsersService`, `AdminService`, `AnalyticsService`) remain as `@deprecated` rollback providers, while `EmailService` stays active behind `EMAIL_SENDER`/`INVITATION_EMAIL`. **Caveat update:** MongoDB now connects fine — the prior "Mongo timeout" note was environment-transient. Full-app boot still fails on the pre-existing, out-of-scope kernel gap `Symbol(LEARNING_ACCESS_DATA)`: `LearningAccessModule` provides but does not **export** that token, so `EnrollInCourseService` (EnrollmentsModule) can't resolve it. `git diff develop...HEAD` touches no enrollment/course/lesson/quiz/shared-kernel files, so this is not a DEV1 regression. Recommended fix (kernel owner): add `LEARNING_ACCESS_DATA` to `LearningAccessModule.exports`, then run the manual HTTP smoke. Full detail in `docs/CLAUDE_PROGRESS.md` §DEV1.FINAL.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:

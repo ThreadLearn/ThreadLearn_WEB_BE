@@ -1,5 +1,75 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.FINAL — Final Verification + Handoff (UC01–UC14)
+
+- **Date/time:** 2026-06-30 21:50 +07:00
+- **Branch:** `refactor/dev1-clean-architecture` (base `develop`)
+- **Scope of this phase:** Verification + handoff only. **No source code changed** (only this doc + `docs/CLEAN_ARCHITECTURE_MIGRATION.md`). No new UC added. Course/Lesson/Enrollment/Quiz **not touched**. No runtime refactor.
+
+### Verdict
+DEV1 (UC01–UC14) is **migrated to Clean Architecture and verified green on build/lint/test**. Every request flow for the DEV1 routes goes through application use-cases; no DEV1 controller calls a legacy static service at runtime. The only open item is a **pre-existing, out-of-scope kernel DI gap** (`Symbol(LEARNING_ACCESS_DATA)` in `EnrollmentsModule`) that blocks full-app HTTP boot. It is not a DEV1 regression (see below).
+
+### Build / Lint / Test (re-run this phase)
+- `npm.cmd run build` → **PASS** (`nest build`, no errors).
+- `npm.cmd run lint` → **PASS**, 0 errors, **7 pre-existing warnings**, all OUTSIDE DEV1 scope:
+  - `src/modules/lessons/presentation/response/lesson.presenter.ts` (2× unused `_c`/`_c2`)
+  - `src/modules/quiz-attempts/application/event-handlers/gamification.event-handler.ts` (2× `no-console`)
+  - `src/modules/quiz/application/services/quiz.facade.ts` (3× unused `Inject`/`QUIZ_REPOSITORY`/`IQuizRepository`)
+- `npm.cmd test` → **PASS**, 13/13 (`src/modules/bugfix-regression.spec.ts`).
+
+### Route coverage (real paths — global prefix `api` + `@Controller('v1/...')`)
+| UC | Route | Controller | Wired to | Status |
+| -- | ----- | ---------- | -------- | ------ |
+| UC01 | `POST /api/v1/auth/register` (201) | AuthController | `RegisterUserService` | ✅ migrated |
+| UC02/UC05 | `GET /api/v1/auth/google` (302), `GET /api/v1/auth/google/callback` (302) | AuthController | `GetGoogleAuthUrlService` / `HandleGoogleCallbackService` (+`GoogleLoginService`) | ✅ migrated |
+| UC03 | `POST /api/v1/auth/verify-email` (200), `POST /api/v1/auth/resend-verification` (200) | AuthController | `VerifyEmailService` / `ResendVerificationEmailService` | ✅ migrated |
+| UC04 | `POST /api/v1/auth/login` (200) | AuthController | `LoginUserService` | ✅ migrated |
+| UC06 | `POST /api/v1/auth/logout` (200) | AuthController | `LogoutService` | ✅ migrated |
+| UC07 | `POST /api/v1/auth/forgot-password` (200) | AuthController | `ForgotPasswordService` | ✅ migrated |
+| UC08 | `POST /api/v1/auth/reset-password` (200) | AuthController | `ResetPasswordService` | ✅ migrated |
+| (support) | `POST /api/v1/auth/refresh` (200), `GET /api/v1/auth/session` (200, JwtAuthGuard) | AuthController | `RefreshTokenService` / `GetSessionService` | ✅ migrated |
+| UC09 | `GET /api/v1/users/profile`, `PATCH /api/v1/users/profile`, `POST /api/v1/users/avatar` | UsersController | `GetMyProfileService` / `UpdateMyProfileService` / `UploadAvatarService` | ✅ migrated |
+| UC10 | `POST /api/v1/admin/students` (201) | AdminController | `AddStudentService` | ✅ migrated |
+| UC11 | `PATCH /api/v1/admin/students/:id/lock`, `.../unlock` (200) | AdminController | `LockStudentService` / `UnlockStudentService` | ✅ migrated |
+| UC12 | `GET /api/v1/admin/students` (200) | AdminController | `GetStudentListService` | ✅ migrated |
+| UC13 | `PATCH /api/v1/admin/students/:id` (200) | AdminController | `UpdateStudentInfoService` | ✅ migrated |
+| UC14 | `GET /api/v1/admin/stats` (200), `GET /api/v1/admin/dashboard/statistics` (200) | AdminController | `GetAdminBasicStatsService` / `GetAdminDashboardStatisticsService` (→ `ADMIN_DASHBOARD_STATS_READER`) | ✅ migrated |
+| out-of-scope | `POST /api/v1/admin/execute` (200) | AdminController | `CodeExecutionService` | ⏸ not DEV1 (kept as-is) |
+| out-of-scope | `/api/v1/analytics` | AnalyticsController | — | ⏸ **no routes defined** (controller empty) |
+
+- Controller decoupling re-verified: `auth.controller` and `users.controller` reference legacy services only in comments/use-case names (no static `AuthService.`/`UsersService.` calls); `admin.controller` references neither `AdminService` nor `AnalyticsService` — its constructor injects only `CodeExecutionService` + the 7 DEV1 use-cases.
+
+### Migration status (layers)
+- `auth`, `users`, `admin` each carry `domain/ application/ infrastructure/` (+ legacy `controllers/ services/ models/ validators/` retained for rollback). Mongoose lives only in `infrastructure/persistence`; bcrypt/JWT/SMTP/Google/file wrapped in `infrastructure/services`.
+- `auth/presentation/{controller,response,validators}` are empty `.gitkeep` scaffolds — the wired controller remains at `auth/controllers/auth.controller.ts`. Physical relocation of controllers into `presentation/` was deliberately **not** done (avoids churn; out of scope for FINAL).
+
+### Legacy rollback inventory (intentionally retained)
+| File | Provider/Export | Runtime caller | Marker |
+| ---- | --------------- | -------------- | ------ |
+| `auth/services/auth.service.ts` | yes (AuthModule) | none (dead) | `@deprecated` |
+| `auth/services/email.service.ts` | yes | **ACTIVE** — real impl behind `EMAIL_SENDER` (`SmtpEmailSenderService`) + `INVITATION_EMAIL` (`StudentInvitationEmailService`) | none (correctly NOT deprecated) |
+| `users/services/users.service.ts` | yes (UsersModule) | none (dead) | `@deprecated` |
+| `admin/services/admin.service.ts` | yes (AdminModule) | none (dead) | `@deprecated` |
+| `analytics/services/analytics.service.ts` | yes (AnalyticsModule) | none (dead; AnalyticsController has no routes) | `@deprecated` |
+
+Deletion of the four dead legacy services is deferred to a post-DEV1 cleanup, gated on a stable full-app HTTP smoke (currently blocked by the kernel gap below) + a broader caller/FE audit.
+
+### App boot / smoke — UPDATED caveat
+- **MongoDB now connects successfully** (`✅ Successfully connected to MongoDB database.`). The "MongoDB connection timed out after 15s" caveat recorded in DEV1.7x/1.8x logs was **environment-transient**, not a code issue.
+- Full-app boot (`node dist/main.js`) **still fails**, now with the underlying cause fully visible: `Nest can't resolve dependencies of the EnrollInCourseService (..., Symbol(LEARNING_ACCESS_DATA) at index [3]) ... available in the EnrollmentsModule context.`
+- **Root cause (precise):** `LearningAccessModule` (`src/shared/application/learning-access/learning-access.module.ts`) *provides* `LEARNING_ACCESS_DATA` (`useExisting: MongoLearningAccessDataAdapter`) but **does not list `LEARNING_ACCESS_DATA` in `exports`** (it exports only `LearningAccessService` + `LEARNING_ACCESS`). `EnrollInCourseService` in `EnrollmentsModule` injects `LEARNING_ACCESS_DATA`, so DI can't resolve it across the module boundary.
+- **Not a DEV1 regression:** `git diff --name-only develop...HEAD` touches **zero** enrollment/course/lesson/quiz/shared-kernel files (111 files, all `auth`/`users`/`admin`/`analytics`/docs). The gap reproduces independent of DEV1 wiring.
+- **Recommended one-line fix (kernel owner, NOT DEV1):** add `LEARNING_ACCESS_DATA` to `LearningAccessModule.exports`. After that, retry full HTTP smoke for the DEV1 routes.
+- DI smoke for the DEV1 module in isolation (`NestFactory.createApplicationContext(AdminModule)`) passed previously (`AdminModule context OK`); the failure is isolated to `EnrollmentsModule`.
+
+### Manual HTTP smoke checklist (BLOCKED until kernel fix)
+Register→verify→login · forgot→reset→login · login→refresh→logout · Google callback→FE · profile/avatar · admin students CRUD/lock/unlock · dashboard stats — all **pending** a bootable full app.
+
+### Handoff — next recommended tasks (in order)
+1. **Kernel owner:** export `LEARNING_ACCESS_DATA` from `LearningAccessModule`, boot the app, run the manual HTTP smoke above. (Outside DEV1 scope.)
+2. **DEV1 post-cleanup (after smoke green):** delete the 4 dead legacy services + their providers/exports; keep `EmailService` (active). Optionally relocate controllers into `presentation/` and remove the empty `.gitkeep` scaffolds.
+3. Address the 7 pre-existing lint warnings in `lessons`/`quiz`/`quiz-attempts` (their owners; not DEV1).
+
 ## DEV1.8E Admin Dashboard / Statistics Cleanup Audit + Deprecation
 
 - **Date/time:** 2026-06-30 15:53:54 +07:00
