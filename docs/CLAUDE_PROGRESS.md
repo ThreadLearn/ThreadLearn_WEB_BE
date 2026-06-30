@@ -4,8 +4,8 @@
 
 - Date/time: 2026-06-30
 - Branch: `refactor/dev1-clean-architecture`
-- Module: DEV1 / `users`
-- Task: **DEV1.6E UsersService Cleanup Audit + Deprecation** (audit toàn repo xác nhận `UsersController` không còn dùng `UsersService`/`saveUploadedFile`/model; thêm JSDoc `@deprecated` cho `UsersService`; sửa comment sai lệch trong `users.module.ts`; GIỮ provider/export cho rollback — KHÔNG xoá gì). Xem section §DEV1.6E. (Trước đó: DEV1.6A Audit, DEV1.6B Domain/Ports/Adapter, DEV1.6C Application Use-cases + DI, DEV1.6D Controller Migration.)
+- Module: DEV1 / `admin`
+- Task: **DEV1.7A Admin Student Management Baseline Audit** (audit-only UC10–UC13: Add / Lock / Unlock / List / Update Student trên `AdminController` + `AdminService` legacy static; KHÔNG sửa runtime, route, response shape, authorization, lock/unlock behavior). Xem section §DEV1.7A. (Trước đó: DEV1.6A–6E Profile/Avatar migration.)
 
 ## Current Status
 
@@ -1999,3 +1999,179 @@ Liên quan (đã migrate Clean Arch ở DEV1.4C): `GET /api/v1/auth/session` →
 ### Next recommended task
 
 - **DEV1.6F (deletion, sau khi kernel `LEARNING_ACCESS_DATA` được sửa + smoke đủ 3 route UC09):** gỡ provider/export `UsersService` khỏi `UsersModule`, xoá `users.service.ts` legacy + clean import `User`/`UserStats` không còn dùng. Hoặc chuyển sang module DEV1 kế tiếp (admin/dashboard) nếu deletion còn bị chặn bởi kernel debt.
+
+---
+
+## DEV1.7A Admin Student Management Baseline Audit
+
+- **Date/time:** 2026-06-30
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Module:** DEV1 / `admin` — **AUDIT-ONLY**. KHÔNG sửa runtime, KHÔNG đổi route/response/authorization/lock-unlock/create-student behavior, KHÔNG xoá legacy, KHÔNG tạo Clean Architecture code mới.
+- **Scope:** UC10 Add Student · UC11 Lock/Unlock Student · UC12 View Student List · UC13 Update Student Information.
+
+### Files changed (2 — docs only)
+
+- `docs/CLAUDE_PROGRESS.md` (file này) — thêm section §DEV1.7A + cập nhật header "Last Updated".
+- `docs/CLEAN_ARCHITECTURE_MIGRATION.md` — note ngắn DEV1.7A.
+- **KHÔNG** đụng `src/modules/**`, `src/common/**`, `src/utils/**`, `package.json`, `.env`.
+
+### Endpoints found (UC10–UC13)
+
+> Path thật = global prefix `app.setGlobalPrefix('api')` (main.ts:24) + `@Controller('v1/admin')` ⇒ **base `/api/v1/admin`**.
+> Class-level: `@UseGuards(JwtAuthGuard)` + `@Roles('ADMIN')` + `@ApiBearerAuth('BearerAuth')` + `@ApiTags('Admin')`.
+> **Mọi** handler còn gọi `ensureAdminCanManageStudents(admin)` → `AdminService.ensureActiveAdmin(admin.id)` (re-fetch admin từ DB, check `role==='ADMIN'`, `assertUserCanAuthenticate`) — **double-check** ngoài guard.
+> Toàn bộ student logic gọi `AdminService.*` **static** (không qua DI).
+
+| UC | Method | Full path | Controller method | Validator (pipe) | Body/Query/Param | HTTP status | Response `data` |
+|----|--------|-----------|-------------------|------------------|------------------|-------------|------------------|
+| UC10 | POST | `/api/v1/admin/students` | `createStudent` | `ZodValidationPipe(createStudentSchema)` | body `{email, password?, firstName, lastName}` | **201** (Nest default POST) | `SafeUser` (student vừa tạo) |
+| UC12 | GET | `/api/v1/admin/students` | `listStudents` | `ZodValidationPipe(listStudentsQuerySchema)` | query `{page=1, limit=20(max100), search?, isActive?, isVerified?}` | 200 | `SafeUser[]` (+ `meta`) |
+| UC13 | PATCH | `/api/v1/admin/students/:id` | `updateStudent` | param `objectIdParamSchema` + body `updateStudentSchema` | param `:id`(24-hex), body `{firstName?, lastName?, avatarUrl?, isVerified?}` (≥1 field) | 200 | `SafeUser` |
+| UC11 | PATCH | `/api/v1/admin/students/:id/lock` | `lockStudent` | param `objectIdParamSchema` + body `lockStudentSchema` | param `:id`, body `{lockedReason?}`(≤500) | 200 | `SafeUser` |
+| UC11 | PATCH | `/api/v1/admin/students/:id/unlock` | `unlockStudent` | param `objectIdParamSchema` | param `:id`, **no body** | 200 | `SafeUser` |
+
+- **Response wrapper:** tất cả qua `ApiResponse.success({message, data, meta?})` ⇒ `{ success:true, message, data, meta }`. **Lưu ý:** `createStudent` truyền `statusCode:201` vào `ApiResponse.success` nhưng wrapper **bỏ qua** field này (`_statusCode`) — HTTP 201 đến từ Nest default của `@Post()`, KHÔNG có `@HttpCode`. Message của Add Student động theo `temporaryPasswordSent`.
+- **Swagger:** mỗi route có `@ApiOperation({summary})`; class có `@ApiTags('Admin')` + `@ApiBearerAuth('BearerAuth')`.
+- **Out-of-scope cùng controller (KHÔNG thuộc UC10–13):** `GET /api/v1/admin/stats`, `GET /api/v1/admin/dashboard/statistics`, `POST /api/v1/admin/execute`.
+
+### Controllers / services / models involved
+
+- **Controller:** `src/modules/admin/controllers/admin.controller.ts` (inject duy nhất `CodeExecutionService`; mọi student-flow gọi `AdminService` **static**; `getStats` query model trực tiếp).
+- **Service:** `src/modules/admin/services/admin.service.ts` — **static class** (`createStudent`/`listStudents`/`updateStudent`/`lockStudent`/`unlockStudent`/`ensureActiveAdmin` + dead methods).
+- **Validators:** `src/modules/admin/validators/admin.validator.ts` (zod).
+- **Models import trực tiếp (coupling):** `User` (auth/models), `UserStats` (gamification/models), `Course` (courses/models). Controller thêm `Enrollment`, `QuizAttempt`.
+- **Cross-module utils:** `EmailService` (auth, static), `sanitizeUser` + `assertUserCanAuthenticate` (auth/utils/user-sanitizer), `AnalyticsService` (analytics, static).
+- **Module:** `admin.module.ts` đăng ký `AdminService` làm provider+export — **dead DI** (dùng static, không inject ở đâu).
+
+### Current add student behavior (UC10)
+
+- **Admin nhập:** `email`, `firstName`, `lastName`, **optional** `password` (zod: email hợp lệ, password ≥6, firstName/lastName trim ≥1).
+- **Duplicate email:** có — `User.findOne({email})` → `BadRequestError('Email address is already in use.')` (400).
+- **Password:** nếu admin nhập → dùng; nếu không → generate `crypto.randomBytes(12).toString('base64url')`. Luôn `bcrypt.hash(password, 10)` (hash trực tiếp, không qua `PASSWORD_HASHER` port/`src/utils`).
+- **Role/active/verified:** hardcode `role:'STUDENT'`, `isActive:true`, `isVerified:true`, `emailVerifiedAt: now` ⇒ student **active + verified ngay**, KHÔNG qua email-verification flow.
+- **UserStats:** có — `UserStats.create({userId, xp:0, level:1})` **trực tiếp** (coupling gamification; KHÔNG qua `USER_STATS_PROVISIONER` port).
+- **Invitation email:** **chỉ khi password được generate** → `EmailService.sendStudentInvitationEmail({email, firstName, temporaryPassword})` (static, fire-and-forget, mock-log nếu thiếu SMTP). Admin tự nhập password ⇒ **KHÔNG** gửi email.
+- **Response:** `toSafeStudent` = `sanitizeUser` ⇒ `SafeUser`. **KHÔNG expose** `passwordHash`/temporary password trong response (chỉ qua email/log). `temporaryPasswordSent` chỉ đổi **message** string.
+- **Error/status:** email trùng → 400; input invalid → 400 (ZodValidationPipe); email gửi fail → nuốt lỗi (fire-and-forget, log), không surface.
+
+### Current lock/unlock behavior (UC11)
+
+- **Lock set fields:** `isActive=false`, `lockedAt=now`, `lockedReason=reason?`. **KHÔNG** đụng `lockedUntil`/`failedLoginAttempts`.
+- **Admin lock vs temporary login lock:** 2 tập field **tách biệt** — admin lock = `isActive`+`lockedAt`+`lockedReason`; temporary login lock (auth login flow) = `lockedUntil`+`failedLoginAttempts`. Admin lock/unlock **không** chạm tập lockout tạm thời.
+- **Reason bắt buộc?** Không — `lockedReason` optional (≤500 ký tự).
+- **Unlock clear fields:** `isActive=true`, `lockedAt=undefined`, `lockedReason=undefined`. **KHÔNG** clear `lockedUntil`/`failedLoginAttempts`.
+- **Chặn tự lock admin/current user?** KHÔNG có check `target !== admin` tường minh — nhưng `getStudentOrThrow` enforce `role==='STUDENT'`, mà admin là ADMIN ⇒ admin **không thể** lock chính mình (rớt ở "not a student").
+- **Chặn lock non-student?** Có — `getStudentOrThrow` → `BadRequestError('Target user is not a student.')` (400).
+- **User not found?** Có — `NotFoundError('Student not found.')` (404).
+- **Response:** `SafeUser`.
+
+### Current student list behavior (UC12)
+
+- **Query params:** `page`(default 1), `limit`(default 20, max 100), `search?`, `isActive?`, `isVerified?`. **KHÔNG** có `status`/`role`/`sort` param. Sort **hardcode** `{createdAt:-1}`.
+- **Search:** regex case-insensitive (đã escape) trên `$or: [email, firstName, lastName]`.
+- **Filter:** hardcode `role:'STUDENT'` ⇒ **KHÔNG include admin**. Optional thêm `isActive`/`isVerified`.
+- **Response shape:** `data: SafeUser[]` (key `items` ở service → controller map sang `data`) + `meta:{ page, limit, total, totalPages }`. **KHÔNG** có `stats`.
+- **Sanitize:** có — `sanitizeUser`. **KHÔNG expose** `googleId`/`githubId`/`passwordHash`/`failedLoginAttempts`/`lockedUntil`/`lockedReason`/`planType` (whitelist `SafeUser`).
+
+### Current update student behavior (UC13)
+
+- **Updatable fields:** chỉ `firstName`, `lastName`, `avatarUrl`, `isVerified`. **KHÔNG** cho update `email`/`role`/`isActive`/`password`/`planType`.
+- **isVerified toggle:** `true` → set `emailVerifiedAt` (nếu chưa có); `false` → `emailVerifiedAt=undefined`.
+- **Validate duplicate email:** N/A (email không cho update).
+- **Update password / admin role / self:** KHÔNG (không nằm trong schema; target phải là STUDENT ⇒ không update được admin/self).
+- **Chặn update non-student?** Có — `getStudentOrThrow` → 400. **Not found** → 404.
+- **Empty body:** `updateStudentSchema.refine` → 400 ('At least one student field must be provided.').
+- **Response:** `SafeUser`.
+
+### Current response shapes
+
+- **Envelope:** `{ success:true, message, data, meta? }` (`ApiResponse.success`).
+- **`SafeUser`** (`sanitizeUser`): `{ id, email, firstName, lastName, avatarUrl, role, isVerified, isActive, lastLoginAt, createdAt, updatedAt }`. KHÔNG `passwordHash`/`googleId`/`githubId`/`failedLoginAttempts`/`lockedUntil`/`lockedReason`/`planType`/`emailVerifiedAt`.
+- **List `meta`:** `{ page, limit, total, totalPages }`.
+
+### Current validation/security behavior
+
+- **AuthZ:** lớp guard `JwtAuthGuard` + `@Roles('ADMIN')` (verify JWT + check role). **Cộng thêm** re-check `ensureActiveAdmin` mỗi request (re-fetch admin, role==ADMIN, `assertUserCanAuthenticate`) ⇒ logic authz lặp ở controller/service ngoài guard.
+- **Validation:** zod schemas qua `ZodValidationPipe` (body/query/param). ObjectId 24-hex regex cho `:id`.
+- **Secrets:** response không lộ password/hash/token. Temporary password chỉ đi qua email/mock-log (KHÔNG vào response). KHÔNG log secret trong docs.
+
+### Email / UserStats behavior
+
+- **Email:** `EmailService.sendStudentInvitationEmail` (static, auth module) — **chỉ** khi password generate. Fire-and-forget + exponential-backoff retry (1s/2s, 3 lần), mock-log nếu thiếu SMTP. Là consumer **active** duy nhất còn lại của `EmailService` ngoài port `EMAIL_SENDER`.
+- **UserStats:** `UserStats.create({userId, xp:0, level:1})` trực tiếp khi tạo student (mirror default schema gamification). KHÔNG idempotent, KHÔNG qua port.
+
+### Coupling / layer issues
+
+1. **`AdminService` là static class** — controller gọi `AdminService.createStudent(...)` static; provider+export trong `AdminModule` là **dead DI registration** (không inject).
+2. **Service import model trực tiếp:** `User` (auth), `UserStats` (gamification), `Course` (courses) ⇒ coupling chéo module, không qua repository/port.
+3. **Controller query DB trực tiếp:** `getStats` gọi `User/Course/Enrollment/QuizAttempt.countDocuments()` (ngoài UC10–13 nhưng cùng controller); import 4 model + `AnalyticsService` static.
+4. **Email trực tiếp:** `EmailService.sendStudentInvitationEmail` static — chưa có `INVITATION_EMAIL` port.
+5. **UserStats trực tiếp:** `UserStats.create` — bỏ qua `USER_STATS_PROVISIONER` port đã có sẵn ở auth.
+6. **AuthZ lặp:** `ensureAdminCanManageStudents` (controller) + `ensureActiveAdmin` (service) lặp lại check role mà guard `@Roles('ADMIN')` đã làm + thêm 1 query DB/request.
+7. **Pagination thủ công lặp:** `listStudents` (skip/limit/countDocuments) lặp với `listUsers` (dead) + pattern các module khác — không có shared pagination helper/port.
+8. **Sanitizer:** **KHÔNG** duplicate — dùng chung `sanitizeUser` (auth utils); `toSafeStudent` chỉ là wrapper mỏng. ✅
+9. **Dead code trong `AdminService`:** `listUsers`, `updateUserRole`, `toggleCoursePublish`, `deleteUser` — **không có caller** nào trong repo.
+10. **Shared OK:** `JwtAuthGuard`/`Roles`/`CurrentUser`/`ApiResponse`/`ZodValidationPipe`/custom errors dùng đúng, không duplicate. ✅
+
+### Shared code available for reuse
+
+- **Presentation:** `JwtAuthGuard`, `Roles`, `CurrentUser`, `AuthenticatedUser`, `ApiResponse`, `ZodValidationPipe`, custom errors — đã dùng đúng, reuse nguyên.
+- **`USER_REPOSITORY`** (auth, **đã export**): có `findById`/`findByEmail`/`create`/`update`. **Thiếu:** `listStudents`/`countStudents`/search-filter-pagination.
+- **`PASSWORD_HASHER`** port (auth) — cho hash password Add Student (thay `bcrypt.hash` trực tiếp).
+- **`USER_STATS_PROVISIONER`** port (auth) — `ensureForUser(userId)` (mirror xp:0/level:1, idempotent) thay `UserStats.create`.
+- **`EMAIL_SENDER`** port (auth, `SmtpEmailSenderService` wrap `EmailService`) — hiện chỉ verification/reset; cần **mở rộng** thêm invitation hoặc tạo `INVITATION_EMAIL` port mới.
+- **`UserEntity`** (auth domain): đã có `lock(reason)`/`unlock()` **mirror chính xác** admin lock/unlock (isActive+lockedAt+lockedReason); có `createNew`/`markEmailVerified`/`updateProfile`/`activate`/getters. **Thiếu:** factory verified-student, `updateStudentInfo` (kèm isVerified↔emailVerifiedAt), `canBeManagedByAdmin`.
+- **`sanitizeUser` / `SafeUser`** (auth utils) — presenter base reuse.
+
+### Proposed Clean Architecture target (đề xuất — CHƯA code)
+
+**Domain (auth `UserEntity` mở rộng / hoặc admin-specific):**
+- Reuse `lock(reason)`/`unlock()` — đã đúng behavior admin lock/unlock, **không thêm method trùng**. Giữ phân biệt admin-lock (`lockedAt`/`lockedReason`) ≠ temporary login lock (`lockedUntil`/`failedLoginAttempts`).
+- Thêm factory `createVerifiedStudent(input)` (role=STUDENT + active + verified + emailVerifiedAt) — mirror Add Student.
+- Thêm `updateStudentInfo({firstName?,lastName?,avatarUrl?,isVerified?})` (xử lý isVerified ↔ emailVerifiedAt; khác `updateProfile` hiện chỉ 3 field).
+- Thêm `canBeManagedByAdmin()` → `role === 'STUDENT'` (dùng cho lock/unlock/update guard, thay `getStudentOrThrow`).
+
+**Application (`admin/application/services`):**
+- `AddStudentService` (USER_REPOSITORY + PASSWORD_HASHER + INVITATION_EMAIL + USER_STATS_PROVISIONER): dup-email check → hash → `createVerifiedStudent` → `create` → provision stats → gửi invitation nếu generated → trả `{ student: SafeUser, temporaryPasswordSent }`.
+- `LockStudentService` / `UnlockStudentService` (USER_REPOSITORY): load → `canBeManagedByAdmin` → `entity.lock/unlock` → `update` → SafeUser.
+- `GetStudentListService` (USER_REPOSITORY mở rộng): filter role=STUDENT + isActive/isVerified + search → paginate → `{ items, meta }`.
+- `UpdateStudentInfoService` (USER_REPOSITORY): load → `canBeManagedByAdmin` → `updateStudentInfo` → `update` → SafeUser.
+- **DTO/result:** `AddStudentInput`/`AddStudentResult`, `ListStudentsQuery`/`ListStudentsResult`, `UpdateStudentInput`, `Lock/UnlockInput`.
+- **Presenter:** reuse `sanitizeUser` hoặc `AdminStudentPresenter` (entity → SafeUser).
+- **Ports cần:** `USER_REPOSITORY` (extend list/count), `PASSWORD_HASHER` (reuse), `USER_STATS_PROVISIONER` (reuse), **`INVITATION_EMAIL` port mới** (hoặc extend `IEmailSender`), optional pagination helper.
+- **AuthZ:** giữ ở guard layer; nếu cần "active admin re-check" thì model thành guard/use-case nhỏ — **không** lặp query DB ở cả controller + service.
+
+**Infrastructure:**
+- Mở rộng `MongoUserRepository` (hoặc repo admin riêng): `listStudents(filter, pagination)` + `countStudents` + `findStudentById`. Reuse `create`/`update`/`findByEmail`/`findById`.
+- Adapter invitation email: extend `SmtpEmailSenderService` hoặc `SmtpInvitationEmailSender` wrap `EmailService.sendStudentInvitationEmail` (giữ SMTP/mock/fire-and-forget).
+- Reuse `MongoUserStatsProvisionerService` cho stats.
+
+**Presentation:**
+- `AdminController` migrate UC10–UC13 sang inject use-cases — **giữ nguyên** path/method/status/`@Roles`/`@ApiBearerAuth`/zod schemas/`ApiResponse`/message/shape.
+- **Thứ tự migrate đề xuất:** Lock → Unlock (đơn giản nhất, entity method đã có) → Update → List → Add Student (nhiều dependency: hasher+email+stats). `getStats`/`dashboard/statistics`/`execute` giữ nguyên (ngoài scope).
+
+### What was intentionally NOT changed
+
+- KHÔNG sửa bất kỳ file runtime nào: `src/modules/**`, `src/common/**`, `src/utils/**`. KHÔNG đổi route/method/status/response shape/message. KHÔNG đổi admin authorization, lock/unlock, create-student behavior. KHÔNG xoá legacy (`AdminService` dead methods giữ nguyên). KHÔNG tạo guard/decorator/helper/type/port/use-case mới. KHÔNG sửa `.env`/`package.json`. KHÔNG sửa nợ kernel `LEARNING_ACCESS_DATA`. KHÔNG commit tự động. KHÔNG expose secret/token/password.
+
+### Build / Lint / Test result
+
+- `npm run build`: ✅ PASS (nest build, no error).
+- `npm run lint`: ✅ 0 error, **7 warning** pre-existing ngoài scope (`lessons`/`quiz`/`quiz-attempts`) — **0** ở `admin`/`users`/`auth`.
+- `npm test`: ✅ 13/13 pass.
+
+### App boot/smoke result
+
+- `node dist/main.js`: fail **đúng** lỗi pre-existing `Symbol(LEARNING_ACCESS_DATA)` (`EnrollInCourseService`/`EnrollmentsModule`) — pre-existing, **ngoài scope DEV1**, KHÔNG sửa. KHÔNG lỗi mới (audit-only, zero runtime change). Smoke HTTP UC10–13 bị chặn bởi nợ kernel này.
+
+### Known issues / caveats
+
+1. App chưa boot được (nợ kernel `LEARNING_ACCESS_DATA`) ⇒ chưa smoke HTTP UC10–13 end-to-end. Pre-existing, ngoài scope DEV1.
+2. `AdminService` dead methods (`listUsers`/`updateUserRole`/`toggleCoursePublish`/`deleteUser`) chưa xoá (audit-only) — để phase cleanup.
+3. `getStats`/`dashboard/statistics`/`execute` cùng controller có coupling (model trực tiếp + `AnalyticsService` static) nhưng **ngoài** scope UC10–13 — chưa đụng.
+4. User aggregate nằm ở **auth module** ⇒ migrate admin sẽ cross-module wiring (giống UC09 `UsersModule` import `AuthModule`).
+5. Invitation email chưa có port riêng ⇒ cần quyết định extend `IEmailSender` hay tạo `INVITATION_EMAIL` mới ở phase migrate.
+
+### Next recommended task
+
+- **DEV1.7B (Domain + Ports + Infrastructure cho UC10–13, KHÔNG đổi controller):** thêm `UserEntity.createVerifiedStudent`/`updateStudentInfo`/`canBeManagedByAdmin`; mở rộng `USER_REPOSITORY`/`MongoUserRepository` (`listStudents`/`countStudents`); thêm `INVITATION_EMAIL` port + adapter wrap `sendStudentInvitationEmail`; reuse `PASSWORD_HASHER`/`USER_STATS_PROVISIONER`. Sau đó DEV1.7C (application use-cases) → DEV1.7D (migrate `AdminController` routes). Giữ path/response/status/authorization.
