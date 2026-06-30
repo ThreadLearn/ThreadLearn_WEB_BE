@@ -44,6 +44,10 @@ Admin student management UC10-UC13 now has application DTO/result types, an admi
 
 The five Admin student management routes now call Clean Architecture use-cases from `AdminController`: add, list, update, lock, and unlock student. Route decorators, validators, response messages, flat SafeUser/list data shapes, list meta, class-level admin authorization, and HTTP status behavior were preserved. Admin stats/dashboard/execute routes were intentionally left on their existing legacy paths for later bounded phases.
 
+## DEV1.7E Note (2026-06-30)
+
+AdminService cleanup was limited to audit plus method-level deprecation markers for legacy student-management rollback methods. `AdminService` itself, its provider/export, stats/dashboard/execute behavior, and legacy model imports were retained because non-migrated admin routes still need existing compatibility. No API path, response shape, validator, or authorization behavior changed.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:
