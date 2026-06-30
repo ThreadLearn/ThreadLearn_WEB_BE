@@ -64,6 +64,10 @@ Admin dashboard/statistics now has application DTO/result types plus two use-cas
 
 AdminController now delegates `GET /api/v1/admin/stats` to `GetAdminBasicStatsService` and `GET /api/v1/admin/dashboard/statistics` to `GetAdminDashboardStatisticsService`. Route decorators, query validation, default status behavior, response messages, response shapes, and admin authorization behavior were preserved. Direct dashboard model counts plus `AnalyticsService`/`AdminService` calls were removed from the controller only.
 
+## DEV1.8E Note (2026-06-30)
+
+Cleanup audit confirmed `AdminController` no longer depends on dashboard models, `AdminService`, or `AnalyticsService` for UC14. `AnalyticsService` has no active controller consumer and `AdminService` has no active controller caller, but both providers/exports remain for rollback compatibility. Safe deprecation JSDoc was added to legacy analytics methods and `AdminService.ensureActiveAdmin`; no runtime logic, route behavior, API shape, validator, or authorization behavior changed.
+
 ## Shared Code Reuse Rule
 
 DEV1 **bắt buộc tái sử dụng**, KHÔNG tạo bản trùng:

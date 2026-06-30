@@ -1,5 +1,37 @@
 # ThreadLearn BE DEV1 Clean Architecture Progress
 
+## DEV1.8E Admin Dashboard / Statistics Cleanup Audit + Deprecation
+
+- **Date/time:** 2026-06-30 15:53:54 +07:00
+- **Branch:** `refactor/dev1-clean-architecture`
+- **Files changed:**
+  - `src/modules/analytics/services/analytics.service.ts`
+  - `src/modules/admin/services/admin.service.ts`
+  - `src/modules/admin/admin.module.ts`
+  - `docs/CLAUDE_PROGRESS.md`
+  - `docs/CLEAN_ARCHITECTURE_MIGRATION.md`
+- **AdminController audit:** `rg` and self-check confirm `AdminController` no longer imports/calls `AdminService`, `AnalyticsService`, direct dashboard models, `countDocuments`, or aggregate logic. `/stats` calls `GetAdminBasicStatsService`; `/dashboard/statistics` calls `GetAdminDashboardStatisticsService`. The `execute` route and student routes were not changed.
+- **AdminService usage audit:** Repo search shows the only real source import is `AdminModule`; no `AdminService.*` runtime call remains. Other matches are the class/export itself or comments/JSDoc documenting legacy mirrors. `AdminModule` still registers and exports `AdminService`.
+- **AnalyticsService usage audit:** Repo search shows `AnalyticsService` is imported only by `AnalyticsModule`, where it remains provider/export. `AnalyticsController` has no routes. No `AnalyticsService.*` runtime call remains; `getPlatformStats`, `getAdminDashboardStatistics`, and `getUserProgress` are dead-ish rollback legacy methods.
+- **Direct model import audit:** `AdminController` has no direct model imports. `admin/application` and `admin/domain` do not import models. Direct model access remains in `MongoAdminDashboardStatsReaderService` (correct infrastructure layer), `AnalyticsService` (legacy service retained), and `AdminService` legacy/rollback methods.
+- **Controller cleanup:** No controller edit was needed in DEV1.8E; DEV1.8D cleanup already removed stale imports.
+- **Deprecation markers added:** Added `@deprecated` JSDoc to `AnalyticsService.getPlatformStats`, `AnalyticsService.getAdminDashboardStatistics`, `AnalyticsService.getUserProgress`, and `AdminService.ensureActiveAdmin`. Existing DEV1.7E student-management deprecation markers were left unchanged.
+- **Module provider/export decision:** Kept `AdminService` provider/export, `AnalyticsService` provider/export, `AnalyticsModule`, dashboard reader provider, and dashboard use-case providers. Updated only the `AdminModule` comment to clarify rollback compatibility after dashboard migration.
+- **What was intentionally NOT changed:** No route logic, controller methods, decorators, validators, response wrappers, response messages, response shapes, admin authorization, provider/export wiring, legacy method logic/signatures/imports, models, `.env`, package metadata, common shared code, or kernel/learning-access code changed.
+- **Runtime compatibility:** Runtime behavior is unchanged except for comments/JSDoc metadata.
+- **API compatibility:** No API path, method, status, message, or response shape changed.
+- **Query/validator compatibility:** `dashboardStatisticsQuerySchema` and `ZodValidationPipe` are unchanged.
+- **Authorization compatibility:** `JwtAuthGuard`, `@Roles('ADMIN')`, `@CurrentUser`, and active-admin behavior through use-cases are unchanged.
+- **Response shape compatibility:** `/stats` and `/dashboard/statistics` shapes remain as migrated in DEV1.8D.
+- **Security compatibility:** No secret/token/password/env value was logged or documented.
+- **Build result:** `npm.cmd run build` PASS.
+- **Lint result:** `npm.cmd run lint` PASS with 0 errors and 7 pre-existing warnings outside DEV1 admin/dashboard scope (`lessons`, `quiz`, `quiz-attempts`).
+- **Test result:** `npm.cmd test` PASS, 13/13 tests.
+- **Self-check result:** AdminController forbidden dashboard/model/static-service check is empty. Admin application and infrastructure checks are clean. Admin domain scan reports only existing comment prose in `invitation-email.port.ts`. Recursive service usage checks show only module provider/export plus comments/JSDoc/class declarations for `AdminService` and `AnalyticsService`.
+- **App boot/smoke result if any:** `node dist/main.js` timed out after 15s while connecting to MongoDB. Isolated built `AdminModule` DI smoke passed with `AdminModule context OK`.
+- **Known issues/caveats:** Full HTTP/manual route smoke remains blocked by MongoDB connection timeout in this environment. `AnalyticsService` and `AdminService` are still retained as rollback legacy and module exports by design.
+- **Next recommended task:** DEV1.8F or final DEV1 cleanup can reassess removing legacy providers/exports only after stable full-app smoke and a broader caller audit across runtime and FE expectations.
+
 ## DEV1.8D AdminController Migration - Dashboard / Statistics UC14
 
 - **Date/time:** 2026-06-30 15:46:28 +07:00

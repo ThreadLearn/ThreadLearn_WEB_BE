@@ -43,6 +43,11 @@ export class AdminService {
     return { users, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  /**
+   * @deprecated AdminController UC14 routes now re-check active admin through
+   * Clean Architecture use-cases (DEV1.8D). Retained temporarily for
+   * rollback/compatibility until final cleanup.
+   */
   static async ensureActiveAdmin(adminId: string) {
     const admin = await User.findById(adminId);
     if (!admin) {

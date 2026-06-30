@@ -20,6 +20,9 @@ type MonthlyCount = {
 export class AnalyticsService {
   /**
    * Returns aggregated platform-wide stats for the admin dashboard.
+   *
+   * @deprecated No active HTTP/controller consumer remains after DEV1.8D UC14
+   * migration. Retained temporarily for rollback/compatibility until final cleanup.
    */
   static async getPlatformStats() {
     const [totalUsers, totalCourses, totalEnrollments, totalAttempts] = await Promise.all([
@@ -48,6 +51,11 @@ export class AnalyticsService {
     };
   }
 
+  /**
+   * @deprecated Admin dashboard statistics request flow has been migrated to Clean
+   * Architecture use-cases in DEV1.8D. Retained temporarily for rollback/compatibility
+   * until final cleanup.
+   */
   static async getAdminDashboardStatistics(query: DashboardStatisticsQuery) {
     const range = this.resolveDateRange(query);
     const newUsersThisMonthStart = new Date();
@@ -132,6 +140,9 @@ export class AnalyticsService {
 
   /**
    * Returns per-user progress summary.
+   *
+   * @deprecated No active HTTP/controller consumer remains after DEV1.8D audit.
+   * Retained temporarily for rollback/compatibility until final cleanup.
    */
   static async getUserProgress(userId: string) {
     const enrollments = await Enrollment.find({ userId }).populate('courseId', 'title');

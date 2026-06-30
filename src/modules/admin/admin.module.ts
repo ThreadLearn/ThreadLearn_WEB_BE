@@ -32,8 +32,10 @@ import {
  * KHÔNG đổi runtime: `AdminController`/`AdminService` legacy static giữ nguyên.
  * DEV1.7C update: application use-case providers are now registered below; controller migration
  * is intentionally left for the next phase.
- * DEV1.7E update: student routes are migrated; provider/export stays for non-migrated admin
- * routes and rollback compatibility.
+ * DEV1.7E update: student routes are migrated; provider/export stays for rollback
+ * compatibility.
+ * DEV1.8E update: dashboard/statistics routes are migrated too; `AdminService`
+ * has no active controller consumer, but provider/export stays for rollback compatibility.
  */
 @Module({
   imports: [AuthModule, LearningAccessModule, CodeExecutionModule],
