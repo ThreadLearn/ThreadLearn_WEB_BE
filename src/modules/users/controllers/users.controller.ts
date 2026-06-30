@@ -17,22 +17,42 @@ import { BadRequestError } from '../../../common/custom-error';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
-import { saveUploadedFile } from '../../../configs/upload';
-import { UsersService } from '../services/users.service';
+import {
+  GetMyProfileService,
+  UpdateMyProfileService,
+  UploadAvatarService,
+} from '../application/services';
 import { updateProfileSchema } from '../validators/users.validator';
 
+/**
+ * UsersController (UC09 — Profile / Avatar).
+ *
+ * DEV1.6D — migrate sang Clean Architecture use-cases (`GetMyProfileService`,
+ * `UpdateMyProfileService`, `UploadAvatarService`). Controller chỉ còn lo
+ * presentation: auth context, body/file extraction, `ApiResponse.success` wrapper.
+ *
+ * GIỮ NGUYÊN so với legacy: route path, HTTP method/status, response message + shape,
+ * `FileInterceptor('avatar')` memory upload, không validate mime, không xoá avatar cũ.
+ * Không còn query DB / gọi `UsersService` legacy / gọi `saveUploadedFile` trực tiếp.
+ */
 @ApiTags('Users')
 @Controller('v1/users')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class UsersController {
+  constructor(
+    private readonly getMyProfileService: GetMyProfileService,
+    private readonly updateMyProfileService: UpdateMyProfileService,
+    private readonly uploadAvatarService: UploadAvatarService
+  ) {}
+
   @Get('profile')
   async getMyProfile(@CurrentUser() user?: AuthenticatedUser) {
     if (!user) {
       throw new BadRequestError('User context not found.');
     }
 
-    const profile = await UsersService.getProfile(user.id);
+    const profile = await this.getMyProfileService.execute({ userId: user.id });
     return ApiResponse.success({
       message: 'Profile retrieved successfully.',
       data: profile,
@@ -50,7 +70,12 @@ export class UsersController {
       throw new BadRequestError('User context not found.');
     }
 
-    const updatedProfile = await UsersService.updateProfile(user.id, body);
+    const updatedProfile = await this.updateMyProfileService.execute({
+      userId: user.id,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      avatarUrl: body.avatarUrl,
+    });
     return ApiResponse.success({
       message: 'Profile updated successfully.',
       data: updatedProfile,
@@ -69,12 +94,10 @@ export class UsersController {
         throw new BadRequestError('User context not found.');
       }
 
-      if (!file) {
-        throw new BadRequestError('No avatar file provided in FormData.');
-      }
-
-      const fileUrl = await saveUploadedFile(file, 'avatars');
-      const updatedUser = await UsersService.updateAvatar(user.id, fileUrl);
+      const updatedUser = await this.uploadAvatarService.execute({
+        userId: user.id,
+        file,
+      });
 
       return ApiResponse.success({
         message: 'Avatar uploaded successfully.',
