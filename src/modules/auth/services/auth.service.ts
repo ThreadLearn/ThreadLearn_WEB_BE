@@ -434,7 +434,8 @@ export class AuthService {
       expiresAt,
     });
 
-    const verificationUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(rawToken)}`;
+    const frontendUrl = env.FRONTEND_URL[0].replace(/\/$/, '');
+    const verificationUrl = `${frontendUrl}/verify-email?token=${encodeURIComponent(rawToken)}`;
     await EmailService.sendVerificationEmail({
       email: user.email,
       firstName: user.firstName,

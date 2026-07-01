@@ -16,10 +16,9 @@ async function bootstrap() {
   await connectToDatabase();
 
   const app = await NestFactory.create(AppModule);
-  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : env.FRONTEND_URL;
 
   app.setGlobalPrefix('api');
 
