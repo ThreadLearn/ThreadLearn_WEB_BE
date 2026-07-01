@@ -39,10 +39,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().url().optional(),
-  FRONTEND_URL: z.string()
-      .default('http://localhost:3000')
-      .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean))
-      .pipe(z.array(z.string().url()).min(1)),
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   FRONTEND_AUTH_SUCCESS_REDIRECT_URL: z.string().url().optional(),
   FRONTEND_AUTH_FAILURE_REDIRECT_URL: z.string().url().optional(),
   SMTP_HOST: optionalNonEmptyString,
