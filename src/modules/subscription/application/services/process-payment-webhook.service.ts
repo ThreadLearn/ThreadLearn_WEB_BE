@@ -23,7 +23,16 @@ export class ProcessPaymentWebhookService {
       throw DomainError.notFound(ErrorCode.SUBSCRIPTION_PURCHASE_NOT_FOUND, 'Purchase not found.');
     }
 
-    if (result.succeeded) {
+    if (result.verified === false) {
+      throw DomainError.badRequest(ErrorCode.SUBSCRIPTION_PURCHASE_INVALID_INPUT, 'Payment webhook verification failed.');
+    }
+
+    const purchaseProps = purchase.toProps();
+    if (purchaseProps.status === 'succeeded' || purchaseProps.status === 'failed') {
+      return purchase;
+    }
+
+    if (result.succeeded && this.amountMatches(purchaseProps.amount, result.amount)) {
       purchase.markSucceeded(new Date());
       const saved = await this.purchaseRepository.update(purchase);
       this.eventEmitter.emit('payment.succeeded', {
@@ -36,5 +45,10 @@ export class ProcessPaymentWebhookService {
 
     purchase.markFailed();
     return this.purchaseRepository.update(purchase);
+  }
+
+  private amountMatches(expected: number, actual?: number): boolean {
+    if (actual === undefined) return true;
+    return Math.round(expected * 100) === Math.round(actual * 100);
   }
 }

@@ -14,7 +14,9 @@ export interface PaymentRequestResult {
 export interface PaymentWebhookResult {
   transactionId: string;
   purchaseId?: string;
+  amount?: number;
   succeeded: boolean;
+  verified?: boolean;
 }
 
 export interface IPaymentGateway {

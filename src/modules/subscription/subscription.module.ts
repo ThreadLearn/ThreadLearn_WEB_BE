@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CreatePlanService } from './application/services/create-plan.service';
 import { DeletePlanService } from './application/services/delete-plan.service';
 import { GetMySubscriptionService } from './application/services/get-my-subscription.service';
@@ -12,6 +13,7 @@ import { PAYMENT_GATEWAY } from './domain/interfaces/payment-gateway.port';
 import { PLAN_REPOSITORY } from './domain/interfaces/plan.repository';
 import { PURCHASE_REPOSITORY } from './domain/interfaces/purchase.repository';
 import { SUBSCRIPTION_REPOSITORY } from './domain/interfaces/subscription.repository';
+import { MockPaymentAdapter } from './infrastructure/payment/mock-payment.adapter';
 import { VNPayAdapter } from './infrastructure/payment/vnpay.adapter';
 import { MongoPlanRepository } from './infrastructure/persistence/mongo-plan.repository';
 import { MongoPurchaseRepository } from './infrastructure/persistence/mongo-purchase.repository';
@@ -25,11 +27,24 @@ import { SubscriptionController } from './presentation/controller/subscription.c
     MongoPlanRepository,
     MongoPurchaseRepository,
     MongoSubscriptionRepository,
+    MockPaymentAdapter,
     VNPayAdapter,
     { provide: PLAN_REPOSITORY, useExisting: MongoPlanRepository },
     { provide: PURCHASE_REPOSITORY, useExisting: MongoPurchaseRepository },
     { provide: SUBSCRIPTION_REPOSITORY, useExisting: MongoSubscriptionRepository },
-    { provide: PAYMENT_GATEWAY, useExisting: VNPayAdapter },
+    {
+      provide: PAYMENT_GATEWAY,
+      inject: [ConfigService, MockPaymentAdapter, VNPayAdapter],
+      useFactory: (
+        config: ConfigService,
+        mockPaymentAdapter: MockPaymentAdapter,
+        vnpayAdapter: VNPayAdapter,
+      ) => {
+        return config.get<string>('PAYMENT_GATEWAY_MODE', 'mock') === 'vnpay'
+          ? vnpayAdapter
+          : mockPaymentAdapter;
+      },
+    },
     CreatePlanService,
     UpdatePlanService,
     DeletePlanService,
