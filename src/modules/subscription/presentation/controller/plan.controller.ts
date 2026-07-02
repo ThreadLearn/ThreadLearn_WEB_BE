@@ -23,7 +23,6 @@ import { PlanPresenter } from '../response/plan.presenter';
 @ApiTags('Subscription Plans')
 @Controller('v1/subscription/plans')
 @UseGuards(JwtAuthGuard)
-@Roles('ADMIN')
 @ApiBearerAuth('BearerAuth')
 export class PlanController {
   constructor(
@@ -35,6 +34,7 @@ export class PlanController {
   ) {}
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'UC51 — create subscription plan.' })
   async create(@Body(new ZodValidationPipe(createPlanSchema)) body: CreatePlanDto) {
     const plan = await this.createPlan.execute(body);
@@ -66,6 +66,7 @@ export class PlanController {
   }
 
   @Put(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'UC51 — update subscription plan.' })
   async update(
     @Param('id', new ZodValidationPipe(planIdParamSchema)) id: string,
@@ -79,6 +80,7 @@ export class PlanController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'UC51 — deactivate subscription plan.' })
   async remove(@Param('id', new ZodValidationPipe(planIdParamSchema)) id: string) {
     const plan = await this.deletePlan.execute(id);
