@@ -21,3 +21,7 @@ Enrollments publishes facts. Gamification owns rewards, Certificates owns issuan
 +## Response compatibility
 
 `CompleteLessonService` continues returning enrollment progress plus `xpRewarded` and `stats`; event transport is an internal implementation detail.
+
++## Publisher orchestration
+
+The publisher ignores repeat completions, emits the lesson event first, emits the course event only for the final lesson, and combines listener results.
