@@ -45,3 +45,7 @@ Certificate issuance listens only to `course.completed`, preventing lesson handl
 +## Provider registration
 
 The publisher and enrollment-owned event handlers are registered in `EnrollmentsModule` so Nest can inject EventEmitter2 and discover decorators.
+
++## Dependency isolation
+
+Enrollment application code depends only on EventEmitter2 and event contracts, not on gamification or leaderboard implementations.
