@@ -29,3 +29,7 @@ The publisher ignores repeat completions, emits the lesson event first, emits th
 +## Completion effects
 
 Numeric XP from listeners is summed. The latest non-null stats snapshot wins so the API returns the state after all completion rewards.
+
++## Consumer topology
+
+Nest providers subscribe through `@OnEvent`; the publisher does not import or construct downstream feature services.
