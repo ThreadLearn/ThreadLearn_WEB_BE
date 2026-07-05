@@ -37,3 +37,7 @@ Nest providers subscribe through `@OnEvent`; the publisher does not import or co
 +## Notification policy
 
 A normal lesson emits a lesson notification. The final lesson suppresses that message and delegates the single completion message to `course.completed`.
+
++## Certificate policy
+
+Certificate issuance listens only to `course.completed`, preventing lesson handlers from duplicating course side effects.
