@@ -41,3 +41,7 @@ A normal lesson emits a lesson notification. The final lesson suppresses that me
 +## Certificate policy
 
 Certificate issuance listens only to `course.completed`, preventing lesson handlers from duplicating course side effects.
+
++## Provider registration
+
+The publisher and enrollment-owned event handlers are registered in `EnrollmentsModule` so Nest can inject EventEmitter2 and discover decorators.
