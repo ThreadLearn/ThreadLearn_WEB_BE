@@ -25,3 +25,7 @@ Enrollments publishes facts. Gamification owns rewards, Certificates owns issuan
 +## Publisher orchestration
 
 The publisher ignores repeat completions, emits the lesson event first, emits the course event only for the final lesson, and combines listener results.
+
++## Completion effects
+
+Numeric XP from listeners is summed. The latest non-null stats snapshot wins so the API returns the state after all completion rewards.
