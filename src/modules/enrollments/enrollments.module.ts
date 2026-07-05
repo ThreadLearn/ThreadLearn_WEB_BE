@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
 import { CourseModule } from '../course/course.module';
 import { LessonsModule } from '../lessons/lessons.module';
+import { CertificatesHandler } from './application/events/certificates.handler';
+import { EnrollmentCompletionPublisher } from './application/events/enrollment-completion.publisher';
+import { NotificationsHandler } from './application/events/notifications.handler';
 import { CompleteLessonService } from './application/services/complete-lesson.service';
 import { EnrollInCourseService } from './application/services/enroll-in-course.service';
 import { GetMyCourseEnrollmentService } from './application/services/get-my-course-enrollment.service';
@@ -30,6 +33,9 @@ import {
     GetMyCourseEnrollmentService,
     GetMyResumeService,
     CompleteLessonService,
+    EnrollmentCompletionPublisher,
+    CertificatesHandler,
+    NotificationsHandler,
   ],
   exports: [ENROLLMENT_REPOSITORY, EnrollInCourseService],
 })
