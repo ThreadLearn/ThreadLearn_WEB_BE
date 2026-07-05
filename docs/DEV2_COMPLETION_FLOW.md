@@ -33,3 +33,7 @@ Numeric XP from listeners is summed. The latest non-null stats snapshot wins so 
 +## Consumer topology
 
 Nest providers subscribe through `@OnEvent`; the publisher does not import or construct downstream feature services.
+
++## Notification policy
+
+A normal lesson emits a lesson notification. The final lesson suppresses that message and delegates the single completion message to `course.completed`.
