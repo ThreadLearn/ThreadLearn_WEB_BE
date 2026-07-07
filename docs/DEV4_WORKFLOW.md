@@ -174,6 +174,8 @@ Trả về:
 | B2 | quiz-attempts | 40–43 | ☑ | ☑ | ☑ | ☑ |
 | B3 | gamification | 48–49 | ☑ | ☑ | ☑ | ☑ |
 | B4 | leaderboard | 50 | ☑ | ☑ | ☑ | ☑ |
-| B5 | subscription | 51–52 | ☐ | ☐ | ☐ | ☐ |
+| B5 | subscription | 51–52 | ☑ | ☐ | ☐ | ☑ |
 
 > Quy tắc chốt: một bước chỉ được tick đủ khi Prompt#2 (model khác) trả PASS toàn bộ. Sau đó mới mở bước kế.
+>
+> Cập nhật 2026-07-07: B5 source đã tồn tại và build xanh (`npx tsc --noEmit`, `npm run build`, `npm test -- --runInBand` pass). Chưa tick nghiệm thu/grep vì chưa chạy đủ Prompt#2 + E2E live với MongoDB/Redis/payment gateway.
