@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { UserStats as UserStatsModel } from '../schemas/user-stats.schema';
+import { XpAwardLog } from '../schemas/xp-award-log.schema';
 import { UserStats } from '../../../domain/entities/user-stats.entity';
-import { IUserStatsRepository } from '../../../domain/interfaces/user-stats.repository';
+import { IUserStatsRepository, XpAwardSourceType } from '../../../domain/interfaces/user-stats.repository';
 import { UserStatsMapper } from '../../mapper/user-stats.mapper';
 
 @Injectable()
@@ -30,6 +31,19 @@ export class UserStatsRepository implements IUserStatsRepository {
     return UserStatsMapper.toEntity(doc);
   }
 
+  async claimXpAward(sourceType: XpAwardSourceType, sourceId: string, userId: string): Promise<boolean> {
+    try {
+      await XpAwardLog.create({ sourceType, sourceId, userId });
+      return true;
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
   async findTopByXp(limit: number): Promise<UserStats[]> {
     const docs = await UserStatsModel.find()
       .sort({ xp: -1 })
@@ -44,4 +58,8 @@ export class UserStatsRepository implements IUserStatsRepository {
     const higherCount = await UserStatsModel.countDocuments({ xp: { $gt: userDoc.xp } }).exec();
     return higherCount + 1;
   }
+}
+
+function isDuplicateKeyError(error: unknown): error is { code: number } {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 }

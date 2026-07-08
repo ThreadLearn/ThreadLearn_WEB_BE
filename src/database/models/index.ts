@@ -19,6 +19,7 @@ import { Quiz } from '../../modules/quiz/models/quiz.model';
 import { QuizAttempt } from '../../modules/quiz-attempts/models/quiz-attempt.model';
 import { AIHistory } from '../../modules/ai/models/ai-history.model';
 import { UserStats } from '../../modules/gamification/infrastructure/persistence/schemas/user-stats.schema';
+import { XpAwardLog } from '../../modules/gamification/infrastructure/persistence/schemas/xp-award-log.schema';
 import { Notification } from '../../modules/notifications/models/notification.model';
 
 export {
@@ -43,5 +44,6 @@ export {
   QuizAttempt,
   AIHistory,
   UserStats,
+  XpAwardLog,
   Notification,
 };
