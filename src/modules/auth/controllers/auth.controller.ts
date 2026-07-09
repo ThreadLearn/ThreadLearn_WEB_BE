@@ -137,7 +137,7 @@ export class AuthController {
     try {
       const result = await this.handleGoogleCallbackService.execute({ code: query.code });
       const redirectUrl = new URL(
-        env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'
+        env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3001/auth/callback'
       );
       redirectUrl.searchParams.set('accessToken', result.accessToken);
       redirectUrl.searchParams.set('refreshToken', result.refreshToken);
@@ -194,7 +194,7 @@ export class AuthController {
   }
 
   private redirectGoogleFailure(response: any, message: string) {
-    const redirectUrl = new URL(env.FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3000/login');
+    const redirectUrl = new URL(env.FRONTEND_AUTH_FAILURE_REDIRECT_URL || 'http://localhost:3001/login');
     redirectUrl.searchParams.set('error', message);
     return response.redirect(redirectUrl.toString());
   }

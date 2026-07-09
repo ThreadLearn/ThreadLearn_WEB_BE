@@ -21,7 +21,7 @@ const optionalBoolean = z.preprocess((value) => {
 }, z.boolean().optional());
 
 const envSchema = z.object({
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(5000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   MOCK_MODE: optionalBoolean.default(false),
   DATABASE_URL: z.string().optional(),
@@ -40,7 +40,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().url().optional(),
   FRONTEND_URL: z.string()
-      .default('http://localhost:3000')
+      .default('http://localhost:3001')
       .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean))
       .pipe(z.array(z.string().url()).min(1)),
   FRONTEND_AUTH_SUCCESS_REDIRECT_URL: z.string().url().optional(),

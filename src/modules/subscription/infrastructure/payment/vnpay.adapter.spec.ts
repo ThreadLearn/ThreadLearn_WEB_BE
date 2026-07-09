@@ -12,7 +12,7 @@ describe('VNPayAdapter.verifyWebhook', () => {
         const values: Record<string, string> = {
           VNP_HASH_SECRET: hashSecret,
           VNP_TMN_CODE: 'TESTTMN',
-          VNP_RETURN_URL: 'http://localhost:3000/subscription/payment-return',
+          VNP_RETURN_URL: 'http://localhost:3001/pricing/callback',
           VNP_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
         };
         return values[key] ?? defaultValue;
