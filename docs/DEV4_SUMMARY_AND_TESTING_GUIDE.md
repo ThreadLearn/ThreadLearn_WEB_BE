@@ -11,6 +11,29 @@
 
 ---
 
+## 0. CẬP NHẬT NHANH 2026-07-09
+
+Các phần DEV4 đã được bổ sung/kiểm thử trong session gần nhất:
+
+- FE đã merge Admin Plan CRUD, Admin Route Guard và Quiz Countdown Timer.
+- BE đã merge service-flow tests cho Subscription UC51-UC52.
+- BE có PR #69 đang mở để bổ sung verification/fix cho realtime XP + leaderboard:
+  - `quiz.passed` có `attemptId`;
+  - XP chỉ award một lần cho cùng một quiz attempt;
+  - leaderboard cache invalidate sau event;
+  - `/leaderboard/me` và top rankings đọc rank mới từ `UserStats`.
+
+Lệnh verify BE đã chạy khi tạo PR #69:
+
+```bash
+npx jest src/modules/gamification/application/event-handlers/xp-leaderboard-flow.spec.ts --runInBand
+npm test -- --runInBand
+npm run build
+npm run lint
+```
+
+---
+
 ## 1. CẤU HÌNH CHUNG
 - **Base URL:** `http://localhost:5000`
 - **Header bắt buộc:** 
@@ -192,6 +215,12 @@
       }
     }
     ```
+*   **Side-effect sau khi pass:**
+    - Backend publish `quiz.submitted` cho mọi lần nộp.
+    - Nếu bài đạt điểm pass, Backend publish thêm `quiz.passed`.
+    - `quiz.passed` mang `attemptId`, `quizId`, `score`, `xpReward`.
+    - Gamification handler xử lý event này để cộng XP.
+    - Sau PR #69, XP quiz được chống double-award theo `attemptId`.
 
 #### 3. Xem danh sách lịch sử các lần làm Quiz của bản thân (UC43)
 *   **Method:** `GET`
@@ -231,6 +260,126 @@
       }
     }
     ```
+
+---
+
+### ─── LUỒNG 5: SUBSCRIPTION / SERVICE PLANS (UC51 - UC52) ───
+
+#### 1. Tạo gói dịch vụ mới (UC51)
+*Yêu cầu Role: `ADMIN`*
+*   **Method:** `POST`
+*   **Path:** `/api/v1/subscription/plans`
+*   **Body:**
+    - `name` (String, bắt buộc, tối đa 120 ký tự)
+    - `description` (String, tùy chọn, tối đa 1000 ký tự)
+    - `price` (Number, bắt buộc, >= 0)
+    - `currency` (String, tùy chọn, mặc định do domain xử lý)
+    - `durationDays` (Number, bắt buộc, integer > 0)
+    - `features` (Array<String>, tùy chọn)
+    - `isActive` (Boolean, tùy chọn)
+*   **Ví dụ Body:**
+    ```json
+    {
+      "name": "Premium Monthly",
+      "description": "Monthly premium access",
+      "price": 99000,
+      "currency": "VND",
+      "durationDays": 30,
+      "features": ["AI hints", "Premium lessons"]
+    }
+    ```
+
+#### 2. Lấy danh sách gói dịch vụ (UC51)
+*Yêu cầu JWT*
+*   **Method:** `GET`
+*   **Path:** `/api/v1/subscription/plans`
+*   **Query Params:**
+    - `includeInactive` (Boolean String, tùy chọn): truyền `true` để admin/debug xem cả plan đã deactivate.
+*   **Ví dụ Request:** `GET /api/v1/subscription/plans?includeInactive=true`
+
+#### 3. Lấy chi tiết một gói dịch vụ (UC51)
+*Yêu cầu JWT*
+*   **Method:** `GET`
+*   **Path:** `/api/v1/subscription/plans/<PLAN_ID>`
+*   **Route Params:**
+    - `PLAN_ID`: Mongo ObjectId 24 ký tự hex.
+
+#### 4. Cập nhật gói dịch vụ (UC51)
+*Yêu cầu Role: `ADMIN`*
+*   **Method:** `PUT`
+*   **Path:** `/api/v1/subscription/plans/<PLAN_ID>`
+*   **Body:** các field giống tạo plan, tất cả tùy chọn nhưng phải có ít nhất 1 field.
+
+#### 5. Vô hiệu hóa gói dịch vụ (UC51)
+*Yêu cầu Role: `ADMIN`*
+*   **Method:** `DELETE`
+*   **Path:** `/api/v1/subscription/plans/<PLAN_ID>`
+*   **Ghi chú:** Đây là soft deactivate, không hard delete.
+
+#### 6. Student mua gói dịch vụ (UC52)
+*Yêu cầu Role: `STUDENT` hoặc user có JWT hợp lệ*
+*   **Method:** `POST`
+*   **Path:** `/api/v1/subscription/purchase`
+*   **Body:**
+    ```json
+    {
+      "planId": "64b7f3c2a1234567890abcde"
+    }
+    ```
+*   **Response data chính:**
+    - `id` / `_id`
+    - `userId`
+    - `planId`
+    - `amount`
+    - `currency`
+    - `status`
+    - `transactionId`
+    - `paymentUrl`
+
+#### 7. Webhook thanh toán (UC52)
+*Dành cho payment gateway / mock gateway*
+*   **Method:** `POST`
+*   **Path:** `/api/v1/subscription/webhook/payment`
+*   **Body:** record linh hoạt theo gateway adapter.
+*   **Mock/service-flow fields thường dùng:**
+    ```json
+    {
+      "purchaseId": "64b7f3c2a1234567890abcde",
+      "transactionId": "64b7f3c2a1234567890abcde",
+      "status": "success",
+      "amount": "99000"
+    }
+    ```
+*   **Side-effect:**
+    - Webhook verified + amount đúng -> purchase `succeeded`.
+    - Emit `payment.succeeded`.
+    - Handler tạo mới hoặc gia hạn subscription active.
+    - Retry webhook thành công cho cùng purchase không emit `payment.succeeded` lần 2.
+
+#### 8. Lấy subscription hiện tại của user (UC52)
+*Yêu cầu JWT*
+*   **Method:** `GET`
+*   **Path:** `/api/v1/subscription/my-subscription`
+*   **Response data chính:**
+    - `id` / `_id`
+    - `userId`
+    - `planId`
+    - `status`
+    - `startedAt`
+    - `expiresAt`
+
+---
+
+## 3. CHECKLIST KIỂM THỬ THỦ CÔNG CHO DEV4
+
+1. Admin login, tạo plan ở FE `/admin/plans`.
+2. Student login, gọi mua plan, nhận `paymentUrl`.
+3. Xử lý mock/webhook payment, kiểm tra `GET /api/v1/subscription/my-subscription` trả subscription active.
+4. Student mở quiz có `timeLimitSeconds`, kiểm tra countdown hiển thị.
+5. Làm quiz pass, kiểm tra response submit có `xpRewarded`.
+6. Gọi `GET /api/v1/gamification/stats`, XP phải tăng.
+7. Gọi `GET /api/v1/leaderboard/me`, rank/xp phải cập nhật.
+8. Retry cùng webhook hoặc cùng event quiz attempt trong test không được cộng side-effect lần 2.
 
 ---
 

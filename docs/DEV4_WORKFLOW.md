@@ -179,3 +179,126 @@ Trả về:
 > Quy tắc chốt: một bước chỉ được tick đủ khi Prompt#2 (model khác) trả PASS toàn bộ. Sau đó mới mở bước kế.
 >
 > Cập nhật 2026-07-07: B5 source đã tồn tại và build xanh (`npx tsc --noEmit`, `npm run build`, `npm test -- --runInBand` pass). Chưa tick nghiệm thu/grep vì chưa chạy đủ Prompt#2 + E2E live với MongoDB/Redis/payment gateway.
+
+---
+
+## 7. CẬP NHẬT SESSION 2026-07-09
+
+Mục này ghi lại những phần đã làm trong session DEV4 gần nhất để dev tiếp theo có thể nắm trạng thái nhanh.
+
+### 7.1 PR / nhánh đã xử lý
+
+| Repo | Nhánh / PR | Trạng thái | Nội dung |
+|------|------------|------------|----------|
+| FE | `feature/admin-plan-crud-fe` / PR #23 | Đã merge vào `develop` | Admin UI CRUD subscription plans: list, create, edit, deactivate plan. |
+| BE | `docs/dev4-workflow-status` / PR #67 | Đã merge vào `develop` | Cập nhật trạng thái workflow DEV4 trước đó. |
+| BE | `test-dev4-subscription-e2e` / PR #68 | Đã merge vào `develop` | Test service flow cho UC51-UC52: plan CRUD, purchase, webhook success/fail, chống double event payment. |
+| FE | `feature/admin-route-guard` / PR #24 | Đã merge vào `develop` | Guard thật cho `/admin/*`, non-admin redirect `/403`. |
+| FE | `feature/quiz-countdown-timer` / PR #25 | Đã merge vào `develop` | Countdown quiz theo `timeLimitSeconds`, cảnh báo dưới 60s, auto submit khi hết giờ. |
+| BE | `test-dev4-xp-leaderboard-flow` / PR #69 | Đang mở, chờ CI/merge | Verify/fix realtime XP + leaderboard, chống double-award XP theo `attemptId`. |
+
+### 7.2 Phần đã hoàn thiện trong session
+
+#### Admin Plan CRUD FE
+
+- Thêm màn `/admin/plans` để admin quản lý service plans.
+- Kết nối FE với API subscription plans hiện có của BE.
+- Sidebar admin có entry quản lý plans.
+- Scope thuộc UC51.
+
+#### Subscription service-flow tests BE
+
+- Thêm test service-level cho flow UC51-UC52.
+- Bao phủ:
+  - tạo/list/update/deactivate plan;
+  - tạo purchase;
+  - webhook thành công tạo/gia hạn subscription;
+  - webhook retry không emit `payment.succeeded` lần 2;
+  - webhook invalid/amount mismatch không kích hoạt subscription.
+- File chính: `src/modules/subscription/application/services/subscription-flow.spec.ts`.
+
+#### Admin route guard FE
+
+- Thêm guard ở layout admin.
+- Nếu user không phải `ADMIN` truy cập trực tiếp `/admin/*`, FE redirect về `/403`.
+- Lưu ý: đây là guard UX/client-side. BE vẫn phải giữ `@Roles('ADMIN')` ở API admin.
+
+#### Quiz countdown timer FE
+
+- Màn làm quiz đọc `quiz.timeLimitSeconds`.
+- Hiển thị đồng hồ countdown.
+- Đổi trạng thái cảnh báo khi còn dưới 60 giây.
+- Tự submit bài khi hết giờ.
+- Disable submit thủ công sau khi timeout để tránh double action từ UI.
+
+#### Realtime XP / Leaderboard verification BE
+
+- Nhánh/PR: `test-dev4-xp-leaderboard-flow` / PR #69.
+- Mục tiêu:
+  - pass quiz phải emit `quiz.passed`;
+  - XP tăng đúng một lần;
+  - leaderboard rank đọc lại từ stats mới;
+  - retry cùng `quiz.passed` event không double-award XP.
+- Thay đổi kỹ thuật trong PR #69:
+  - thêm `XpAwardLog` collection;
+  - thêm `IUserStatsRepository.claimXpAward(sourceType, sourceId, userId)`;
+  - thêm `AwardXpService.executeOnce(...)`;
+  - `GamificationRewardsEventHandler` dùng `attemptId` của `QuizPassedEvent` làm idempotency key;
+  - seed cleanup xóa cả `XpAwardLog`.
+- Test mới:
+  - `src/modules/gamification/application/event-handlers/xp-leaderboard-flow.spec.ts`.
+
+### 7.3 Lệnh verify đã chạy
+
+Trên BE:
+
+```bash
+npx jest src/modules/gamification/application/event-handlers/xp-leaderboard-flow.spec.ts --runInBand
+npm test -- --runInBand
+npm run build
+npm run lint
+```
+
+Kết quả khi tạo PR #69:
+
+- Spec XP/leaderboard mới pass.
+- Full test pass: 5 suites, 24 tests.
+- Build pass.
+- Lint pass.
+
+Trên FE cho các PR đã merge:
+
+```bash
+npm run build
+npx tsc --noEmit
+```
+
+Kết quả khi làm:
+
+- `feature/admin-route-guard`: build pass, typecheck pass.
+- `feature/quiz-countdown-timer`: build pass, typecheck pass.
+
+### 7.4 Trạng thái nghiệm thu hiện tại
+
+| Hạng mục | Trạng thái |
+|----------|------------|
+| UC36-UC39 Quiz CRUD/questions | Đã có BE, cần test manual thêm với dữ liệu thật nếu chuẩn bị demo. |
+| UC40-UC43 Quiz runtime/history | Đã có BE, FE đã bổ sung countdown timer. |
+| UC48-UC50 XP/Level/Leaderboard | Có BE flow; PR #69 bổ sung idempotency + test verification, cần merge sau CI. |
+| UC51-UC52 Subscription/Payment | BE + FE plan CRUD đã có; service-flow test đã merge. Cần test live với MongoDB/payment gateway nếu demo production-like. |
+| Admin FE protection | Sidebar ẩn menu + route guard đã merge; BE role guard vẫn là lớp bảo vệ chính. |
+
+### 7.5 Việc còn lại nên làm tiếp
+
+1. Merge PR #69 sau khi CI xanh.
+2. Chạy manual E2E với FE + BE + MongoDB:
+   - admin tạo plan;
+   - student purchase plan;
+   - webhook/mock payment kích hoạt subscription;
+   - student làm quiz pass;
+   - kiểm tra XP tăng một lần;
+   - kiểm tra `/leaderboard/me` và `/leaderboard` đổi rank.
+3. Nếu cần nâng độ chắc chắn cho demo, thêm E2E HTTP-level cho:
+   - quiz submit timeout;
+   - non-admin gọi admin plan API bị reject;
+   - leaderboard cache miss/hit với Redis thật.
