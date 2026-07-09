@@ -7,7 +7,19 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { BadRequestError } from '../../../common/custom-error';
 import { env } from '../../../configs/env';
-import { AuthService } from '../services/auth.service';
+import {
+  RefreshTokenService,
+  LogoutService,
+  GetSessionService,
+  VerifyEmailService,
+  ResendVerificationEmailService,
+  ForgotPasswordService,
+  ResetPasswordService,
+  RegisterUserService,
+  LoginUserService,
+  GetGoogleAuthUrlService,
+  HandleGoogleCallbackService,
+} from '../application/services';
 import {
   forgotPasswordSchema,
   googleOAuthCallbackSchema,
@@ -22,9 +34,33 @@ import {
 @ApiTags('Auth')
 @Controller('v1/auth')
 export class AuthController {
+  /**
+   * DEV1.4C-1: session/logout/refresh → use-case.
+   * DEV1.4C-2: verify-email/resend-verification/forgot-password/reset-password → use-case.
+   * DEV1.4C-3: register/login → use-case.
+   * DEV1.4C-4: google/google-callback → use-case.
+   * Toàn bộ request flow của AuthController KHÔNG còn gọi `AuthService` legacy.
+   */
+  constructor(
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly logoutService: LogoutService,
+    private readonly getSessionService: GetSessionService,
+    private readonly verifyEmailService: VerifyEmailService,
+    private readonly resendVerificationEmailService: ResendVerificationEmailService,
+    private readonly forgotPasswordService: ForgotPasswordService,
+    private readonly resetPasswordService: ResetPasswordService,
+    private readonly registerUserService: RegisterUserService,
+    private readonly loginUserService: LoginUserService,
+    private readonly getGoogleAuthUrlService: GetGoogleAuthUrlService,
+    private readonly handleGoogleCallbackService: HandleGoogleCallbackService,
+  ) {}
+
   @Post('register')
-  async register(@Body(new ZodValidationPipe(registerSchema)) body: unknown) {
-    const result = await AuthService.register(body);
+  async register(
+    @Body(new ZodValidationPipe(registerSchema))
+    body: { email: string; password: string; firstName: string; lastName: string }
+  ) {
+    const result = await this.registerUserService.execute(body);
     return ApiResponse.success({
       message: 'User registered successfully.',
       data: result,
@@ -36,7 +72,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Verify an email address with a verification token.' })
   async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { token: string }) {
-    const result = await AuthService.verifyEmail(body.token);
+    const result = await this.verifyEmailService.execute({ token: body.token });
     return ApiResponse.success({
       message: 'Email verified successfully.',
       data: result,
@@ -47,7 +83,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Resend the email verification link.' })
   async resendVerification(@Body(new ZodValidationPipe(resendVerificationSchema)) body: { email: string }) {
-    await AuthService.resendVerification(body.email);
+    await this.resendVerificationEmailService.execute({ email: body.email });
     return ApiResponse.success({
       message: 'Verification email sent successfully.',
     });
@@ -57,7 +93,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Request a password reset link.' })
   async forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) body: { email: string }) {
-    await AuthService.forgotPassword(body.email);
+    await this.forgotPasswordService.execute({ email: body.email });
     return ApiResponse.success({
       message: 'If the email exists, a password reset link has been sent.',
     });
@@ -70,7 +106,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(resetPasswordSchema))
     body: { token: string; newPassword: string }
   ) {
-    await AuthService.resetPassword(body.token, body.newPassword);
+    await this.resetPasswordService.execute({ token: body.token, newPassword: body.newPassword });
     return ApiResponse.success({
       message: 'Password reset successfully.',
     });
@@ -79,7 +115,8 @@ export class AuthController {
   @Get('google')
   @ApiOperation({ summary: 'Start Google OAuth authentication.' })
   async googleAuth(@Res() response: any) {
-    return response.redirect(AuthService.getGoogleAuthorizationUrl());
+    const { url } = this.getGoogleAuthUrlService.execute();
+    return response.redirect(url);
   }
 
   @Get('google/callback')
@@ -98,7 +135,7 @@ export class AuthController {
     }
 
     try {
-      const result = await AuthService.loginWithGoogleCode(query.code);
+      const result = await this.handleGoogleCallbackService.execute({ code: query.code });
       const redirectUrl = new URL(
         env.FRONTEND_AUTH_SUCCESS_REDIRECT_URL || 'http://localhost:3000/auth/callback'
       );
@@ -115,8 +152,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body(new ZodValidationPipe(loginSchema)) body: unknown) {
-    const result = await AuthService.login(body);
+  async login(@Body(new ZodValidationPipe(loginSchema)) body: { email: string; password: string }) {
+    const result = await this.loginUserService.execute(body);
     return ApiResponse.success({
       message: 'Login successful.',
       data: result,
@@ -126,7 +163,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    const result = await AuthService.refresh(body.refreshToken);
+    const result = await this.refreshTokenService.execute({ refreshToken: body.refreshToken });
     return ApiResponse.success({
       message: 'Tokens refreshed successfully.',
       data: result,
@@ -136,7 +173,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   async logout(@Body(new ZodValidationPipe(refreshTokenSchema)) body: { refreshToken: string }) {
-    await AuthService.logout(body.refreshToken);
+    await this.logoutService.execute({ refreshToken: body.refreshToken });
     return ApiResponse.success({
       message: 'Logged out successfully.',
     });
@@ -149,10 +186,10 @@ export class AuthController {
     if (!user) {
       throw new BadRequestError('User context missing from request.');
     }
-    const sessionUser = await AuthService.getSessionUser(user.id);
+    const result = await this.getSessionService.execute({ userId: user.id });
     return ApiResponse.success({
       message: 'User context retrieved successfully.',
-      data: { user: sessionUser },
+      data: { user: result.user },
     });
   }
 
