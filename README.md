@@ -88,19 +88,19 @@ npm run start:dev
 The default backend URL is:
 
 ```text
-http://localhost:3000
+http://localhost:5000
 ```
 
 Swagger UI:
 
 ```text
-http://localhost:3000/api/docs
+http://localhost:5000/api/docs
 ```
 
 Health check:
 
 ```text
-http://localhost:3000/api/v1/health
+http://localhost:5000/api/v1/health
 ```
 
 ## Scripts

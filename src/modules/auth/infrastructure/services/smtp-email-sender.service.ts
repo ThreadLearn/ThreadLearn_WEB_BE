@@ -11,13 +11,13 @@ import {
  * Reset URL base — giữ ĐÚNG behavior hiện tại của AuthService
  * (`process.env.PASSWORD_RESET_URL`, KHÔNG đi qua `env` config object như verify link).
  */
-const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3000/reset-password';
+const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3001/reset-password';
 
 /**
  * Adapter cho `IEmailSender` — **wrap `EmailService` hiện tại** để giữ nguyên
  * SMTP behavior (mock-khi-thiếu-config, fire-and-forget + retry backoff, KHÔNG log
  * SMTP_PASS). Adapter dựng link y hệt AuthService:
- *  - verify: `FRONTEND_URL.replace(/\/$/,'') + '/verify-email?token=' + encodeURIComponent(token)`
+ *  - verify: first `FRONTEND_URL` origin + '/verify-email?token=' + encodeURIComponent(token)
  *  - reset : `PASSWORD_RESET_URL + '?token=' + encodeURIComponent(token)`
  * KHÔNG log token. Port nhận raw `token`; adapter chỉ nhúng vào link gửi qua email
  * (đúng như flow hiện tại — token KHÔNG xuất hiện ở log của adapter này).
@@ -27,7 +27,8 @@ const PASSWORD_RESET_URL = process.env.PASSWORD_RESET_URL || 'http://localhost:3
 @Injectable()
 export class SmtpEmailSenderService implements IEmailSender {
   async sendVerificationEmail(input: SendVerificationEmailInput): Promise<void> {
-    const verificationUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(
+    const frontendUrl = env.FRONTEND_URL[0].replace(/\/$/, '');
+    const verificationUrl = `${frontendUrl}/verify-email?token=${encodeURIComponent(
       input.token,
     )}`;
     await EmailService.sendVerificationEmail({
