@@ -56,6 +56,8 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
   JUDGE0_API_KEY: z.string().optional(),
+  AI_API_URL: z.string().default('http://localhost:8001'),
+  AI_API_TIMEOUT_MS: z.coerce.number().default(30000),
   UPLOAD_DIR: z.string().default('./public/uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().default(10),
 });

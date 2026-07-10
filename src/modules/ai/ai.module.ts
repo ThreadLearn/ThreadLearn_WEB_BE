@@ -1,5 +1,5 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
-import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
 import { AIRetentionService } from './application/services/ai-retention.service';
 import { GetHistoryByIdService } from './application/services/get-history-by-id.service';
 import { GetHistoryLogsService } from './application/services/get-history-logs.service';
@@ -10,7 +10,7 @@ import { MongoAIHistoryRepository } from './infrastructure/persistence/mongo-ai-
 import { AIController } from './presentation/controller/ai.controller';
 
 @Module({
-  imports: [LearningAccessModule],
+  imports: [HttpModule],
   controllers: [AIController],
   providers: [
     MongoAIHistoryRepository,
