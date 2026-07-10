@@ -1,12 +1,9 @@
 import { z } from '../../../../common/zod/z';
 
 export const aiRecommendationSchema = z.object({
-  courseId: z.string().optional(),
-  lessonId: z.string().optional(),
   codeExecutionId: z.string().optional(),
-  inputCode: z.string().max(50000).optional(),
-  language: z.string().optional(),
-  prompt: z.string().max(4000).optional(),
+  inputCode: z.string().min(1, 'inputCode is required').max(50000),
+  language: z.string().default('javascript'),
 });
 
 export const feedbackSchema = z.object({
