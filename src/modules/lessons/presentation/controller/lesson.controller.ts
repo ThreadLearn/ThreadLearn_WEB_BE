@@ -21,6 +21,7 @@ import { BadRequestError } from '../../../../common/custom-error';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../../../common/guards/optional-jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import { saveUploadedFile } from '../../../../configs/upload';
 import {
@@ -73,6 +74,8 @@ export class LessonController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
   async getById(
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @CurrentUser() user?: AuthenticatedUser,
@@ -85,6 +88,8 @@ export class LessonController {
   }
 
   @Get(':id/access-check')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
   async accessCheck(
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @CurrentUser() user?: AuthenticatedUser,

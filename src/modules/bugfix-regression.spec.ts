@@ -160,6 +160,37 @@ describe('reported bug regressions', () => {
     expect(isEnrolled).not.toHaveBeenCalled();
   });
 
+  it('allows enrolled students to interact with preview lessons', async () => {
+    const accessPort = new LearningAccessService({
+      findLesson: jest.fn().mockResolvedValue({
+        id: '507f1f77bcf86cd799439012',
+        courseId: '507f1f77bcf86cd799439013',
+        status: 'active',
+        isPreview: true,
+        isLocked: false,
+        title: 'Preview lesson',
+      }),
+      findCourse: jest.fn().mockResolvedValue({
+        id: '507f1f77bcf86cd799439013',
+        status: 'published',
+        isPremium: false,
+      }),
+      isEnrolled: jest.fn().mockResolvedValue(true),
+      hasActivePremium: jest.fn().mockResolvedValue(false),
+      touchCursor: jest.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      accessPort.assertLessonInteractionAccess(
+        '507f1f77bcf86cd799439012',
+        { id: '507f1f77bcf86cd799439011', role: 'STUDENT' },
+      ),
+    ).resolves.toMatchObject({
+      id: '507f1f77bcf86cd799439012',
+      courseId: '507f1f77bcf86cd799439013',
+    });
+  });
+
   it('filters enrollments whose populated course no longer exists', async () => {
     const validEnrollment = { _id: 'valid', courseId: { _id: 'course' } };
     const orphanEnrollment = { _id: 'orphan', courseId: null };
