@@ -53,3 +53,7 @@ Enrollment application code depends only on EventEmitter2 and event contracts, n
 +## Legacy cleanup
 
 Static enrollment-side bridges are removed after all side effects gain event subscribers in their owning modules.
+
++## Dependency inversion
+
+The completion use case publishes domain facts and no longer reaches across module boundaries to invoke reward or cache services.
