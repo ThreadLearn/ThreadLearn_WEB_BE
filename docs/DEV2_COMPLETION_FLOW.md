@@ -49,3 +49,7 @@ The publisher and enrollment-owned event handlers are registered in `Enrollments
 +## Dependency isolation
 
 Enrollment application code depends only on EventEmitter2 and event contracts, not on gamification or leaderboard implementations.
+
++## Legacy cleanup
+
+Static enrollment-side bridges are removed after all side effects gain event subscribers in their owning modules.
