@@ -57,3 +57,7 @@ Static enrollment-side bridges are removed after all side effects gain event sub
 +## Dependency inversion
 
 The completion use case publishes domain facts and no longer reaches across module boundaries to invoke reward or cache services.
+
++## Migration compatibility
+
+Event names remain `lesson.completed` and `course.completed`, matching existing gamification and leaderboard subscribers.
