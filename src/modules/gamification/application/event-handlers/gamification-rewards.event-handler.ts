@@ -37,12 +37,23 @@ export class GamificationRewardsEventHandler {
   }
 
   @OnEvent('quiz.passed')
-  private async handleQuizPassed(event: { userId: string; quizId: string; xpReward: number }) {
+  private async handleQuizPassed(event: { userId: string; quizId: string; attemptId: string; xpReward: number }) {
     this.logger.log(`[Gamification] Bắt đầu xử lý XP cho user ${event.userId} (Quiz: ${event.quizId})`);
     try {
-      await this.awardXpService.execute(event.userId, event.xpReward, 1);
-      await this.updateStreakService.execute(event.userId);
-      this.logger.log(`[Gamification] Cấp ${event.xpReward} XP thành công cho user ${event.userId}`);
+      const result = await this.awardXpService.executeOnce(
+        event.userId,
+        event.xpReward,
+        1,
+        'quiz_attempt',
+        event.attemptId,
+      );
+
+      if (result.awarded) {
+        await this.updateStreakService.execute(event.userId);
+        this.logger.log(`[Gamification] Cấp ${event.xpReward} XP thành công cho user ${event.userId}`);
+      } else {
+        this.logger.log(`[Gamification] Bỏ qua XP quiz đã xử lý cho attempt ${event.attemptId}`);
+      }
     } catch (error) {
       this.logger.error(`[Gamification Error] Không thể cấp XP cho user ${event.userId}:`, error);
       // Fallback không rollback quiz attempt (Eventual Consistency)

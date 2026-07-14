@@ -21,6 +21,7 @@ import {
   QuizAttempt,
   AIHistory,
   Notification,
+  XpAwardLog,
   RefreshToken,
   EmailVerificationToken,
   PasswordResetToken,
@@ -56,6 +57,7 @@ async function seed() {
     await Promise.all([
       User.deleteMany({}),
       UserStats.deleteMany({}),
+      XpAwardLog.deleteMany({}),
       Course.deleteMany({}),
       Section.deleteMany({}),
       CourseReview.deleteMany({}),
