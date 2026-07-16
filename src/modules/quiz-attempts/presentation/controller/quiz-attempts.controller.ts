@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, Param, Post, UseGuards,
+  Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
@@ -11,7 +11,12 @@ import { SubmitAttemptService } from '../../application/services/submit-attempt.
 import { GetAttemptService } from '../../application/services/get-attempt.service';
 import { GetMyAttemptsService } from '../../application/services/get-my-attempts.service';
 import { GetStudentQuizByLessonService } from '../../application/services/get-student-quiz-by-lesson.service';
-import { quizSubmitSchema, QuizSubmitDto } from '../validators/quiz-attempt.validator';
+import {
+  quizAttemptHistoryQuerySchema,
+  QuizAttemptHistoryQueryDto,
+  quizSubmitSchema,
+  QuizSubmitDto,
+} from '../validators/quiz-attempt.validator';
 import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 
 @ApiTags('Quiz - Student')
@@ -54,9 +59,28 @@ export class QuizAttemptsController {
 
   // ─── UC43: Học viên xem lịch sử làm bài ──────────────────
   @Get('attempts/me')
-  async getMyAttempts(@CurrentUser() user: AuthenticatedUser) {
-    const attempts = await this.getMyAttemptsService.execute(user.id);
-    return ApiResponse.success({ message: 'Quiz attempts fetched successfully.', data: QuizAttemptPresenter.toList(attempts) });
+  async getMyAttempts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(quizAttemptHistoryQuerySchema)) query: QuizAttemptHistoryQueryDto,
+  ) {
+    const result = await this.getMyAttemptsService.execute(user.id, query);
+    if (Array.isArray(result)) {
+      return ApiResponse.success({
+        message: 'Quiz attempts fetched successfully.',
+        data: QuizAttemptPresenter.toList(result),
+      });
+    }
+
+    return ApiResponse.success({
+      message: 'Quiz attempts fetched successfully.',
+      data: QuizAttemptPresenter.toList(result.items),
+      meta: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
   }
 
   // ─── UC42: Học viên xem chi tiết 1 lượt làm bài ──────────

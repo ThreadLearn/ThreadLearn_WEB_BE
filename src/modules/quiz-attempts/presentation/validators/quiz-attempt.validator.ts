@@ -18,8 +18,21 @@ export const quizSubmitSchema = z.object({
     .openapi({ example: '2026-06-17T02:00:00.000Z' }),
 }).openapi('QuizSubmitDto');
 
+export const quizAttemptHistoryQuerySchema = z.object({
+  page: z.preprocess(
+    (value) => (value === undefined || value === '' ? undefined : value),
+    z.coerce.number().int().min(1).optional(),
+  ),
+  limit: z.preprocess(
+    (value) => (value === undefined || value === '' ? undefined : value),
+    z.coerce.number().int().min(1).max(100).optional(),
+  ),
+}).openapi('QuizAttemptHistoryQueryDto');
+
 // ─── Đăng ký Swagger registry ──────────────────────────────────
 registry.register('QuizSubmitDto', quizSubmitSchema);
+registry.register('QuizAttemptHistoryQueryDto', quizAttemptHistoryQuerySchema);
 
 // ─── DTO type ──────────────────────────────────────────────────
 export type QuizSubmitDto = z.infer<typeof quizSubmitSchema>;
+export type QuizAttemptHistoryQueryDto = z.infer<typeof quizAttemptHistoryQuerySchema>;

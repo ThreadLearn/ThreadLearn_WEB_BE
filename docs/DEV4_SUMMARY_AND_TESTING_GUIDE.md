@@ -225,8 +225,12 @@ npm run lint
 #### 3. Xem danh sách lịch sử các lần làm Quiz của bản thân (UC43)
 *   **Method:** `GET`
 *   **Path:** `/api/v1/quiz/attempts/me`
-*   **Params / Query:** Không có.
-*   **Ví dụ Response:** Trả về danh sách mảng các lần làm bài, xếp theo thời gian nộp mới nhất lên đầu.
+*   **Query Params tùy chọn:**
+    - `page` (Number String, tùy chọn, >= 1): trang lịch sử cần lấy.
+    - `limit` (Number String, tùy chọn, 1 - 100): số attempt mỗi trang.
+*   **Backward compatibility:** Nếu không truyền `page`/`limit`, `data` vẫn là mảng đầy đủ như trước để FE cũ không vỡ.
+*   **Ví dụ Request phân trang:** `GET /api/v1/quiz/attempts/me?page=1&limit=10`
+*   **Ví dụ Response:** Trả về danh sách các lần làm bài, xếp theo thời gian nộp mới nhất lên đầu. Khi có query phân trang, response có thêm `meta.page`, `meta.limit`, `meta.total`, `meta.totalPages`.
 
 #### 4. Xem chi tiết kết quả một lần làm bài (UC42)
 *   **Method:** `GET`
