@@ -14,6 +14,7 @@ import { PLAN_REPOSITORY } from './domain/interfaces/plan.repository';
 import { PURCHASE_REPOSITORY } from './domain/interfaces/purchase.repository';
 import { SUBSCRIPTION_REPOSITORY } from './domain/interfaces/subscription.repository';
 import { MockPaymentAdapter } from './infrastructure/payment/mock-payment.adapter';
+import { PayOSAdapter } from './infrastructure/payment/payos.adapter';
 import { VNPayAdapter } from './infrastructure/payment/vnpay.adapter';
 import { MongoPlanRepository } from './infrastructure/persistence/mongo-plan.repository';
 import { MongoPurchaseRepository } from './infrastructure/persistence/mongo-purchase.repository';
@@ -28,21 +29,24 @@ import { SubscriptionController } from './presentation/controller/subscription.c
     MongoPurchaseRepository,
     MongoSubscriptionRepository,
     MockPaymentAdapter,
+    PayOSAdapter,
     VNPayAdapter,
     { provide: PLAN_REPOSITORY, useExisting: MongoPlanRepository },
     { provide: PURCHASE_REPOSITORY, useExisting: MongoPurchaseRepository },
     { provide: SUBSCRIPTION_REPOSITORY, useExisting: MongoSubscriptionRepository },
     {
       provide: PAYMENT_GATEWAY,
-      inject: [ConfigService, MockPaymentAdapter, VNPayAdapter],
+      inject: [ConfigService, MockPaymentAdapter, VNPayAdapter, PayOSAdapter],
       useFactory: (
         config: ConfigService,
         mockPaymentAdapter: MockPaymentAdapter,
         vnpayAdapter: VNPayAdapter,
+        payOSAdapter: PayOSAdapter,
       ) => {
-        return config.get<string>('PAYMENT_GATEWAY_MODE', 'mock') === 'vnpay'
-          ? vnpayAdapter
-          : mockPaymentAdapter;
+        const mode = config.get<string>('PAYMENT_GATEWAY_MODE', 'mock').toLowerCase();
+        if (mode === 'vnpay') return vnpayAdapter;
+        if (mode === 'payos') return payOSAdapter;
+        return mockPaymentAdapter;
       },
     },
     CreatePlanService,
