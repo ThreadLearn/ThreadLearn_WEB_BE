@@ -35,9 +35,9 @@ export class LearningAccessService implements ILearningAccess {
       if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'LESSON_LOCKED' };
     }
-    if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
 
     if (!viewer?.id) {
+      if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
 
@@ -46,14 +46,17 @@ export class LearningAccessService implements ILearningAccess {
       return { canView: false, reason: 'LESSON_NOT_FOUND' };
     }
     if (course.status !== 'published') {
+      if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
     if (course.isPremium && !(await this.data.hasActivePremium(viewer.id))) {
+      if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'PREMIUM_REQUIRED' };
     }
 
     const enrolled = await this.data.isEnrolled(viewer.id, lesson.courseId);
     if (!enrolled) {
+      if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
     return { canView: true, reason: 'ENROLLED' };

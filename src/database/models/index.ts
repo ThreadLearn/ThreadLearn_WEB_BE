@@ -20,6 +20,9 @@ import { QuizAttempt } from '../../modules/quiz-attempts/models/quiz-attempt.mod
 import { AIHistory } from '../../modules/ai/models/ai-history.model';
 import { UserStats } from '../../modules/gamification/infrastructure/persistence/schemas/user-stats.schema';
 import { Notification } from '../../modules/notifications/models/notification.model';
+import { PlanModel as SubscriptionPlan } from '../../modules/subscription/infrastructure/persistence/schemas/plan.schema';
+import { SubscriptionModel as UserSubscription } from '../../modules/subscription/infrastructure/persistence/schemas/subscription.schema';
+import { PurchaseModel as SubscriptionPurchase } from '../../modules/subscription/infrastructure/persistence/schemas/purchase.schema';
 
 export {
   User,
@@ -44,4 +47,7 @@ export {
   AIHistory,
   UserStats,
   Notification,
+  SubscriptionPlan,
+  UserSubscription,
+  SubscriptionPurchase,
 };

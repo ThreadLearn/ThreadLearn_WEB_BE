@@ -21,6 +21,9 @@ import {
   QuizAttempt,
   AIHistory,
   Notification,
+  SubscriptionPlan,
+  UserSubscription,
+  SubscriptionPurchase,
   RefreshToken,
   EmailVerificationToken,
   PasswordResetToken,
@@ -50,7 +53,7 @@ async function seed() {
     logger.info('🔌 Connected to MongoDB for seeding.');
 
     // ════════════════════════════════════════════════════════════
-    // 1. WIPE — xóa toàn bộ collection (đầy đủ 22 model)
+    // 1. WIPE — xóa toàn bộ collection seedable
     // ════════════════════════════════════════════════════════════
     logger.info('🗑️  Wiping all collections...');
     await Promise.all([
@@ -73,6 +76,9 @@ async function seed() {
       QuizAttempt.deleteMany({}),
       AIHistory.deleteMany({}),
       Notification.deleteMany({}),
+      SubscriptionPlan.deleteMany({}),
+      UserSubscription.deleteMany({}),
+      SubscriptionPurchase.deleteMany({}),
       RefreshToken.deleteMany({}),
       EmailVerificationToken.deleteMany({}),
       PasswordResetToken.deleteMany({}),
@@ -633,6 +639,9 @@ async function seed() {
       prompt: 'Review my reduce usage and suggest improvements.',
       response: 'Your reduce works but throws on empty arrays. Provide an initial value of 0.',
       suggestions: ['Add an initial accumulator value', 'Handle the empty-array case'],
+      raceConditions: [
+        'If this reducer later mutates shared state across workers, protect the accumulator or keep the calculation immutable.',
+      ],
       optimizedCode: 'const sum = arr => arr.reduce((a,b)=>a+b, 0);',
       explanation: 'Supplying 0 as the initial value avoids the "Reduce of empty array with no initial value" error.',
       tokenUsage: 180,
@@ -652,11 +661,102 @@ async function seed() {
       { userId: bob._id, title: 'Keep going!', message: 'You did not reach the passing score yet. Try the JS quiz again.', type: 'QUIZ_FAILED', isRead: false },
       { userId: bob._id, title: 'Enrolled', message: 'You enrolled in "JavaScript Programming Fundamentals".', type: 'COURSE_ENROLLED', isRead: true, readAt: daysAgo(14) },
       { userId: alice._id, title: 'Welcome to ThreadLearn!', message: 'Verify your email to unlock all features.', type: 'SYSTEM', isRead: false },
+      { userId: jane._id, title: 'Premium plan active', message: 'Your ThreadLearn Premium plan is active until the end of the term.', type: 'PAYMENT_SUCCESS', link: '/pricing', isRead: false },
+      { userId: bob._id, title: 'Level up!', message: 'You reached level 1 after completing JavaScript practice.', type: 'LEVEL_UP', link: '/leaderboard', isRead: false },
     ]);
-    logger.info('✅ Created 5 notifications.');
+    logger.info('✅ Created 7 notifications.');
 
     // ════════════════════════════════════════════════════════════
-    // 21. AUTH TOKENS (expiresAt phải ở TƯƠNG LAI — RefreshToken có TTL)
+    // 21. SUBSCRIPTION PLANS / USER SUBSCRIPTIONS / PURCHASES
+    // ════════════════════════════════════════════════════════════
+    logger.info('💳 Creating subscription plans and purchases...');
+    const [freePlan, monthlyPlan, semesterPlan] = await SubscriptionPlan.create([
+      {
+        name: 'Free',
+        description: 'Core courses, quizzes, progress tracking, and limited AI recommendations for students getting started.',
+        price: 0,
+        currency: 'VND',
+        durationDays: 30,
+        features: [
+          'Basic courses',
+          'Unlimited quiz practice',
+          'IDE access',
+          '10 AI recommendations per day',
+        ],
+        isActive: true,
+      },
+      {
+        name: 'Premium Monthly',
+        description: 'Unlock advanced concurrent programming courses, deeper AI feedback, and saved analysis history.',
+        price: 99000,
+        currency: 'VND',
+        durationDays: 30,
+        features: [
+          'Advanced courses',
+          'Premium AI code analysis',
+          '30 AI recommendations per day',
+          'Saved AI history',
+          'Priority practice feedback',
+        ],
+        isActive: true,
+      },
+      {
+        name: 'Premium Semester',
+        description: 'Best value for WDP301 students working through the full concurrent programming roadmap.',
+        price: 399000,
+        currency: 'VND',
+        durationDays: 180,
+        features: [
+          'All Premium Monthly features',
+          '40 AI recommendations per day',
+          'Long-term progress retention',
+          'Certificate-ready learning path',
+        ],
+        isActive: true,
+      },
+    ]);
+
+    await UserSubscription.create([
+      {
+        userId: jane._id,
+        planId: semesterPlan._id,
+        status: 'active',
+        startedAt: daysAgo(10),
+        expiresAt: daysFromNow(170),
+      },
+      {
+        userId: bob._id,
+        planId: freePlan._id,
+        status: 'active',
+        startedAt: daysAgo(20),
+        expiresAt: daysFromNow(10),
+      },
+    ]);
+
+    await SubscriptionPurchase.create([
+      {
+        userId: jane._id,
+        planId: semesterPlan._id,
+        amount: 399000,
+        currency: 'VND',
+        status: 'succeeded',
+        transactionId: `seed-vnpay-${jane._id.toString()}`,
+        paidAt: daysAgo(10),
+      },
+      {
+        userId: bob._id,
+        planId: monthlyPlan._id,
+        amount: 99000,
+        currency: 'VND',
+        status: 'pending',
+        transactionId: `seed-pending-${bob._id.toString()}`,
+        paymentUrl: 'http://localhost:3001/mock-payment/vnpay?status=success',
+      },
+    ]);
+    logger.info('✅ Created 3 plans, 2 subscriptions, and 2 purchase records.');
+
+    // ════════════════════════════════════════════════════════════
+    // 22. AUTH TOKENS (expiresAt phải ở TƯƠNG LAI — RefreshToken có TTL)
     // ════════════════════════════════════════════════════════════
     logger.info('🔑 Creating auth tokens...');
     await RefreshToken.create([
