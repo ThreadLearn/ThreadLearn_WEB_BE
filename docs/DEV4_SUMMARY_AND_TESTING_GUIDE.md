@@ -39,6 +39,7 @@ npm run lint
 - **Header bắt buộc:** 
   - `Content-Type: application/json`
   - `Authorization: Bearer <JWT_TOKEN>` (Token này lấy được sau khi gọi API `/api/v1/auth/login` bằng tài khoản Admin hoặc Student).
+- **E2E payment/subscription guide:** Xem thêm `docs/DEV4_SUBSCRIPTION_PAYMENT_E2E_GUIDE.md` để chạy luồng Admin tạo plan → Student purchase → webhook → subscription active bằng UI hoặc PowerShell.
 
 ---
 
