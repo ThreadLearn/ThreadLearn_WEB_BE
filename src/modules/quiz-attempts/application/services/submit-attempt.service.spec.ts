@@ -83,5 +83,15 @@ class InMemoryQuizAttemptRepository implements IQuizAttemptRepository {
     return [];
   }
 
+  async findByUserPaginated() {
+    return {
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    };
+  }
+
   async deleteById(): Promise<void> {}
 }
