@@ -54,4 +54,12 @@ export class JwtTokenService implements ITokenService {
   hashToken(rawToken: string): string {
     return crypto.createHash('sha256').update(rawToken).digest('hex');
   }
+
+  generateNumericOtp(): string {
+    return crypto.randomInt(100000, 1000000).toString();
+  }
+
+  hashVerificationCode(userId: string, code: string): string {
+    return crypto.createHash('sha256').update(`${userId}:${code}`).digest('hex');
+  }
 }

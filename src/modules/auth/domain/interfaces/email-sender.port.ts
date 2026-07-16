@@ -5,7 +5,7 @@
  */
 export interface SendVerificationEmailInput {
   to: string;
-  token: string;
+  code: string;
   firstName?: string;
 }
 

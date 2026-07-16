@@ -13,6 +13,10 @@ export interface IUser extends Document {
   githubId?: string;
   isVerified: boolean;
   emailVerifiedAt?: Date;
+  emailVerificationCodeHash?: string;
+  emailVerificationCodeExpiresAt?: Date;
+  emailVerificationCodeAttempts?: number;
+  emailVerificationLastSentAt?: Date;
   isActive: boolean;
   lockedAt?: Date;
   lockedReason?: string;
@@ -37,6 +41,10 @@ const UserSchema: Schema<IUser> = new Schema(
     githubId: { type: String, unique: true, sparse: true },
     isVerified: { type: Boolean, default: false },
     emailVerifiedAt: { type: Date },
+    emailVerificationCodeHash: { type: String },
+    emailVerificationCodeExpiresAt: { type: Date },
+    emailVerificationCodeAttempts: { type: Number, default: 0, min: 0 },
+    emailVerificationLastSentAt: { type: Date },
     isActive: { type: Boolean, default: true },
     lockedAt: { type: Date },
     lockedReason: { type: String, trim: true },

@@ -5,7 +5,7 @@ import { env } from '../../../configs/env';
 type VerificationEmailPayload = {
   email: string;
   firstName: string;
-  verificationUrl: string;
+  code: string;
 };
 
 type PasswordResetEmailPayload = {
@@ -32,35 +32,33 @@ type StudentInvitationEmailPayload = {
 export class EmailService {
   static async sendVerificationEmail(payload: VerificationEmailPayload) {
     if (!this.hasSmtpConfig()) {
-      logger.info(
-        `Mock verification email sent to ${payload.email} for ${payload.firstName}: ${payload.verificationUrl}`
-      );
+      logger.info(`Mock verification email sent to ${payload.email} for ${payload.firstName}.`);
       return;
     }
 
     this.dispatch('Verification email', {
       to: payload.email,
-      subject: 'Verify your ThreadLearn email',
+      subject: 'Your ThreadLearn verification code',
       text: [
         `Hi ${payload.firstName},`,
         '',
-        'Please verify your ThreadLearn email address using the link below:',
-        payload.verificationUrl,
+        'Your ThreadLearn verification code is:',
+        payload.code,
         '',
-        'This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.',
+        'This code will expire in 10 minutes. If you did not create a ThreadLearn account, you can ignore this email.',
       ].join('\n'),
       html: `
         <p>Hi ${this.escapeHtml(payload.firstName)},</p>
-        <p>Please verify your ThreadLearn email address using the link below:</p>
-        <p><a href="${this.escapeHtml(payload.verificationUrl)}">Verify your email</a></p>
-        <p>This link will expire soon. If you did not create a ThreadLearn account, you can ignore this email.</p>
+        <p>Your ThreadLearn verification code is:</p>
+        <p style="font-size:24px;font-weight:700;letter-spacing:4px;">${this.escapeHtml(payload.code)}</p>
+        <p>This code will expire in 10 minutes. If you did not create a ThreadLearn account, you can ignore this email.</p>
       `,
     });
   }
 
   static async sendPasswordResetEmail(payload: PasswordResetEmailPayload) {
     if (!this.hasSmtpConfig()) {
-      logger.info(`Mock password reset email sent to ${payload.email} for ${payload.firstName}: ${payload.resetUrl}`);
+      logger.info(`Mock password reset email sent to ${payload.email} for ${payload.firstName}.`);
       return;
     }
 
@@ -86,9 +84,7 @@ export class EmailService {
 
   static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
     if (!this.hasSmtpConfig()) {
-      logger.info(
-        `Mock student invitation email sent to ${payload.email} for ${payload.firstName}. Temporary password: ${payload.temporaryPassword}`
-      );
+      logger.info(`Mock student invitation email sent to ${payload.email} for ${payload.firstName}.`);
       return;
     }
 

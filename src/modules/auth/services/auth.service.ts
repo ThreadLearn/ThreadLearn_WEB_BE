@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs'; 
 import jwt from 'jsonwebtoken';
-import { EmailVerificationToken } from '../models/email-verification-token.model';
 import { PasswordResetToken } from '../models/password-reset-token.model';
 import { User, IUser } from '../models/user.model';
 import { RefreshToken } from '../models/refresh-token.model';
@@ -12,7 +11,7 @@ import { logger } from '../../../configs/logger';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../../common/custom-error';
 import { EmailService } from './email.service';
 
-const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const EMAIL_VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -306,39 +305,45 @@ export class AuthService {
     return true;
   }
 
-  static async verifyEmail(token: string) {
-    const tokenHash = this.hashToken(token);
-    const verificationToken = await EmailVerificationToken.findOne({ tokenHash });
-
-    if (!verificationToken) {
-      throw new BadRequestError('Verification token is invalid.');
-    }
-
-    if (verificationToken.usedAt) {
-      throw new BadRequestError('Verification token has already been used.');
-    }
-
-    if (verificationToken.expiresAt < new Date()) {
-      throw new BadRequestError('Verification token has expired.');
-    }
-
-    const user = await User.findById(verificationToken.userId);
+  static async verifyEmail(email: string, code: string) {
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
-      throw new NotFoundError('User for verification token was not found.');
+      throw new BadRequestError('Verification code is invalid or expired.');
     }
 
     if (user.isVerified) {
-      verificationToken.usedAt = new Date();
-      await verificationToken.save();
-      throw new BadRequestError('Email address is already verified.');
+      return {
+        user: sanitizeUser(user),
+      };
+    }
+
+    if (!user.emailVerificationCodeHash || !user.emailVerificationCodeExpiresAt) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
+
+    if (user.emailVerificationCodeExpiresAt < new Date()) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
+
+    if ((user.emailVerificationCodeAttempts ?? 0) >= 5) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
+
+    if (this.hashVerificationCode(user._id.toString(), code) !== user.emailVerificationCodeHash) {
+      user.emailVerificationCodeAttempts = (user.emailVerificationCodeAttempts ?? 0) + 1;
+      await user.save();
+      throw new BadRequestError('Verification code is invalid.');
     }
 
     const verifiedAt = new Date();
-    verificationToken.usedAt = verifiedAt;
     user.isVerified = true;
     user.emailVerifiedAt = verifiedAt;
+    user.emailVerificationCodeHash = undefined;
+    user.emailVerificationCodeExpiresAt = undefined;
+    user.emailVerificationCodeAttempts = undefined;
+    user.emailVerificationLastSentAt = undefined;
 
-    await Promise.all([verificationToken.save(), user.save()]);
+    await user.save();
 
     return {
       user: sanitizeUser(user),
@@ -354,14 +359,6 @@ export class AuthService {
     if (user.isVerified) {
       throw new BadRequestError('Email address is already verified.');
     }
-
-    await EmailVerificationToken.updateMany(
-      {
-        userId: user._id,
-        $or: [{ usedAt: { $exists: false } }, { usedAt: null }],
-      },
-      { usedAt: new Date() }
-    );
 
     await this.createAndSendVerificationToken(user);
 
@@ -433,22 +430,17 @@ export class AuthService {
   }
 
   private static async createAndSendVerificationToken(user: IUser) {
-    const rawToken = this.generateRawToken();
-    const tokenHash = this.hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+    const code = this.generateVerificationCode();
+    user.emailVerificationCodeHash = this.hashVerificationCode(user._id.toString(), code);
+    user.emailVerificationCodeExpiresAt = new Date(Date.now() + EMAIL_VERIFICATION_CODE_TTL_MS);
+    user.emailVerificationCodeAttempts = 0;
+    user.emailVerificationLastSentAt = new Date();
+    await user.save();
 
-    await EmailVerificationToken.create({
-      userId: user._id,
-      tokenHash,
-      expiresAt,
-    });
-
-    const frontendUrl = env.FRONTEND_URL[0].replace(/\/$/, '');
-    const verificationUrl = `${frontendUrl}/verify-email?token=${encodeURIComponent(rawToken)}`;
     await EmailService.sendVerificationEmail({
       email: user.email,
       firstName: user.firstName,
-      verificationUrl,
+      code,
     });
   }
 
@@ -475,8 +467,16 @@ export class AuthService {
     return crypto.randomBytes(32).toString('hex');
   }
 
+  private static generateVerificationCode() {
+    return crypto.randomInt(100000, 1000000).toString();
+  }
+
   private static hashToken(token: string) {
     return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private static hashVerificationCode(userId: string, code: string) {
+    return crypto.createHash('sha256').update(`${userId}:${code}`).digest('hex');
   }
 
   private static assertGoogleOAuthConfigured() {
