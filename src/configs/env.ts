@@ -20,6 +20,18 @@ const optionalBoolean = z.preprocess((value) => {
   return value;
 }, z.boolean().optional());
 
+const optionalStringList = z.preprocess((value) => {
+  if (value === undefined || value === '') return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return value;
+}, z.array(z.string()).default([]));
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(5000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -29,6 +41,7 @@ const envSchema = z.object({
   MONGODB_PASSWORD: optionalNonEmptyString,
   MONGODB_HOST: optionalNonEmptyString,
   MONGODB_DATABASE: optionalNonEmptyString,
+  DNS_SERVERS: optionalStringList,
   REDIS_URL: z.string().default('redis://localhost:6379'),
   RATE_LIMIT_LIMIT: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
