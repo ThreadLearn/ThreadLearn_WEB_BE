@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { UserStats as UserStatsModel } from '../schemas/user-stats.schema';
+import { XpAwardLog } from '../schemas/xp-award-log.schema';
 import { UserStats } from '../../../domain/entities/user-stats.entity';
-import { IUserStatsRepository } from '../../../domain/interfaces/user-stats.repository';
+import { IUserStatsRepository, XpAwardSourceType } from '../../../domain/interfaces/user-stats.repository';
 import { UserStatsMapper } from '../../mapper/user-stats.mapper';
 
 @Injectable()
@@ -28,6 +29,16 @@ export class UserStatsRepository implements IUserStatsRepository {
       { new: true, upsert: true }
     ).exec();
     return UserStatsMapper.toEntity(doc);
+  }
+
+  async claimXpAward(sourceType: XpAwardSourceType, sourceId: string, userId: string): Promise<boolean> {
+    const result = await XpAwardLog.updateOne(
+      { sourceType, sourceId, userId },
+      { $setOnInsert: { sourceType, sourceId, userId } },
+      { upsert: true },
+    ).exec();
+
+    return result.upsertedCount > 0;
   }
 
   async findTopByXp(limit: number): Promise<UserStats[]> {

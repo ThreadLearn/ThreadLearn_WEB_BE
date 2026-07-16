@@ -6,6 +6,9 @@ export interface IQuizAttempt extends Document {
   score: number;
   answers: Record<string, number>;
   passed: boolean;
+  passingScorePercent?: number;
+  xpRewarded?: number;
+  isTimeout?: boolean;
   startedAt?: Date;
   createdAt: Date;
 }
@@ -17,6 +20,9 @@ const QuizAttemptSchema: Schema<IQuizAttempt> = new Schema(
     score: { type: Number, required: true, min: 0, max: 100 },
     answers: { type: Schema.Types.Mixed, required: true },
     passed: { type: Boolean, default: false },
+    passingScorePercent: { type: Number, min: 1, max: 100 },
+    xpRewarded: { type: Number, default: 0, min: 0 },
+    isTimeout: { type: Boolean, default: false },
     startedAt: { type: Date },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

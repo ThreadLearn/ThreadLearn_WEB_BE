@@ -7,6 +7,9 @@ export interface QuizAttemptProps {
   score: number;
   answers: Record<string, number>;
   passed: boolean;
+  passingScorePercent?: number;
+  xpRewarded?: number;
+  isTimeout?: boolean;
   startedAt?: Date;
   completedAt?: Date;
 }
@@ -71,6 +74,9 @@ export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
       score: this.props.score,
       answers: { ...this.props.answers },
       passed: this.props.passed,
+      passingScorePercent: this.props.passingScorePercent,
+      xpRewarded: this.props.xpRewarded,
+      isTimeout: this.props.isTimeout,
       startedAt: this.props.startedAt,
       completedAt: this.props.completedAt,
     };
@@ -87,6 +93,12 @@ export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
     }
     if (props.score < 0 || props.score > 100) {
       throw DomainError.badRequest(ErrorCode.QUIZ_INVALID_INPUT, 'Score must be between 0 and 100.');
+    }
+    if (props.passingScorePercent !== undefined && (props.passingScorePercent < 1 || props.passingScorePercent > 100)) {
+      throw DomainError.badRequest(ErrorCode.QUIZ_INVALID_INPUT, 'Passing score percent must be between 1 and 100.');
+    }
+    if (props.xpRewarded !== undefined && props.xpRewarded < 0) {
+      throw DomainError.badRequest(ErrorCode.QUIZ_INVALID_INPUT, 'XP rewarded cannot be negative.');
     }
   }
 }

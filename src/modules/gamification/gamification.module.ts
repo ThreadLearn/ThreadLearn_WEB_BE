@@ -8,6 +8,8 @@ import { USER_STATS_REPOSITORY } from './domain/interfaces/user-stats.repository
 import { MongoStudentProgressAdapter } from './infrastructure/adapters/mongo-student-progress.adapter';
 import { STUDENT_PROGRESS_PORT } from './domain/interfaces/student-progress.port';
 import { GamificationRewardsEventHandler } from './application/event-handlers/gamification-rewards.event-handler';
+import { GAMIFICATION_REALTIME_PORT } from './domain/interfaces/gamification-realtime.port';
+import { SocketGamificationRealtimeAdapter } from './infrastructure/adapters/socket-gamification-realtime.adapter';
 
 @Module({
   controllers: [GamificationController],
@@ -16,6 +18,7 @@ import { GamificationRewardsEventHandler } from './application/event-handlers/ga
     UpdateStreakService,
     GetStatsService,
     GamificationRewardsEventHandler,
+    SocketGamificationRealtimeAdapter,
     {
       provide: USER_STATS_REPOSITORY,
       useClass: UserStatsRepository,
@@ -23,6 +26,10 @@ import { GamificationRewardsEventHandler } from './application/event-handlers/ga
     {
       provide: STUDENT_PROGRESS_PORT,
       useClass: MongoStudentProgressAdapter,
+    },
+    {
+      provide: GAMIFICATION_REALTIME_PORT,
+      useClass: SocketGamificationRealtimeAdapter,
     },
   ],
   exports: [
