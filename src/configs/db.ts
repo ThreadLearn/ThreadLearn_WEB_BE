@@ -21,13 +21,20 @@ if (!cached) {
 let dnsConfigured = false;
 
 function configureDnsServers() {
-  if (dnsConfigured || env.DNS_SERVERS.length === 0) {
+  const usesSrvConnectionString = env.DATABASE_URL.startsWith('mongodb+srv://');
+  if (dnsConfigured || !usesSrvConnectionString || env.DNS_SERVERS.length === 0) {
     return;
   }
 
-  dnsConfigured = true;
-  dns.setServers(env.DNS_SERVERS);
-  logger.info(`🌐 Using custom DNS servers for MongoDB SRV lookup: ${env.DNS_SERVERS.join(', ')}`);
+  try {
+    // dns.setServers changes Node's process-wide resolver; keep it opt-in and SRV-only.
+    dns.setServers(env.DNS_SERVERS);
+    dnsConfigured = true;
+    logger.info(`🌐 Using custom process-wide DNS servers before MongoDB SRV lookup: ${dns.getServers().join(', ')}`);
+  } catch (error) {
+    logger.error('❌ Invalid DNS_SERVERS configuration. Process-wide DNS override was not applied.', error);
+    throw error;
+  }
 }
 
 export async function connectToDatabase() {
