@@ -34,6 +34,9 @@ export class AIHistoryMapper {
       feedbackRating: doc.feedbackRating,
       status: doc.status ?? 'completed',
       category: doc.category,
+      issues: doc.issues ?? [],
+      docsUsed: doc.docsUsed ?? [],
+      cached: doc.cached ?? false,
       createdAt: doc.createdAt,
     };
   }
@@ -58,6 +61,9 @@ export class AIHistoryMapper {
       feedbackRating: props.feedbackRating,
       status: props.status,
       category: props.category,
+      issues: props.issues,
+      docsUsed: props.docsUsed,
+      cached: props.cached,
     };
   }
 }

@@ -16,13 +16,21 @@ interface AnalyzeIssue {
   severity: 'high' | 'medium' | 'low';
   description: string;
   fix: string;
+  pattern_id?: string;
+}
+
+interface AnalyzeKnowledgeDoc {
+  id: string;
+  title: string;
+  category?: string;
+  bm25_score?: number;
 }
 
 interface AnalyzeResponse {
   user_id: string;
   language: string;
   issues: AnalyzeIssue[];
-  docs_used: string[];
+  docs_used: AnalyzeKnowledgeDoc[];
   cached: boolean;
 }
 
@@ -86,6 +94,20 @@ export class RequestRecommendationService {
         explanation,
         modelName: 'threadlearn-ai2-server',
         category: 'code-analysis',
+        issues: issues.map((issue) => ({
+          patternId: issue.pattern_id ?? 'unknown',
+          lineRange: issue.line_range,
+          severity: issue.severity,
+          description: issue.description,
+          fix: issue.fix,
+        })),
+        docsUsed: (data.docs_used ?? []).map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          category: doc.category,
+          score: doc.bm25_score,
+        })),
+        cached: data.cached ?? false,
       }),
     );
   }
