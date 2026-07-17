@@ -23,6 +23,7 @@ interface AnalyzeKnowledgeDoc {
   id: string;
   title: string;
   category?: string;
+  content?: string;
   bm25_score?: number;
 }
 
@@ -105,6 +106,7 @@ export class RequestRecommendationService {
           id: doc.id,
           title: doc.title,
           category: doc.category,
+          content: doc.content,
           score: doc.bm25_score,
         })),
         cached: data.cached ?? false,
