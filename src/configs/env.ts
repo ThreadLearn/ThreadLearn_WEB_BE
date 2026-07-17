@@ -47,7 +47,7 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   JWT_ACCESS_SECRET: z.string().min(1, 'JWT_ACCESS_SECRET is required'),
   JWT_REFRESH_SECRET: z.string().min(1, 'JWT_REFRESH_SECRET is required'),
-  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('30m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
