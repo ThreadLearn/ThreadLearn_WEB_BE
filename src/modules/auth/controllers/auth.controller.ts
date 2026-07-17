@@ -70,9 +70,9 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Verify an email address with a verification token.' })
-  async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { token: string }) {
-    const result = await this.verifyEmailService.execute({ token: body.token });
+  @ApiOperation({ summary: 'Verify an email address with a 6-digit OTP code.' })
+  async verifyEmail(@Body(new ZodValidationPipe(verifyEmailSchema)) body: { email: string; code: string }) {
+    const result = await this.verifyEmailService.execute({ email: body.email, code: body.code });
     return ApiResponse.success({
       message: 'Email verified successfully.',
       data: result,
@@ -81,7 +81,7 @@ export class AuthController {
 
   @Post('resend-verification')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Resend the email verification link.' })
+  @ApiOperation({ summary: 'Resend the email verification OTP code.' })
   async resendVerification(@Body(new ZodValidationPipe(resendVerificationSchema)) body: { email: string }) {
     await this.resendVerificationEmailService.execute({ email: body.email });
     return ApiResponse.success({

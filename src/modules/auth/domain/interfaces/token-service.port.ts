@@ -20,6 +20,8 @@ export interface ITokenService {
   verifyRefreshToken(token: string): unknown;
   generateRandomToken(): string;
   hashToken(rawToken: string): string;
+  generateNumericOtp(): string;
+  hashVerificationCode(userId: string, code: string): string;
 }
 
 /** DI token cho `ITokenService`. */
