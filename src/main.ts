@@ -19,6 +19,10 @@ async function bootstrap() {
   const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
     : env.FRONTEND_URL;
+  const uploadCorsOrigins =
+    process.env.CORS_ORIGIN || process.env.FRONTEND_URL
+      ? corsOrigins
+      : Array.from(new Set([...corsOrigins, 'http://localhost:3001']));
 
   app.setGlobalPrefix('api');
 
@@ -41,7 +45,27 @@ async function bootstrap() {
       },
     }),
   );
-  app.use('/uploads', express.static(join(process.cwd(), env.UPLOAD_DIR)));
+  app.use(
+    '/uploads',
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const requestOrigin = req.headers.origin;
+
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+      if (uploadCorsOrigins.includes('*')) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      } else if (requestOrigin && uploadCorsOrigins.includes(requestOrigin)) {
+        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        res.setHeader('Vary', 'Origin');
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', uploadCorsOrigins[0] ?? 'http://localhost:3001');
+        res.setHeader('Vary', 'Origin');
+      }
+
+      next();
+    },
+    express.static(join(process.cwd(), env.UPLOAD_DIR))
+  );
   app.enableCors({
     origin: corsOrigins.includes('*') ? true : corsOrigins,
     credentials: !corsOrigins.includes('*'),
