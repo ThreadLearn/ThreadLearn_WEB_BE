@@ -1,3 +1,18 @@
+export interface AIIssue {
+  patternId: string;
+  lineRange: string;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  fix: string;
+}
+
+export interface AIKnowledgeDoc {
+  id: string;
+  title: string;
+  category?: string;
+  score?: number;
+}
+
 export interface AIHistoryProps {
   id: string;
   userId: string;
@@ -17,6 +32,9 @@ export interface AIHistoryProps {
   feedbackRating?: number;
   status: string;
   category: string;
+  issues: AIIssue[];
+  docsUsed: AIKnowledgeDoc[];
+  cached?: boolean;
   createdAt?: Date;
 }
 
@@ -32,6 +50,12 @@ export class AIHistoryEntity {
   }
 
   toProps(): AIHistoryProps {
-    return { ...this.props, suggestions: [...this.props.suggestions], raceConditions: [...this.props.raceConditions] };
+    return {
+      ...this.props,
+      suggestions: [...this.props.suggestions],
+      raceConditions: [...this.props.raceConditions],
+      issues: [...this.props.issues],
+      docsUsed: [...this.props.docsUsed],
+    };
   }
 }

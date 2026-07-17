@@ -1,5 +1,20 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface IAIIssue {
+  patternId: string;
+  lineRange: string;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  fix: string;
+}
+
+export interface IAIKnowledgeDoc {
+  id: string;
+  title: string;
+  category?: string;
+  score?: number;
+}
+
 export interface IAIHistory extends Document {
   userId: mongoose.Types.ObjectId;
   courseId?: mongoose.Types.ObjectId;
@@ -18,8 +33,32 @@ export interface IAIHistory extends Document {
   feedbackRating?: number;
   status?: string;
   category: string;
+  issues?: IAIIssue[];
+  docsUsed?: IAIKnowledgeDoc[];
+  cached?: boolean;
   createdAt: Date;
 }
+
+const AIIssueSchema = new Schema<IAIIssue>(
+  {
+    patternId: { type: String, required: true },
+    lineRange: { type: String, required: true },
+    severity: { type: String, enum: ['high', 'medium', 'low'], required: true },
+    description: { type: String, required: true },
+    fix: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const AIKnowledgeDocSchema = new Schema<IAIKnowledgeDoc>(
+  {
+    id: { type: String, required: true },
+    title: { type: String, required: true },
+    category: { type: String },
+    score: { type: Number },
+  },
+  { _id: false }
+);
 
 const AIHistorySchema: Schema<IAIHistory> = new Schema(
   {
@@ -40,6 +79,9 @@ const AIHistorySchema: Schema<IAIHistory> = new Schema(
     feedbackRating: { type: Number, min: 1, max: 5 },
     status: { type: String, enum: ['completed', 'failed'], default: 'completed' },
     category: { type: String, required: true, index: true },
+    issues: { type: [AIIssueSchema], default: [] },
+    docsUsed: { type: [AIKnowledgeDocSchema], default: [] },
+    cached: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
