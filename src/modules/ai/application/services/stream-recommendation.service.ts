@@ -23,6 +23,7 @@ interface AnalyzeKnowledgeDoc {
   id: string;
   title: string;
   category?: string;
+  content?: string;
   bm25_score?: number;
 }
 
@@ -117,6 +118,7 @@ export class StreamRecommendationService {
             id: doc.id,
             title: doc.title,
             category: doc.category,
+            content: doc.content,
             score: doc.bm25_score,
           })),
           cached: resultData.cached ?? false,
@@ -124,8 +126,20 @@ export class StreamRecommendationService {
       );
     };
 
+    // Client (browser) can abort mid-stream (tab close, reload) — that's normal,
+    // not a server error. Stop forwarding chunks and tear down the upstream request
+    // without throwing, so it never reaches GlobalExceptionFilter on a closed response.
+    let clientAborted = false;
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        clientAborted = true;
+        upstream.data.destroy();
+      }
+    });
+
     await new Promise<void>((resolve, reject) => {
       upstream.data.on('data', (chunk: Buffer) => {
+        if (clientAborted) return;
         const text = chunk.toString('utf-8');
         buffer += text;
         res.write(text);
@@ -148,12 +162,16 @@ export class StreamRecommendationService {
       });
 
       upstream.data.on('end', () => {
-        res.end();
+        if (!clientAborted) res.end();
         resolve();
       });
 
       upstream.data.on('error', (err: Error) => {
-        res.end();
+        if (clientAborted) {
+          resolve();
+          return;
+        }
+        if (!res.writableEnded) res.end();
         reject(err);
       });
     });

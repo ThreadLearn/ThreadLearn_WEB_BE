@@ -12,6 +12,7 @@ export interface IAIKnowledgeDoc {
   id: string;
   title: string;
   category?: string;
+  content?: string;
   score?: number;
 }
 
@@ -55,6 +56,7 @@ const AIKnowledgeDocSchema = new Schema<IAIKnowledgeDoc>(
     id: { type: String, required: true },
     title: { type: String, required: true },
     category: { type: String },
+    content: { type: String },
     score: { type: Number },
   },
   { _id: false }

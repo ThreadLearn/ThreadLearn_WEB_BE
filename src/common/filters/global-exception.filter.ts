@@ -17,6 +17,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    // Streaming responses (SSE) already flushed headers before the body finished —
+    // res.status()/json() would throw ERR_HTTP_HEADERS_SENT and crash the process.
+    if (response.headersSent) {
+      logger.error(`[${request.method}] ${request.url} - Error after headers sent`, exception);
+      if (!response.writableEnded) response.end();
+      return;
+    }
+
     if (exception instanceof AppError) {
       logger.warn(
         `[${request.method}] ${request.url} - AppError: ${exception.message} (Status ${exception.statusCode})`
