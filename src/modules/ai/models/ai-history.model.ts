@@ -6,6 +6,7 @@ export interface IAIIssue {
   severity: 'high' | 'medium' | 'low';
   description: string;
   fix: string;
+  codeSnippet?: string;
 }
 
 export interface IAIKnowledgeDoc {
@@ -48,6 +49,7 @@ const AIIssueSchema = new Schema<IAIIssue>(
     severity: { type: String, enum: ['high', 'medium', 'low'], required: true },
     description: { type: String, required: true },
     fix: { type: String, required: true },
+    codeSnippet: { type: String },
   },
   { _id: false }
 );

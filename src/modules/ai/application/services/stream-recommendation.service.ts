@@ -18,6 +18,7 @@ interface AnalyzeIssue {
   description: string;
   fix: string;
   pattern_id?: string;
+  code_snippet?: string;
 }
 
 interface AnalyzeKnowledgeDoc {
@@ -113,6 +114,7 @@ export class StreamRecommendationService {
             severity: issue.severity,
             description: issue.description,
             fix: issue.fix,
+            codeSnippet: issue.code_snippet,
           })),
           docsUsed: (resultData.docs_used ?? []).map((doc) => ({
             id: doc.id,
