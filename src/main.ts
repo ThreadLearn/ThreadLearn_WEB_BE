@@ -33,7 +33,14 @@ async function bootstrap() {
   });
 
   app.use(helmet());
-  app.use(compression());
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.path.includes('/analyze/stream')) return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
   app.use('/uploads', express.static(join(process.cwd(), env.UPLOAD_DIR)));
   app.enableCors({
     origin: corsOrigins.includes('*') ? true : corsOrigins,
