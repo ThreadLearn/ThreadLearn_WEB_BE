@@ -36,6 +36,7 @@ export interface AIHistoryProps {
   issues: AIIssue[];
   docsUsed: AIKnowledgeDoc[];
   cached?: boolean;
+  analyzeTimeMs?: number;
   createdAt?: Date;
 }
 

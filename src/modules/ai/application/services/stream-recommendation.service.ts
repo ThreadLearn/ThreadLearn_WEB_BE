@@ -7,6 +7,7 @@ import { env } from '../../../../configs/env';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
+import { buildExplanation } from './build-explanation';
 
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
@@ -59,6 +60,7 @@ export class StreamRecommendationService {
     await this.assertDailyLimit(userId, isPremiumTier);
 
     const aiToken = jwt.sign({ sub: userId }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
+    const startTime = Date.now();
 
     const upstream = await axios.post(
       `${env.AI_API_URL}/api/v1/ai/analyze/stream`,
@@ -82,9 +84,7 @@ export class StreamRecommendationService {
       const suggestions = issues.map((issue) => `[${issue.severity}] ${issue.description}`);
       const raceConditions = issues.map((issue) => `${issue.line_range}: ${issue.description}`);
       const optimizedCode = issues[0]?.fix;
-      const explanation = issues.length
-        ? `Found ${issues.length} concurrency issue(s) in the submitted ${payload.language} code.`
-        : 'No concurrency issues detected.';
+      const explanation = buildExplanation(issues.length, (resultData.docs_used ?? []).length);
       const response = [
         '### AI Code Analysis',
         '',
@@ -122,6 +122,7 @@ export class StreamRecommendationService {
             score: doc.bm25_score,
           })),
           cached: resultData.cached ?? false,
+          analyzeTimeMs: Date.now() - startTime,
         }),
       );
     };
@@ -171,8 +172,16 @@ export class StreamRecommendationService {
           resolve();
           return;
         }
-        if (!res.writableEnded) res.end();
-        reject(err);
+        // Headers/body may already be partially flushed to the client at this point
+        // (SSE stream mid-flight) — never reject here, since a reject propagates to
+        // GlobalExceptionFilter which would try res.status().json() on a response
+        // that has already started writing, crashing with ERR_HTTP_HEADERS_SENT.
+        // Instead, tell the client via a proper SSE error event and end cleanly.
+        if (!res.writableEnded) {
+          res.write(`event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`);
+          res.end();
+        }
+        resolve();
       });
     });
   }

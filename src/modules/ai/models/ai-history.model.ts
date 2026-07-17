@@ -37,6 +37,7 @@ export interface IAIHistory extends Document {
   issues?: IAIIssue[];
   docsUsed?: IAIKnowledgeDoc[];
   cached?: boolean;
+  analyzeTimeMs?: number;
   createdAt: Date;
 }
 
@@ -84,6 +85,7 @@ const AIHistorySchema: Schema<IAIHistory> = new Schema(
     issues: { type: [AIIssueSchema], default: [] },
     docsUsed: { type: [AIKnowledgeDocSchema], default: [] },
     cached: { type: Boolean, default: false },
+    analyzeTimeMs: { type: Number },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
