@@ -20,6 +20,10 @@ export interface UserProps {
   role: UserRole;
   isVerified: boolean;
   emailVerifiedAt?: Date;
+  emailVerificationCodeHash?: string;
+  emailVerificationCodeExpiresAt?: Date;
+  emailVerificationCodeAttempts?: number;
+  emailVerificationLastSentAt?: Date;
   isActive: boolean;
   lockedAt?: Date;
   lockedReason?: string;
@@ -120,6 +124,27 @@ export class UserEntity {
     if (!this.props.emailVerifiedAt) {
       this.props.emailVerifiedAt = now;
     }
+  }
+
+  setEmailVerificationCode(input: { codeHash: string; expiresAt: Date; sentAt?: Date }): void {
+    if (!input.codeHash) {
+      throw new Error('emailVerificationCodeHash is required.');
+    }
+    this.props.emailVerificationCodeHash = input.codeHash;
+    this.props.emailVerificationCodeExpiresAt = input.expiresAt;
+    this.props.emailVerificationCodeAttempts = 0;
+    this.props.emailVerificationLastSentAt = input.sentAt ?? new Date();
+  }
+
+  clearEmailVerificationCode(): void {
+    this.props.emailVerificationCodeHash = undefined;
+    this.props.emailVerificationCodeExpiresAt = undefined;
+    this.props.emailVerificationCodeAttempts = undefined;
+    this.props.emailVerificationLastSentAt = undefined;
+  }
+
+  recordFailedEmailVerificationAttempt(): void {
+    this.props.emailVerificationCodeAttempts = (this.props.emailVerificationCodeAttempts ?? 0) + 1;
   }
 
   /** Khoá tài khoản (mirror admin lock: isActive=false + lockedAt + lockedReason). */

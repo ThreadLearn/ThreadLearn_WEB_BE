@@ -48,6 +48,34 @@ export class MongoUserRepository implements IUserRepository {
     return UserMapper.toEntity(doc!);
   }
 
+  async updateEmailVerificationState(entity: UserEntity): Promise<UserEntity> {
+    const p = entity.toProps();
+    const set: Record<string, unknown> = {
+      isVerified: p.isVerified,
+    };
+    const unset: Record<string, string> = {};
+
+    if (p.emailVerifiedAt !== undefined) set.emailVerifiedAt = p.emailVerifiedAt;
+    else unset.emailVerifiedAt = '';
+    if (p.emailVerificationCodeHash !== undefined) set.emailVerificationCodeHash = p.emailVerificationCodeHash;
+    else unset.emailVerificationCodeHash = '';
+    if (p.emailVerificationCodeExpiresAt !== undefined) {
+      set.emailVerificationCodeExpiresAt = p.emailVerificationCodeExpiresAt;
+    } else {
+      unset.emailVerificationCodeExpiresAt = '';
+    }
+    if (p.emailVerificationCodeAttempts !== undefined) set.emailVerificationCodeAttempts = p.emailVerificationCodeAttempts;
+    else unset.emailVerificationCodeAttempts = '';
+    if (p.emailVerificationLastSentAt !== undefined) set.emailVerificationLastSentAt = p.emailVerificationLastSentAt;
+    else unset.emailVerificationLastSentAt = '';
+
+    const update: Record<string, unknown> = { $set: set };
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
+    const doc = await User.findByIdAndUpdate(entity.id, update, { new: true });
+    return UserMapper.toEntity(doc!);
+  }
+
   async updateLastLogin(userId: string, date: Date): Promise<void> {
     await User.updateOne({ _id: userId }, { lastLoginAt: date });
   }
