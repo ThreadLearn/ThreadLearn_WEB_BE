@@ -10,6 +10,7 @@ export interface AIKnowledgeDoc {
   id: string;
   title: string;
   category?: string;
+  content?: string;
   score?: number;
 }
 

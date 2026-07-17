@@ -82,7 +82,8 @@ export interface LoginUserResult {
 // ----- Verify email -----
 
 export interface VerifyEmailInput {
-  token: string;
+  email: string;
+  code: string;
 }
 
 /** Mirror `AuthService.verifyEmail` → `{ user: sanitizeUser }`. */

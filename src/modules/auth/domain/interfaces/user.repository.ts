@@ -35,6 +35,7 @@ export interface IUserRepository {
   findByGoogleId(googleId: string): Promise<UserEntity | null>;
   create(entity: UserEntity): Promise<UserEntity>;
   update(entity: UserEntity): Promise<UserEntity>;
+  updateEmailVerificationState(entity: UserEntity): Promise<UserEntity>;
   updateLastLogin(userId: string, date: Date): Promise<void>;
   /**
    * Persist trạng thái bảo mật đăng nhập (lockout): `failedLoginAttempts`,

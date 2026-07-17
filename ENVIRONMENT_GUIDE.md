@@ -14,7 +14,7 @@ This guide documents the environment variables used by the NestJS backend. Runti
 | `RATE_LIMIT_WINDOW_MS` | No | `900000` | Rate-limit window in milliseconds. |
 | `JWT_ACCESS_SECRET` | Yes | - | Secret for JWT access tokens. Use a long random value in production. |
 | `JWT_REFRESH_SECRET` | Yes | - | Secret for JWT refresh tokens. Use a long random value in production. |
-| `JWT_ACCESS_EXPIRES_IN` | No | `15m` | Access token lifetime. |
+| `JWT_ACCESS_EXPIRES_IN` | No | `30m` | Access token lifetime. |
 | `JWT_REFRESH_EXPIRES_IN` | No | `7d` | Refresh token lifetime. |
 | `GOOGLE_CLIENT_ID` | No | - | Reserved for a future NestJS Passport Google OAuth implementation. |
 | `GOOGLE_CLIENT_SECRET` | No | - | Reserved for a future NestJS Passport Google OAuth implementation. |

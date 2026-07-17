@@ -1,68 +1,54 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { BadRequestError } from '../../../../common/custom-error';
 import { UserEntity } from '../../domain/entities/user.entity';
 import { IUserRepository, USER_REPOSITORY } from '../../domain/interfaces/user.repository';
 import { ITokenService, TOKEN_SERVICE } from '../../domain/interfaces/token-service.port';
-import {
-  EMAIL_VERIFICATION_TOKEN_REPOSITORY,
-  IEmailVerificationTokenRepository,
-} from '../../domain/interfaces/email-verification-token.repository';
 import { SafeAuthUser, VerifyEmailInput, VerifyEmailResult } from '../dto/auth-use-case.dto';
 
-/**
- * UC03 — Verify email. Mirror luồng xác minh hiện tại:
- * hash raw token → tra cứu token → chặn invalid/used/expired → tìm user →
- * (nếu đã verify: đánh dấu token used rồi báo lỗi) → markEmailVerified + markUsed →
- * lưu cả hai → trả `{ user: safe user }`.
- *
- * Chỉ điều phối qua port. KHÔNG log raw token. KHÔNG lộ tokenHash/passwordHash.
- * Phase DEV1.3B: chưa wire runtime.
- */
+const MAX_EMAIL_VERIFICATION_ATTEMPTS = 5;
+
 @Injectable()
 export class VerifyEmailService {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
-    @Inject(EMAIL_VERIFICATION_TOKEN_REPOSITORY)
-    private readonly verificationTokenRepo: IEmailVerificationTokenRepository,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
   ) {}
 
   async execute(input: VerifyEmailInput): Promise<VerifyEmailResult> {
-    const tokenHash = this.tokenService.hashToken(input.token);
-    const verificationToken = await this.verificationTokenRepo.findByTokenHash(tokenHash);
-
-    if (!verificationToken) {
-      throw new BadRequestError('Verification token is invalid.');
-    }
-    if (verificationToken.isUsed()) {
-      throw new BadRequestError('Verification token has already been used.');
-    }
-    if (verificationToken.isExpired()) {
-      throw new BadRequestError('Verification token has expired.');
-    }
-
-    const user = await this.userRepo.findById(verificationToken.userId);
+    const user = await this.userRepo.findByEmail(input.email.trim().toLowerCase());
     if (!user) {
-      throw new NotFoundError('User for verification token was not found.');
+      throw new BadRequestError('Verification code is invalid or expired.');
     }
 
     if (user.isVerified) {
-      verificationToken.markUsed();
-      await this.verificationTokenRepo.update(verificationToken);
-      throw new BadRequestError('Email address is already verified.');
+      return { user: this.toSafeUser(user) };
     }
 
-    const now = new Date();
-    user.markEmailVerified(now);
-    verificationToken.markUsed(now);
+    const props = user.toProps();
+    if (!props.emailVerificationCodeHash || !props.emailVerificationCodeExpiresAt) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
+    if (props.emailVerificationCodeExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
+    if ((props.emailVerificationCodeAttempts ?? 0) >= MAX_EMAIL_VERIFICATION_ATTEMPTS) {
+      throw new BadRequestError('Verification code is invalid or expired.');
+    }
 
-    await this.userRepo.update(user);
-    await this.verificationTokenRepo.update(verificationToken);
+    const codeHash = this.tokenService.hashVerificationCode(props.id, input.code);
+    if (codeHash !== props.emailVerificationCodeHash) {
+      user.recordFailedEmailVerificationAttempt();
+      await this.userRepo.updateEmailVerificationState(user);
+      throw new BadRequestError('Verification code is invalid.');
+    }
 
-    return { user: this.toSafeUser(user) };
+    user.markEmailVerified(new Date());
+    user.clearEmailVerificationCode();
+    const saved = await this.userRepo.updateEmailVerificationState(user);
+
+    return { user: this.toSafeUser(saved) };
   }
 
-  /** Whitelist field an toàn — mirror `sanitizeUser`. */
   private toSafeUser(user: UserEntity): SafeAuthUser {
     const p = user.toProps();
     return {
