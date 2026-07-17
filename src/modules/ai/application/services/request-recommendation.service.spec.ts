@@ -48,7 +48,7 @@ describe('RequestRecommendationService', () => {
           pattern_id: 'closure_loop_var',
         },
       ],
-      docs_used: ['Closure Loop Variable'],
+      docs_used: [{ id: 'doc-1', title: 'Closure Loop Variable', category: 'patterns', bm25_score: 12.5 }],
       cached: false,
     });
     const service = new RequestRecommendationService(repo, http as any);
@@ -66,6 +66,19 @@ describe('RequestRecommendationService', () => {
     expect(result.props.optimizedCode).toBe('Use let instead of var.');
     expect(result.props.modelName).toBe('threadlearn-ai2-server');
     expect(result.props.category).toBe('code-analysis');
+    expect(result.props.issues).toEqual([
+      {
+        patternId: 'closure_loop_var',
+        lineRange: '1-3',
+        severity: 'high',
+        description: 'Closure captures loop variable declared with var.',
+        fix: 'Use let instead of var.',
+      },
+    ]);
+    expect(result.props.docsUsed).toEqual([
+      { id: 'doc-1', title: 'Closure Loop Variable', category: 'patterns', score: 12.5 },
+    ]);
+    expect(result.props.cached).toBe(false);
   });
 
   it('produces an empty analysis summary when the AI service finds no issues', async () => {

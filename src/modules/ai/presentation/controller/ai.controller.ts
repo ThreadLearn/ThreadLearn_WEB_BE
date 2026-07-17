@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
@@ -14,6 +15,7 @@ import {
 import { GetHistoryByIdService } from '../../application/services/get-history-by-id.service';
 import { GetHistoryLogsService } from '../../application/services/get-history-logs.service';
 import { RequestRecommendationService } from '../../application/services/request-recommendation.service';
+import { StreamRecommendationService } from '../../application/services/stream-recommendation.service';
 import { UpdateFeedbackService } from '../../application/services/update-feedback.service';
 
 @ApiTags('AI')
@@ -23,6 +25,7 @@ import { UpdateFeedbackService } from '../../application/services/update-feedbac
 export class AIController {
   constructor(
     private readonly requestRecommendationSvc: RequestRecommendationService,
+    private readonly streamRecommendationSvc: StreamRecommendationService,
     private readonly getHistoryLogsSvc: GetHistoryLogsService,
     private readonly getHistoryByIdSvc: GetHistoryByIdService,
     private readonly updateFeedbackSvc: UpdateFeedbackService,
@@ -46,6 +49,15 @@ export class AIController {
     @Body(new ZodValidationPipe(aiRecommendationSchema)) body: AIRecommendationPayload,
   ) {
     return this.recommend(user, body);
+  }
+
+  @Post('analyze/stream')
+  async analyzeStream(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(aiRecommendationSchema)) body: AIRecommendationPayload,
+    @Res() res: Response,
+  ) {
+    await this.streamRecommendationSvc.execute(user.id, body, res);
   }
 
   @Get('history')

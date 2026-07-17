@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { IUserStatsRepository, USER_STATS_REPOSITORY } from '../../domain/interfaces/user-stats.repository';
+import {
+  IUserStatsRepository,
+  USER_STATS_REPOSITORY,
+  XpAwardSourceType,
+} from '../../domain/interfaces/user-stats.repository';
 
 /**
  * UC48: Accumulate Experience Points - XP Engine (Student, XP System)
@@ -18,5 +22,29 @@ export class AwardXpService {
     await this.userStatsRepository.save(stats);
 
     return stats;
+  }
+
+  async executeOnce(input: {
+    userId: string;
+    xpAmount: number;
+    quizzesCompletedDelta?: number;
+    sourceType: XpAwardSourceType;
+    sourceId: string;
+  }) {
+    const claimed = await this.userStatsRepository.claimXpAward(
+      input.sourceType,
+      input.sourceId,
+      input.userId,
+    );
+    const stats = await this.userStatsRepository.findOrCreate(input.userId);
+
+    if (!claimed) {
+      return { stats, awarded: false };
+    }
+
+    stats.addXp(input.xpAmount, input.quizzesCompletedDelta ?? 0);
+    const saved = await this.userStatsRepository.save(stats);
+
+    return { stats: saved, awarded: true };
   }
 }

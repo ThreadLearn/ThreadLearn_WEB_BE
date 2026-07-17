@@ -47,6 +47,8 @@ export class SubmitAttemptService {
       limit,
     );
 
+    const xpRewarded = grading.passed ? quiz.xpReward : 0;
+
     // Domain factory validation
     const attemptEntity = QuizAttempt.createNew({
       quizId,
@@ -54,17 +56,15 @@ export class SubmitAttemptService {
       score: grading.score,
       answers,
       passed: grading.passed,
+      passingScorePercent: passingThreshold,
+      xpRewarded,
+      isTimeout: grading.isTimeout,
       startedAt: startTime ? new Date(startTime) : undefined,
     });
 
     // Save attempt using repository
     const attempt = await this.quizAttemptRepository.create(attemptEntity);
     const attemptId = attempt.id;
-
-    let xpRewarded = 0;
-    if (grading.passed) {
-      xpRewarded = quiz.xpReward;
-    }
 
     // ─────────────────────────────────────────────────────────────
     // NON-CRITICAL ASYNCHRONOUS EVENTS

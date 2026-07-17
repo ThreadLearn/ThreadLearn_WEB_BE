@@ -31,9 +31,9 @@ export class QuizAttemptPresenter {
       startedAt: p.startedAt,
       completedAt: p.completedAt,
       // Legacy fields mapping
-      passingScorePercent: quizProps.passingScorePercent ?? 80,
-      xpRewarded: p.passed ? (quizProps.xpReward ?? 100) : 0,
-      isTimeout: false, // Could be recalculated or stored if needed
+      passingScorePercent: p.passingScorePercent ?? quizProps.passingScorePercent ?? 80,
+      xpRewarded: p.xpRewarded ?? (p.passed ? (quizProps.xpReward ?? 100) : 0),
+      isTimeout: p.isTimeout ?? false,
     };
   }
 
