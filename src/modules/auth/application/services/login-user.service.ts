@@ -10,6 +10,7 @@ import {
   REFRESH_TOKEN_REPOSITORY,
 } from '../../domain/interfaces/refresh-token.repository';
 import { LoginUserInput, LoginUserResult } from '../dto/auth-use-case.dto';
+import { ACCOUNT_LOCKED_MESSAGE } from '../../auth-error-messages';
 
 /** Refresh token sống 7 ngày — giữ đúng TTL của luồng đăng nhập hiện tại. */
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +58,7 @@ export class LoginUserService {
     if (!user || !passwordHash) {
       // Cân bằng timing với nhánh sai-mật-khẩu để không lộ user có tồn tại hay không.
       await this.passwordHasher.compare(input.password ?? '', DUMMY_PASSWORD_HASH);
-      throw new BadRequestError('Invalid email or password credentials.');
+      throw new BadRequestError('Invalid credentials.');
     }
 
     // Lockout parity (legacy): chặn khi đang khoá tạm thời — TRƯỚC khi so khớp
@@ -83,7 +84,7 @@ export class LoginUserService {
           `Account locked for ${LOGIN_LOCKOUT_MS / 60000} minutes after too many failed attempts.`,
         );
       }
-      throw new BadRequestError('Invalid email or password credentials.');
+      throw new BadRequestError('Invalid credentials.');
     }
 
     this.assertCanAuthenticate(user);
@@ -126,10 +127,10 @@ export class LoginUserService {
   private assertCanAuthenticate(user: UserEntity): void {
     const p = user.toProps();
     if (p.isActive === false) {
-      throw new ForbiddenError('User account is inactive.');
+      throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
     }
     if (p.lockedAt) {
-      throw new ForbiddenError('User account is locked.');
+      throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
     }
   }
 }

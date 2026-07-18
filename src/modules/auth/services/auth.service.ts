@@ -97,7 +97,7 @@ export class AuthService {
       // response timing is comparable to the wrong-password path. Prevents
       // user enumeration via timing side-channel.
       await bcrypt.compare(data.password ?? '', '$2a$10$invalidsaltdummyHASHvaluetomatchTHEbcryptOPCOST');
-      throw new BadRequestError('Invalid email or password credentials.');
+      throw new BadRequestError('Invalid credentials.');
     }
 
     // SECURITY (P0): account lockout after consecutive failed attempts.
@@ -122,7 +122,7 @@ export class AuthService {
         );
       }
       await user.save();
-      throw new BadRequestError('Invalid email or password credentials.');
+      throw new BadRequestError('Invalid credentials.');
     }
 
     assertUserCanAuthenticate(user);
