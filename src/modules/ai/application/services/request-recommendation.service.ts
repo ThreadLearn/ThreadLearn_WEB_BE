@@ -7,6 +7,7 @@ import { env } from '../../../../configs/env';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
+import { buildExplanation } from './build-explanation';
 
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
@@ -70,9 +71,7 @@ export class RequestRecommendationService {
     const suggestions = issues.map((issue) => `[${issue.severity}] ${issue.description}`);
     const raceConditions = issues.map((issue) => `${issue.line_range}: ${issue.description}`);
     const optimizedCode = issues[0]?.fix;
-    const explanation = issues.length
-      ? `Found ${issues.length} concurrency issue(s) in the submitted ${payload.language} code.`
-      : 'No concurrency issues detected.';
+    const explanation = buildExplanation(issues.length, (data.docs_used ?? []).length);
     const response = [
       '### AI Code Analysis',
       '',

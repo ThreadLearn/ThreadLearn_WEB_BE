@@ -37,6 +37,7 @@ export class AIHistoryMapper {
       issues: doc.issues ?? [],
       docsUsed: doc.docsUsed ?? [],
       cached: doc.cached ?? false,
+      analyzeTimeMs: doc.analyzeTimeMs,
       createdAt: doc.createdAt,
     };
   }
@@ -64,6 +65,7 @@ export class AIHistoryMapper {
       issues: props.issues,
       docsUsed: props.docsUsed,
       cached: props.cached,
+      analyzeTimeMs: props.analyzeTimeMs,
     };
   }
 }

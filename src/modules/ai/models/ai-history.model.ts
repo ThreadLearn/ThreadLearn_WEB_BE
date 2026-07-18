@@ -6,6 +6,7 @@ export interface IAIIssue {
   severity: 'high' | 'medium' | 'low';
   description: string;
   fix: string;
+  codeSnippet?: string;
 }
 
 export interface IAIKnowledgeDoc {
@@ -37,6 +38,7 @@ export interface IAIHistory extends Document {
   issues?: IAIIssue[];
   docsUsed?: IAIKnowledgeDoc[];
   cached?: boolean;
+  analyzeTimeMs?: number;
   createdAt: Date;
 }
 
@@ -47,6 +49,7 @@ const AIIssueSchema = new Schema<IAIIssue>(
     severity: { type: String, enum: ['high', 'medium', 'low'], required: true },
     description: { type: String, required: true },
     fix: { type: String, required: true },
+    codeSnippet: { type: String },
   },
   { _id: false }
 );
@@ -84,6 +87,7 @@ const AIHistorySchema: Schema<IAIHistory> = new Schema(
     issues: { type: [AIIssueSchema], default: [] },
     docsUsed: { type: [AIKnowledgeDocSchema], default: [] },
     cached: { type: Boolean, default: false },
+    analyzeTimeMs: { type: Number },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
