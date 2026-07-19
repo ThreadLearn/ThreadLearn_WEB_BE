@@ -89,3 +89,7 @@ A newly completed normal lesson returns 100 XP. A newly completed final lesson c
 +## Final lesson ordering
 
 The lesson event completes before the course event, ensuring the returned stats snapshot includes both rewards in deterministic order.
+
++## Handler error behavior
+
+Gamification failures are logged with the event name and user identity; the handler returns `{ xpRewarded: 0, stats: null }`.
