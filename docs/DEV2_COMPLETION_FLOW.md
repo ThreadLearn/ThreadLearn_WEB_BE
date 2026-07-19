@@ -81,3 +81,7 @@ Streak updates occur only after a reward source is successfully claimed; duplica
 +## Eventual consistency
 
 Reward-handler failures return empty effects and are logged, avoiding rollback of an enrollment or quiz action that has already persisted.
+
++## Reward calculation
+
+A newly completed normal lesson returns 100 XP. A newly completed final lesson combines 100 lesson XP and 500 course XP for 600 XP.
