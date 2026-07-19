@@ -77,3 +77,7 @@ Each successfully claimed reward emits one XP payload and one leaderboard update
 +## Streak behavior
 
 Streak updates occur only after a reward source is successfully claimed; duplicate deliveries do not touch the streak.
+
++## Eventual consistency
+
+Reward-handler failures return empty effects and are logged, avoiding rollback of an enrollment or quiz action that has already persisted.
