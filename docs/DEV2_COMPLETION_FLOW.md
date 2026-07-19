@@ -69,3 +69,7 @@ Lesson rewards use `lesson_completion:<lessonId>:<userId>` and course rewards us
 +## Idempotency
 
 Repeated delivery returns zero newly awarded XP and does not emit another realtime reward update.
+
++## Realtime behavior
+
+Each successfully claimed reward emits one XP payload and one leaderboard update signal using the saved stats snapshot.
