@@ -85,3 +85,7 @@ Reward-handler failures return empty effects and are logged, avoiding rollback o
 +## Reward calculation
 
 A newly completed normal lesson returns 100 XP. A newly completed final lesson combines 100 lesson XP and 500 course XP for 600 XP.
+
++## Final lesson ordering
+
+The lesson event completes before the course event, ensuring the returned stats snapshot includes both rewards in deterministic order.
