@@ -65,3 +65,7 @@ Event names remain `lesson.completed` and `course.completed`, matching existing 
 +## Reward source identity
 
 Lesson rewards use `lesson_completion:<lessonId>:<userId>` and course rewards use `course_completion:<courseId>:<userId>` through the repository claim contract.
+
++## Idempotency
+
+Repeated delivery returns zero newly awarded XP and does not emit another realtime reward update.
