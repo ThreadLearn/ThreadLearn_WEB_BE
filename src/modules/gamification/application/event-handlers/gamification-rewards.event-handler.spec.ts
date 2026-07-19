@@ -12,6 +12,43 @@ import { UpdateStreakService } from '../services/update-streak.service';
 import { GamificationRewardsEventHandler } from './gamification-rewards.event-handler';
 
 describe('GamificationRewardsEventHandler', () => {
+  it('awards lesson and course XP once per completion source', async () => {
+    const statsRepository = new InMemoryUserStatsRepository();
+    const realtime = new CapturingRealtimePort();
+    const handler = new GamificationRewardsEventHandler(
+      new AwardXpService(statsRepository),
+      new UpdateStreakService(statsRepository),
+      realtime,
+    );
+
+    const firstLesson = await handler.handleLessonCompleted({
+      userId: 'student-1',
+      lessonId: 'lesson-1',
+    });
+    const duplicateLesson = await handler.handleLessonCompleted({
+      userId: 'student-1',
+      lessonId: 'lesson-1',
+    });
+    const firstCourse = await handler.handleCourseCompleted({
+      userId: 'student-1',
+      courseId: 'course-1',
+    });
+    const duplicateCourse = await handler.handleCourseCompleted({
+      userId: 'student-1',
+      courseId: 'course-1',
+    });
+
+    expect(firstLesson.xpRewarded).toBe(100);
+    expect(duplicateLesson.xpRewarded).toBe(0);
+    expect(firstCourse.xpRewarded).toBe(500);
+    expect(duplicateCourse.xpRewarded).toBe(0);
+    expect((await statsRepository.findByUserId('student-1'))?.toProps()).toMatchObject({
+      xp: 600,
+    });
+    expect(realtime.xpEvents).toHaveLength(2);
+    expect(realtime.leaderboardUpdates).toBe(2);
+  });
+
   it('awards quiz XP once per attempt and emits realtime updates once', async () => {
     const statsRepository = new InMemoryUserStatsRepository();
     const realtime = new CapturingRealtimePort();
@@ -27,8 +64,8 @@ describe('GamificationRewardsEventHandler', () => {
       xpReward: 150,
     };
 
-    await (handler as any).handleQuizPassed(event);
-    await (handler as any).handleQuizPassed(event);
+    await handler.handleQuizPassed(event);
+    await handler.handleQuizPassed(event);
 
     const stats = await statsRepository.findByUserId('student-1');
     expect(stats?.toProps()).toMatchObject({
