@@ -73,3 +73,7 @@ Repeated delivery returns zero newly awarded XP and does not emit another realti
 +## Realtime behavior
 
 Each successfully claimed reward emits one XP payload and one leaderboard update signal using the saved stats snapshot.
+
++## Streak behavior
+
+Streak updates occur only after a reward source is successfully claimed; duplicate deliveries do not touch the streak.
