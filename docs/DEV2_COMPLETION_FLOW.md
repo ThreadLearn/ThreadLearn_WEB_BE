@@ -61,3 +61,7 @@ The completion use case publishes domain facts and no longer reaches across modu
 +## Migration compatibility
 
 Event names remain `lesson.completed` and `course.completed`, matching existing gamification and leaderboard subscribers.
+
++## Reward source identity
+
+Lesson rewards use `lesson_completion:<lessonId>:<userId>` and course rewards use `course_completion:<courseId>:<userId>` through the repository claim contract.
