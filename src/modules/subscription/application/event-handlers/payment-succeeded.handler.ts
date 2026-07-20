@@ -2,6 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PLAN_REPOSITORY, IPlanRepository } from '../../domain/interfaces/plan.repository';
 import { ISubscriptionRepository, SUBSCRIPTION_REPOSITORY } from '../../domain/interfaces/subscription.repository';
+import {
+  IUserPlanAccessRepository,
+  USER_PLAN_ACCESS_REPOSITORY,
+} from '../../domain/interfaces/user-plan-access.repository';
 import { Subscription } from '../../domain/entities/subscription.entity';
 
 interface PaymentSucceededEvent {
@@ -15,6 +19,8 @@ export class PaymentSucceededHandler {
   constructor(
     @Inject(PLAN_REPOSITORY) private readonly planRepository: IPlanRepository,
     @Inject(SUBSCRIPTION_REPOSITORY) private readonly subscriptionRepository: ISubscriptionRepository,
+    @Inject(USER_PLAN_ACCESS_REPOSITORY)
+    private readonly userPlanAccessRepository: IUserPlanAccessRepository,
   ) {}
 
   @OnEvent('payment.succeeded')
@@ -28,11 +34,12 @@ export class PaymentSucceededHandler {
 
     if (existing) {
       existing.extend(plan.id, planProps.durationDays, now);
-      await this.subscriptionRepository.update(existing);
+      const subscription = await this.subscriptionRepository.update(existing);
+      await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
       return;
     }
 
-    await this.subscriptionRepository.create(
+    const subscription = await this.subscriptionRepository.create(
       Subscription.createActive({
         userId: event.userId,
         planId: plan.id,
@@ -40,5 +47,6 @@ export class PaymentSucceededHandler {
         now,
       }),
     );
+    await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
   }
 }

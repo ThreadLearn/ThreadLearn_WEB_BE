@@ -12,10 +12,12 @@ import {
 import { IPlanRepository } from '../../domain/interfaces/plan.repository';
 import { IPurchaseRepository } from '../../domain/interfaces/purchase.repository';
 import { ISubscriptionRepository } from '../../domain/interfaces/subscription.repository';
+import { IUserPlanAccessRepository } from '../../domain/interfaces/user-plan-access.repository';
 import { PaymentSucceededHandler } from '../event-handlers/payment-succeeded.handler';
 import { CreatePlanService } from './create-plan.service';
 import { DeletePlanService } from './delete-plan.service';
 import { GetMySubscriptionService } from './get-my-subscription.service';
+import { GetMyPurchaseService } from './get-my-purchase.service';
 import { ListPlansService } from './list-plans.service';
 import { ProcessPaymentWebhookService } from './process-payment-webhook.service';
 import { PurchasePlanService } from './purchase-plan.service';
@@ -25,6 +27,7 @@ describe('Subscription UC51-52 service flow', () => {
   let planRepository: InMemoryPlanRepository;
   let purchaseRepository: InMemoryPurchaseRepository;
   let subscriptionRepository: InMemorySubscriptionRepository;
+  let userPlanAccessRepository: InMemoryUserPlanAccessRepository;
   let paymentGateway: FakePaymentGateway;
   let eventEmitter: CapturingEventEmitter;
   let createPlan: CreatePlanService;
@@ -34,17 +37,20 @@ describe('Subscription UC51-52 service flow', () => {
   let purchasePlan: PurchasePlanService;
   let processWebhook: ProcessPaymentWebhookService;
   let getMySubscription: GetMySubscriptionService;
+  let getMyPurchase: GetMyPurchaseService;
 
   beforeEach(() => {
     planRepository = new InMemoryPlanRepository();
     purchaseRepository = new InMemoryPurchaseRepository();
     subscriptionRepository = new InMemorySubscriptionRepository();
+    userPlanAccessRepository = new InMemoryUserPlanAccessRepository();
     paymentGateway = new FakePaymentGateway();
     eventEmitter = new CapturingEventEmitter();
 
     const paymentSucceededHandler = new PaymentSucceededHandler(
       planRepository,
       subscriptionRepository,
+      userPlanAccessRepository,
     );
     eventEmitter.handlePaymentSucceeded = (payload) => paymentSucceededHandler.handle(payload);
 
@@ -59,6 +65,7 @@ describe('Subscription UC51-52 service flow', () => {
       eventEmitter as unknown as EventEmitter2,
     );
     getMySubscription = new GetMySubscriptionService(subscriptionRepository);
+    getMyPurchase = new GetMyPurchaseService(purchaseRepository);
   });
 
   it('covers admin plan CRUD including inactive filtering', async () => {
@@ -122,6 +129,11 @@ describe('Subscription UC51-52 service flow', () => {
       transactionId: purchase.id,
       paymentUrl: `/mock-payment/vnpay?purchaseId=${purchase.id}`,
     });
+    await expect(getMyPurchase.execute('another-student', purchase.id)).rejects.toMatchObject({
+      code: ErrorCode.SUBSCRIPTION_PURCHASE_NOT_FOUND,
+      statusCode: 404,
+    });
+    expect((await getMyPurchase.execute('student-1', purchase.id)).toProps().status).toBe('pending');
 
     const processed = await processWebhook.execute({
       purchaseId: purchase.id,
@@ -150,6 +162,32 @@ describe('Subscription UC51-52 service flow', () => {
       status: 'active',
     });
     expect(subscription?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(userPlanAccessRepository.grants).toHaveLength(1);
+    expect(userPlanAccessRepository.grants[0]).toMatchObject({ userId: 'student-1' });
+    expect(userPlanAccessRepository.grants[0].expiresAt.getTime()).toBe(
+      subscription?.expiresAt.getTime(),
+    );
+
+    const upgradedPlan = await createPlan.execute({
+      name: 'Premium Plus',
+      price: 1299000,
+      currency: 'VND',
+      durationDays: 30,
+      features: ['Everything', 'Priority support'],
+    });
+    const upgradedPurchase = await purchasePlan.execute('student-1', upgradedPlan.id);
+    await processWebhook.execute({
+      purchaseId: upgradedPurchase.id,
+      transactionId: upgradedPurchase.id,
+      status: 'success',
+      amount: '1299000',
+    });
+    await eventEmitter.waitForLastEvent();
+
+    const upgradedSubscription = await getMySubscription.execute('student-1');
+    expect(upgradedSubscription?.toProps().planId).toBe(upgradedPlan.id);
+    expect(upgradedSubscription?.expiresAt.getTime()).toBeGreaterThan(subscription!.expiresAt.getTime());
+    expect(userPlanAccessRepository.grants).toHaveLength(2);
 
     const secondWebhookResult = await processWebhook.execute({
       purchaseId: purchase.id,
@@ -160,7 +198,7 @@ describe('Subscription UC51-52 service flow', () => {
     await eventEmitter.waitForLastEvent();
 
     expect(secondWebhookResult.status).toBe('succeeded');
-    expect(eventEmitter.events).toHaveLength(1);
+    expect(eventEmitter.events).toHaveLength(2);
   });
 
   it('rejects unverified webhooks without changing purchase or subscription state', async () => {
@@ -333,6 +371,14 @@ class InMemorySubscriptionRepository implements ISubscriptionRepository {
     };
     this.subscriptions.set(props.id, cloneSubscriptionProps(props));
     return Subscription.fromPersistence(cloneSubscriptionProps(props));
+  }
+}
+
+class InMemoryUserPlanAccessRepository implements IUserPlanAccessRepository {
+  grants: Array<{ userId: string; expiresAt: Date }> = [];
+
+  async grantPremiumAccess(userId: string, expiresAt: Date): Promise<void> {
+    this.grants.push({ userId, expiresAt: new Date(expiresAt) });
   }
 }
 

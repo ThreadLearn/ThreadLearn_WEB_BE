@@ -30,6 +30,8 @@ export const purchasePlanSchema = z.object({
   planId: planIdParamSchema,
 });
 
+export const purchaseIdParamSchema = planIdParamSchema;
+
 export const paymentWebhookSchema = z.record(z.unknown());
 
 export type CreatePlanDto = z.infer<typeof createPlanSchema>;
