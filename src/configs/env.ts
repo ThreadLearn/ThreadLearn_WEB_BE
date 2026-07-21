@@ -68,7 +68,10 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
+  /** Preferred key name used by code-execution module */
   JUDGE0_API_KEY: z.string().optional(),
+  /** Alias some env templates use for RapidAPI Judge0 */
+  JUDGE0_RAPIDAPI_KEY: z.string().optional(),
   AI_API_URL: z.string().default('http://localhost:8001'),
   AI_API_TIMEOUT_MS: z.coerce.number().default(30000),
   UPLOAD_DIR: z.string().default('./public/uploads'),
@@ -100,7 +103,11 @@ if (!databaseUrl) {
   throw new Error('Environment validation failed');
 }
 
+// Accept either JUDGE0_API_KEY or legacy JUDGE0_RAPIDAPI_KEY from .env templates
+const judge0ApiKey = parsed.data.JUDGE0_API_KEY || parsed.data.JUDGE0_RAPIDAPI_KEY;
+
 export const env = {
   ...parsed.data,
   DATABASE_URL: databaseUrl,
+  JUDGE0_API_KEY: judge0ApiKey,
 };
