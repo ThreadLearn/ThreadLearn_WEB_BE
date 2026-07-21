@@ -1,15 +1,12 @@
 /* eslint-disable no-console */
-import 'dotenv/config';
 import mongoose from 'mongoose';
+import { connectToDatabase } from '../../configs/db';
 
 const legacyIndexName = 'userId_1_lessonId_1';
 
 async function migrate() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error('DATABASE_URL is required.');
-
-  await mongoose.connect(databaseUrl);
-  const notes = mongoose.connection.collection('notes');
+  const database = await connectToDatabase();
+  const notes = database.connection.collection('notes');
   const indexes = await notes.indexes();
   const legacyIndex = indexes.find((index) => index.name === legacyIndexName && index.unique);
 
