@@ -8,8 +8,9 @@ import { NoteMapper } from '../mapper/note.mapper';
 
 @Injectable()
 export class MongoNoteRepository implements INoteRepository {
-  async findLatestByLesson(userId: string, lessonId: string): Promise<unknown | null> {
-    return Note.findOne({ userId, lessonId }).sort({ updatedAt: -1 });
+  async listByLesson(userId: string, lessonId: string): Promise<unknown[]> {
+    const notes = await Note.find({ userId, lessonId }).sort({ updatedAt: -1 }).lean();
+    return notes.map((note) => NoteMapper.formatView(note));
   }
 
   async listByUser(userId: string, page: number, limit: number) {
@@ -33,14 +34,9 @@ export class MongoNoteRepository implements INoteRepository {
     };
   }
 
-  async upsert(note: NoteEntity): Promise<unknown> {
-    const props = note.toProps();
-    const saved = await Note.findOneAndUpdate(
-      { userId: props.userId, lessonId: props.lessonId },
-      { $set: { noteText: props.noteText, codeSnippet: props.codeSnippet } },
-      { new: true, upsert: true, setDefaultsOnInsert: true, sort: { updatedAt: -1 } },
-    );
-    return saved ? NoteMapper.formatView(saved) : null;
+  async create(note: NoteEntity): Promise<unknown> {
+    const saved = await Note.create(NoteMapper.toPersistence(note));
+    return NoteMapper.formatView(saved);
   }
 
   async findOwned(userId: string, noteId: string): Promise<NoteEntity | null> {
@@ -50,7 +46,9 @@ export class MongoNoteRepository implements INoteRepository {
   }
 
   async update(note: NoteEntity): Promise<unknown> {
-    const doc = await Note.findByIdAndUpdate(note.id, NoteMapper.toPersistence(note), { new: true });
+    const doc = await Note.findByIdAndUpdate(note.id, NoteMapper.toPersistence(note), {
+      new: true,
+    });
     if (!doc) throw new NotFoundError('Note not found.');
     return NoteMapper.formatView(doc);
   }
