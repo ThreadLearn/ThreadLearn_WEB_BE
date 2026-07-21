@@ -1,5 +1,7 @@
+import { SubscriptionFeatureKey } from '../../../../shared/domain/subscription-features';
+
 export interface IUserPlanAccessRepository {
-  grantPremiumAccess(userId: string, expiresAt: Date): Promise<void>;
+  grantPlanAccess(userId: string, expiresAt: Date, features: SubscriptionFeatureKey[]): Promise<void>;
 }
 
 export const USER_PLAN_ACCESS_REPOSITORY = Symbol('USER_PLAN_ACCESS_REPOSITORY');

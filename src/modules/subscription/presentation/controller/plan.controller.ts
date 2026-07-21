@@ -19,6 +19,7 @@ import { GetPlanService } from '../../application/services/get-plan.service';
 import { ListPlansService } from '../../application/services/list-plans.service';
 import { UpdatePlanService } from '../../application/services/update-plan.service';
 import { PlanPresenter } from '../response/plan.presenter';
+import { SUBSCRIPTION_FEATURES } from '../../../../shared/domain/subscription-features';
 
 @ApiTags('Subscription Plans')
 @Controller('v1/subscription/plans')
@@ -52,6 +53,16 @@ export class PlanController {
     return ApiResponse.success({
       message: 'Subscription plans fetched successfully.',
       data: PlanPresenter.toList(plans),
+    });
+  }
+
+  @Get('features')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'UC51 — list enforceable subscription features.' })
+  availableFeatures() {
+    return ApiResponse.success({
+      message: 'Available subscription features fetched successfully.',
+      data: SUBSCRIPTION_FEATURES,
     });
   }
 

@@ -37,7 +37,11 @@ export class PaymentSucceededHandler {
     if (existing) {
       existing.extend(plan.id, planProps.durationDays, now);
       const subscription = await this.subscriptionRepository.update(existing);
-      await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
+      await this.userPlanAccessRepository.grantPlanAccess(
+        event.userId,
+        subscription.expiresAt,
+        planProps.features,
+      );
       await this.notificationsService?.notifyAdminPaymentSuccess(event);
       return;
     }
@@ -50,7 +54,11 @@ export class PaymentSucceededHandler {
         now,
       }),
     );
-    await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
+    await this.userPlanAccessRepository.grantPlanAccess(
+      event.userId,
+      subscription.expiresAt,
+      planProps.features,
+    );
     await this.notificationsService?.notifyAdminPaymentSuccess(event);
   }
 }

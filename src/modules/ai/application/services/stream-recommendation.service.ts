@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import type { Response } from 'express';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
+import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
@@ -54,10 +55,12 @@ export class StreamRecommendationService {
     const user = await this.histories.findUserProfile(userId);
     if (!user) throw new NotFoundError('User profile not found.');
 
-    const isPremiumTier =
-      user.role === 'ADMIN' ||
-      (user.planType === 'PREMIUM' &&
-        (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now()));
+    const isPremiumTier = user.role === 'ADMIN' || hasActiveSubscriptionFeature({
+      planType: user.planType,
+      subscriptionExpiresAt: user.subscriptionExpiresAt,
+      subscriptionFeatures: user.subscriptionFeatures,
+      feature: 'AI_ADVANCED_ANALYSIS',
+    });
     await this.assertDailyLimit(userId, isPremiumTier);
 
     const aiToken = jwt.sign({ sub: userId }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
@@ -140,7 +143,7 @@ export class StreamRecommendationService {
       }
     });
 
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       upstream.data.on('data', (chunk: Buffer) => {
         if (clientAborted) return;
         const text = chunk.toString('utf-8');

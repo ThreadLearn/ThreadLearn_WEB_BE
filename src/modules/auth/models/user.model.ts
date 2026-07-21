@@ -8,6 +8,7 @@ export interface IUser extends Document {
   role: 'STUDENT' | 'ADMIN';
   planType?: 'FREE' | 'PREMIUM';
   subscriptionExpiresAt?: Date;
+  subscriptionFeatures?: string[];
   avatarUrl?: string;
   googleId?: string;
   githubId?: string;
@@ -36,6 +37,7 @@ const UserSchema: Schema<IUser> = new Schema(
     role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT' },
     planType: { type: String, enum: ['FREE', 'PREMIUM'], default: 'FREE' },
     subscriptionExpiresAt: { type: Date },
+    subscriptionFeatures: { type: [String] },
     avatarUrl: { type: String },
     googleId: { type: String, unique: true, sparse: true },
     githubId: { type: String, unique: true, sparse: true },

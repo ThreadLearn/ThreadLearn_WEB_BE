@@ -31,6 +31,9 @@ export interface UserProps {
   failedLoginAttempts?: number;
   /** Thời điểm hết khoá tạm thời do sai mật khẩu nhiều lần (KHÁC `lockedAt` admin-lock). */
   lockedUntil?: Date;
+  planType?: 'FREE' | 'PREMIUM';
+  subscriptionExpiresAt?: Date;
+  subscriptionFeatures?: string[];
   lastLoginAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

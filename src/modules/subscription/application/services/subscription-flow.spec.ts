@@ -75,7 +75,7 @@ describe('Subscription UC51-52 service flow', () => {
       price: 99000,
       currency: 'vnd',
       durationDays: 30,
-      features: ['AI hints', 'Premium lessons'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     await expect(createPlan.execute({
@@ -90,14 +90,14 @@ describe('Subscription UC51-52 service flow', () => {
     const updated = await updatePlan.execute(monthly.id, {
       name: 'Premium Monthly Plus',
       price: 129000,
-      features: ['AI hints', 'Premium lessons', 'Certificates'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     expect(updated.toProps()).toMatchObject({
       name: 'Premium Monthly Plus',
       price: 129000,
       currency: 'VND',
-      features: ['AI hints', 'Premium lessons', 'Certificates'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
       isActive: true,
     });
 
@@ -115,7 +115,7 @@ describe('Subscription UC51-52 service flow', () => {
       price: 999000,
       currency: 'VND',
       durationDays: 365,
-      features: ['Everything'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     const purchase = await purchasePlan.execute('student-1', plan.id);
@@ -163,7 +163,10 @@ describe('Subscription UC51-52 service flow', () => {
     });
     expect(subscription?.expiresAt.getTime()).toBeGreaterThan(Date.now());
     expect(userPlanAccessRepository.grants).toHaveLength(1);
-    expect(userPlanAccessRepository.grants[0]).toMatchObject({ userId: 'student-1' });
+    expect(userPlanAccessRepository.grants[0]).toMatchObject({
+      userId: 'student-1',
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
+    });
     expect(userPlanAccessRepository.grants[0].expiresAt.getTime()).toBe(
       subscription?.expiresAt.getTime(),
     );
@@ -173,7 +176,7 @@ describe('Subscription UC51-52 service flow', () => {
       price: 1299000,
       currency: 'VND',
       durationDays: 30,
-      features: ['Everything', 'Priority support'],
+      features: ['PREMIUM_COURSES'],
     });
     const upgradedPurchase = await purchasePlan.execute('student-1', upgradedPlan.id);
     await processWebhook.execute({
@@ -188,6 +191,7 @@ describe('Subscription UC51-52 service flow', () => {
     expect(upgradedSubscription?.toProps().planId).toBe(upgradedPlan.id);
     expect(upgradedSubscription?.expiresAt.getTime()).toBeGreaterThan(subscription!.expiresAt.getTime());
     expect(userPlanAccessRepository.grants).toHaveLength(2);
+    expect(userPlanAccessRepository.grants[1].features).toEqual(['PREMIUM_COURSES']);
 
     const secondWebhookResult = await processWebhook.execute({
       purchaseId: purchase.id,
@@ -206,6 +210,7 @@ describe('Subscription UC51-52 service flow', () => {
       name: 'Premium Weekly',
       price: 49000,
       durationDays: 7,
+      features: ['PREMIUM_COURSES'],
     });
     const purchase = await purchasePlan.execute('student-2', plan.id);
 
@@ -230,6 +235,7 @@ describe('Subscription UC51-52 service flow', () => {
       name: 'Premium Quarter',
       price: 299000,
       durationDays: 90,
+      features: ['AI_ADVANCED_ANALYSIS'],
     });
     const purchase = await purchasePlan.execute('student-3', plan.id);
 
@@ -375,10 +381,10 @@ class InMemorySubscriptionRepository implements ISubscriptionRepository {
 }
 
 class InMemoryUserPlanAccessRepository implements IUserPlanAccessRepository {
-  grants: Array<{ userId: string; expiresAt: Date }> = [];
+  grants: Array<{ userId: string; expiresAt: Date; features: string[] }> = [];
 
-  async grantPremiumAccess(userId: string, expiresAt: Date): Promise<void> {
-    this.grants.push({ userId, expiresAt: new Date(expiresAt) });
+  async grantPlanAccess(userId: string, expiresAt: Date, features: string[]): Promise<void> {
+    this.grants.push({ userId, expiresAt: new Date(expiresAt), features: [...features] });
   }
 }
 

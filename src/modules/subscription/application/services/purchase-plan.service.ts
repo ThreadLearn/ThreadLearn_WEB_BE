@@ -20,6 +20,12 @@ export class PurchasePlanService {
     }
 
     const planProps = plan.toProps();
+    if (planProps.features.length === 0) {
+      throw DomainError.badRequest(
+        ErrorCode.SUBSCRIPTION_PLAN_INVALID_INPUT,
+        'This legacy plan has no enforceable features and cannot be purchased.',
+      );
+    }
     let purchase = await this.purchaseRepository.create(
       Purchase.createNew({
         userId,
