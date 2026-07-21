@@ -83,6 +83,21 @@ describe('PayOSAdapter', () => {
       verified: false,
     });
   });
+
+  it('reconciles a paid PayOS payment link from the gateway API', async () => {
+    client.paymentLinkResult = {
+      amount: 99000,
+      amountPaid: 99000,
+      status: 'PAID',
+    };
+
+    await expect(adapter.reconcilePayment('123456')).resolves.toEqual({
+      amount: 99000,
+      succeeded: true,
+      terminal: true,
+    });
+    expect(client.paymentRequests.get).toHaveBeenCalledWith(123456);
+  });
 });
 
 class TestablePayOSAdapter extends PayOSAdapter {
@@ -112,12 +127,22 @@ class FakePayOSClient {
   };
 
   verifyWebhookError?: Error;
+  paymentLinkResult: {
+    amount: number;
+    amountPaid: number;
+    status: 'PENDING' | 'CANCELLED' | 'UNDERPAID' | 'PAID' | 'EXPIRED' | 'PROCESSING' | 'FAILED';
+  } = {
+    amount: 99000,
+    amountPaid: 0,
+    status: 'PENDING' as const,
+  };
 
   paymentRequests = {
     create: jest.fn(async (paymentData: FakePayOSClient['lastPaymentRequest']) => {
       this.lastPaymentRequest = paymentData;
       return { checkoutUrl: 'https://pay.payos.vn/checkout/test' };
     }),
+    get: jest.fn(async () => this.paymentLinkResult),
   };
 
   webhooks = {
@@ -125,6 +150,7 @@ class FakePayOSClient {
       if (this.verifyWebhookError) throw this.verifyWebhookError;
       return this.webhookResult;
     }),
+    confirm: jest.fn(async () => ({})),
   };
 }
 

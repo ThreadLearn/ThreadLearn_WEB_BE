@@ -8,6 +8,7 @@ import { GetPlanService } from './application/services/get-plan.service';
 import { ListPlansService } from './application/services/list-plans.service';
 import { ProcessPaymentWebhookService } from './application/services/process-payment-webhook.service';
 import { PurchasePlanService } from './application/services/purchase-plan.service';
+import { ReconcilePaymentService } from './application/services/reconcile-payment.service';
 import { UpdatePlanService } from './application/services/update-plan.service';
 import { PaymentSucceededHandler } from './application/event-handlers/payment-succeeded.handler';
 import { PAYMENT_GATEWAY } from './domain/interfaces/payment-gateway.port';
@@ -17,6 +18,7 @@ import { SUBSCRIPTION_REPOSITORY } from './domain/interfaces/subscription.reposi
 import { USER_PLAN_ACCESS_REPOSITORY } from './domain/interfaces/user-plan-access.repository';
 import { MockPaymentAdapter } from './infrastructure/payment/mock-payment.adapter';
 import { PayOSAdapter } from './infrastructure/payment/payos.adapter';
+import { PayOSWebhookRegistrationService } from './infrastructure/payment/payos-webhook-registration.service';
 import { VNPayAdapter } from './infrastructure/payment/vnpay.adapter';
 import { MongoPlanRepository } from './infrastructure/persistence/mongo-plan.repository';
 import { MongoPurchaseRepository } from './infrastructure/persistence/mongo-purchase.repository';
@@ -36,6 +38,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     MongoUserPlanAccessRepository,
     MockPaymentAdapter,
     PayOSAdapter,
+    PayOSWebhookRegistrationService,
     VNPayAdapter,
     { provide: PLAN_REPOSITORY, useExisting: MongoPlanRepository },
     { provide: PURCHASE_REPOSITORY, useExisting: MongoPurchaseRepository },
@@ -62,6 +65,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     GetPlanService,
     ListPlansService,
     PurchasePlanService,
+    ReconcilePaymentService,
     ProcessPaymentWebhookService,
     GetMySubscriptionService,
     GetMyPurchaseService,
