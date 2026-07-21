@@ -18,10 +18,12 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import {
   CreateCommentDto,
+  CreateReplyDto,
   ListCommentsQueryDto,
   UpdateCommentDto,
   commentIdParamSchema,
   createCommentSchema,
+  createReplySchema,
   listCommentsQuerySchema,
   updateCommentSchema,
 } from '../../application/dto/comment.dto';
@@ -82,7 +84,7 @@ export class CommentController {
   async reply(
     @CurrentUser() user: AuthenticatedUser,
     @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
-    @Body(new ZodValidationPipe(updateCommentSchema)) body: UpdateCommentDto,
+    @Body(new ZodValidationPipe(createReplySchema)) body: CreateReplyDto,
   ) {
     if (!user) throw new BadRequestError('User context required.');
     const parent = await this.getCommentSvc.execute(commentId);
@@ -91,6 +93,7 @@ export class CommentController {
       targetId: parent.targetId,
       content: body.content,
       parentId: commentId,
+      isAnonymous: body.isAnonymous ?? false,
     });
     return ApiResponse.success({ message: 'Reply created.', data, statusCode: 201 });
   }
@@ -147,13 +150,14 @@ export class LessonCommentsController {
   async createLessonComment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() body: { content: string; parentId?: string },
+    @Body() body: { content: string; parentId?: string; isAnonymous?: boolean },
   ) {
     const comment = await this.createCommentSvc.execute(user.id, user.role, {
       targetType: 'LESSON',
       targetId: id,
       content: body.content,
       parentId: body.parentId,
+      isAnonymous: body.isAnonymous,
     });
     return ApiResponse.success({ message: 'Comment created.', data: comment, statusCode: 201 });
   }
