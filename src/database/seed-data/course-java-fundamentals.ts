@@ -42,7 +42,7 @@ export const javaFundamentalsCourse: SeedCourse = {
               heading: 'Process là gì?',
               body:
                 'Process là chương trình đang chạy với **không gian địa chỉ ảo riêng**. ' +
-                'Hai process Java (hai lần \`java MyApp\`) **không** share heap.\n\n' +
+                'Hai process Java (hai lần `java MyApp`) **không** share heap.\n\n' +
                 '| Tài nguyên | Ý nghĩa |\n|---|---|\n| Address space | Cách ly bộ nhớ |\n| Handles | File, socket |\n| ≥ 1 thread | Bắt đầu với main |',
             },
             {
@@ -50,15 +50,15 @@ export const javaFundamentalsCourse: SeedCourse = {
               body:
                 'Thread là đơn vị lập lịch CPU **trong** process. Trong một JVM:\n' +
                 '- Nhiều thread có thể chạy (parallel trên multi-core)\n' +
-                '- **Cùng heap** — object \`new\` có thể được nhiều thread đụng tới\n' +
+                '- **Cùng heap** — object `new` có thể được nhiều thread đụng tới\n' +
                 '- **Stack riêng** — biến local method không share\n\n' +
                 '```\n┌──────── Process (JVM) ────────┐\n│ Heap: Counter, arrays…        │\n│ T1 stack      T2 stack        │\n└───────────────────────────────┘\n```',
             },
             {
               heading: 'Demo lost update (đọc và hiểu từng dòng)',
               body:
-                'Hai thread cùng \`value++\` thường ra kết quả **nhỏ hơn** 200000. ' +
-                '\`++\` là read-modify-write không atomic.',
+                'Hai thread cùng `value++` thường ra kết quả **nhỏ hơn** 200000. ' +
+                '`++` là read-modify-write không atomic.',
               code: {
                 language: 'java',
                 caption: 'Chạy mentally hoặc IDE Java — actual thường < expected',
@@ -87,7 +87,7 @@ export const javaFundamentalsCourse: SeedCourse = {
             {
               heading: 'So với track JavaScript ThreadLearn',
               body:
-                'JS main: logic race sau \`await\`. Java threads: race/data race trên field heap thật. ' +
+                'JS main: logic race sau `await`. Java threads: race/data race trên field heap thật. ' +
                 'IDE playground FE có thể hiện demo JS seats — đó là **công cụ luyện**, ' +
                 'không thay phần lý thuyết Java của bài này. Hãy đọc hết markdown trước.',
             },
@@ -95,7 +95,7 @@ export const javaFundamentalsCourse: SeedCourse = {
               heading: 'Best practices mở đầu',
               body:
                 '1. Ưu tiên immutability sau publish\n2. Thu hẹp shared mutable\n' +
-                '3. Production: ExecutorService (khóa Advanced)\n4. Đừng nhầm \`run()\` với \`start()\` (bài sau)',
+                '3. Production: ExecutorService (khóa Advanced)\n4. Đừng nhầm `run()` với `start()` (bài sau)',
             },
           ],
           pitfalls: [
@@ -200,7 +200,7 @@ t.join();`,
             {
               heading: 'Sơ đồ',
               body:
-                '\`NEW → RUNNABLE ⇄ BLOCKED|WAITING|TIMED_WAITING → TERMINATED\`\n\n' +
+                '`NEW → RUNNABLE ⇄ BLOCKED|WAITING|TIMED_WAITING → TERMINATED`\n\n' +
                 '| State | Ví dụ |\n|---|---|\n| NEW | new Thread |\n| RUNNABLE | đang/sẵn sàng chạy |\n| BLOCKED | chờ synchronized lock |\n| WAITING | wait(), join() |\n| TIMED_WAITING | sleep, wait(ms) |\n| TERMINATED | run xong |',
             },
             {
@@ -225,7 +225,7 @@ t.join();`,
             {
               heading: 'Interrupt',
               body:
-                '\`t.interrupt()\` set flag — không kill ngay. Loop kiểm tra \`isInterrupted()\` ' +
+                '`t.interrupt()` set flag — không kill ngay. Loop kiểm tra `isInterrupted()` ' +
                 'hoặc method ném InterruptedException.',
               code: {
                 language: 'java',
@@ -239,7 +239,7 @@ t.join();`,
             },
             {
               heading: 'Daemon',
-              body: '\`setDaemon(true)\` **trước** start. JVM thoát khi chỉ còn daemon. Không dùng cho ghi dữ liệu quan trọng dở dang.',
+              body: '`setDaemon(true)` **trước** start. JVM thoát khi chỉ còn daemon. Không dùng cho ghi dữ liệu quan trọng dở dang.',
             },
           ],
           nextUp: 'Module 2: synchronized.',
@@ -279,7 +279,7 @@ t.join();`,
               heading: 'Cạm bẫy',
               body:
                 '1. Khóa khác object → không bảo vệ field\n2. Critical section quá rộng\n' +
-                '3. I/O trong sync → chậm/deadlock\n4. \`synchronized(new Object())\` mỗi lần — vô dụng',
+                '3. I/O trong sync → chậm/deadlock\n4. `synchronized(new Object())` mỗi lần — vô dụng',
             },
           ],
           exercises: [
@@ -346,7 +346,7 @@ t.join();`,
           sections: [
             {
               heading: 'Visibility',
-              body: 'Không sync, thread có thể không thấy ghi của thread khác. \`volatile boolean running\` cho flag shutdown.',
+              body: 'Không sync, thread có thể không thấy ghi của thread khác. `volatile boolean running` cho flag shutdown.',
               code: {
                 language: 'java',
                 code: `volatile boolean running = true;
