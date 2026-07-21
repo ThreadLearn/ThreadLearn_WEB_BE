@@ -369,7 +369,6 @@ async function seed() {
     const jsLessons = lessonsByCourseSlug.get('js-concurrency-fundamentals')!;
     const javaLessons = lessonsByCourseSlug.get('java-multithreading-foundations')!;
     const parallelLessons = lessonsByCourseSlug.get('parallel-js-workers-shared-memory')!;
-    const advJavaLessons = lessonsByCourseSlug.get('advanced-concurrent-java-patterns')!;
 
     logger.info(`✅ Curriculum inserted (${globalLessonOrderHint} lessons total).`);
 

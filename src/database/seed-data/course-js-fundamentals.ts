@@ -74,7 +74,7 @@ for (let i = 0; i < 5e8; i++) s += i;
             {
               heading: 'Vì sao vẫn có “race” trong JS?',
               body:
-                'Dù một thời điểm chỉ một đoạn JS chạy trên một stack, \`await\` **tạm dừng hàm** và cho ' +
+                'Dù một thời điểm chỉ một đoạn JS chạy trên một stack, `await` **tạm dừng hàm** và cho ' +
                 'continuation khác chạy. Shared mutable state (biến module, object) có thể bị đọc/ghi ' +
                 'theo thứ tự không mong muốn — gọi là **logic race**, khác data race C++/SAB.',
             },
@@ -127,9 +127,9 @@ for (let i = 0; i < 5e8; i++) s += i;
             {
               heading: 'Browser vs Node (đủ để lập trình đúng)',
               body:
-                '**Browser:** \`setTimeout\`, \`fetch\`, DOM events qua Web APIs.\n\n' +
+                '**Browser:** `setTimeout`, `fetch`, DOM events qua Web APIs.\n\n' +
                 '**Node:** libuv + thread pool cho một số I/O; event loop có phases ' +
-                '(\`timers → poll → check…\`). Microtask vẫn drain khi stack rỗng.\n\n' +
+                '(`timers → poll → check…`). Microtask vẫn drain khi stack rỗng.\n\n' +
                 'Chi tiết phase Node không cần thuộc lòng ngay — quan trọng là: ' +
                 '**đừng block stack bằng CPU nặng**.',
             },
@@ -137,12 +137,12 @@ for (let i = 0; i < 5e8; i++) s += i;
               heading: 'Hệ quả thiết kế hệ thống',
               body:
                 '1. API handler CPU nặng → latency tăng cho mọi request trên process.\n' +
-                '2. Fan-out I/O → \`Promise.all\` / queue có limit.\n' +
+                '2. Fan-out I/O → `Promise.all` / queue có limit.\n' +
                 '3. Cần parallel CPU → Worker (Premium) hoặc native service.',
             },
           ],
           pitfalls: ['Nghĩ fetch chạy “trong V8 thread riêng” theo nghĩa JS multithread heap'],
-          selfCheck: ['Callback \`setTimeout\` được host hay engine thực thi I/O?'],
+          selfCheck: ['Callback `setTimeout` được host hay engine thực thi I/O?'],
           nextUp: 'Call stack, heap, và cửa sổ sau await.',
         }),
         buildLesson({
@@ -180,7 +180,7 @@ for (let i = 0; i < 5e8; i++) s += i;
             {
               heading: 'await và concurrency',
               body:
-                'Khi \`await promise\`, function **suspend**: frame không giữ stack “bận” theo nghĩa chặn loop; ' +
+                'Khi `await promise`, function **suspend**: frame không giữ stack “bận” theo nghĩa chặn loop; ' +
                 'engine có thể chạy task khác. Đó là cửa sổ **logic race** trên biến shared (Module 3).',
             },
           ],
@@ -242,9 +242,9 @@ console.log('D');
             {
               heading: 'Node phases (overview)',
               body:
-                '\`timers → pending → poll → check (setImmediate) → close\`. ' +
+                '`timers → pending → poll → check (setImmediate) → close`. ' +
                 'Microtask vẫn được xử lý khi stack rỗng. ' +
-                'Đừng phụ thuộc order \`setImmediate\` vs \`setTimeout(0)\` mọi context.',
+                'Đừng phụ thuộc order `setImmediate` vs `setTimeout(0)` mọi context.',
             },
           ],
           pitfalls: [
@@ -284,7 +284,7 @@ console.log('D');`,
           sections: [
             {
               heading: 'Error-first (Node style)',
-              body: 'Quy ước \`(err, data) => { if (err) … }\` — dễ quên handle ở mỗi tầng.',
+              body: 'Quy ước `(err, data) => { if (err) … }` — dễ quên handle ở mỗi tầng.',
               code: {
                 language: 'javascript',
                 code: `fs.readFile(path, (err, data) => {
@@ -332,8 +332,8 @@ doAsync().then(v => process(v)).then(console.log).catch(console.error);`,
             {
               heading: 'Anti-patterns',
               body:
-                '1. Nested then không cần\n2. \`new Promise\` bọc API đã trả Promise\n' +
-                '3. Empty \`.catch(() => {})\`\n4. Quên return trong then → \`undefined\`',
+                '1. Nested then không cần\n2. `new Promise` bọc API đã trả Promise\n' +
+                '3. Empty `.catch(() => {})`\n4. Quên return trong then → `undefined`',
             },
           ],
           nextUp: 'async/await mastery + lab sumParallel.',
@@ -360,14 +360,14 @@ doAsync().then(v => process(v)).then(console.log).catch(console.error);`,
             {
               heading: 'Cơ chế',
               body:
-                '\`async function\` luôn return Promise. \`await\` pause **function đó**, ' +
+                '`async function` luôn return Promise. `await` pause **function đó**, ' +
                 'không “đóng băng” cả process — event loop vẫn chạy task khác.',
             },
             {
               heading: 'Tuần tự vs song song',
               body:
-                'Phụ thuộc dữ liệu → await tuần tự. I/O độc lập → \`Promise.all\`.\n\n' +
-                'Sai phổ biến: \`for\` + \`await fetch\` khi các URL không phụ thuộc nhau.',
+                'Phụ thuộc dữ liệu → await tuần tự. I/O độc lập → `Promise.all`.\n\n' +
+                'Sai phổ biến: `for` + `await fetch` khi các URL không phụ thuộc nhau.',
               code: {
                 language: 'javascript',
                 code: `// Tuần tự (cần user trước posts)
@@ -499,14 +499,14 @@ ac.abort();`,
             {
               heading: 'Ba pattern',
               body:
-                '1. **Check-then-act:** \`if (!cache[k]) cache[k]=await load(k)\`\n' +
+                '1. **Check-then-act:** `if (!cache[k]) cache[k]=await load(k)`\n' +
                 '2. **Stale RMW:** read → await → write dựa giá trị cũ\n' +
                 '3. **Out-of-order response:** request chậm ghi đè UI mới hơn',
             },
             {
               heading: 'Demo overbook seats (hay gặp trên IDE playground)',
               body:
-                'Hai \`enroll\` concurrent đều thấy \`seats > 0\`, cùng await, rồi cùng giảm — ' +
+                'Hai `enroll` concurrent đều thấy `seats > 0`, cùng await, rồi cùng giảm — ' +
                 'có thể bán 2 ghế khi chỉ còn 1. **Đây là đúng lý thuyết race logic.** ' +
                 'Playground IDE để bạn Run và quan sát; phần markdown mới là bài học đầy đủ.',
               code: {
@@ -564,7 +564,7 @@ Promise.all([enroll('an'), enroll('binh')]).then(console.log);`,
           sections: [
             {
               heading: 'Mutex bằng Promise chain',
-              body: 'Mọi \`run\` nối tiếp trên một chain — critical section chạy tuần tự.',
+              body: 'Mọi `run` nối tiếp trên một chain — critical section chạy tuần tự.',
               code: {
                 language: 'javascript',
                 code: `class Mutex {

@@ -200,7 +200,7 @@ parentPort.postMessage(fib(workerData.n));`,
           sections: [
             {
               heading: 'Mô hình',
-              body: 'Nhiều thread cùng vùng nhớ. \`view[0]=view[0]+1\` không Atomics → data race.',
+              body: 'Nhiều thread cùng vùng nhớ. `view[0]=view[0]+1` không Atomics → data race.',
             },
             {
               heading: 'Browser security',
