@@ -38,6 +38,7 @@ export class MongoAIHistoryRepository implements IAIHistoryRepository {
           role: user.role,
           planType: user.planType,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
+          subscriptionFeatures: user.subscriptionFeatures,
         }
       : null;
   }

@@ -1126,32 +1126,14 @@ async function withdraw(amount) {
 
     // ── 9. SUBSCRIPTIONS ────────────────────────────────────────
     logger.info('💳 Subscriptions...');
-    const [freePlan, monthlyPlan, semesterPlan] = await SubscriptionPlan.create([
-      {
-        name: 'Free',
-        description: 'JS + Java foundations, quiz, IDE, AI 10/day.',
-        price: 0,
-        currency: 'VND',
-        durationDays: 3650,
-        features: [
-          'JS Concurrency Fundamentals (full)',
-          'Java Multithreading Foundations (full)',
-          'Unlimited quiz & IDE',
-          'AI 10/day',
-        ],
-        isActive: true,
-      },
+    const [monthlyPlan, semesterPlan] = await SubscriptionPlan.create([
       {
         name: 'Premium Monthly',
         description: 'Workers/Atomics + Advanced Java + AI 40/day + history.',
         price: 99000,
         currency: 'VND',
         durationDays: 30,
-        features: [
-          'All premium concurrent courses',
-          'AI 40/day + history',
-          'Capstone premium tracks',
-        ],
+        features: ['PREMIUM_COURSES', 'AI_ADVANCED_ANALYSIS'],
         isActive: true,
       },
       {
@@ -1160,7 +1142,7 @@ async function withdraw(amount) {
         price: 399000,
         currency: 'VND',
         durationDays: 180,
-        features: ['All Premium Monthly', 'Long retention', 'Demo-ready path'],
+        features: ['PREMIUM_COURSES', 'AI_ADVANCED_ANALYSIS'],
         isActive: true,
       },
       {
@@ -1169,7 +1151,7 @@ async function withdraw(amount) {
         price: 49000,
         currency: 'VND',
         durationDays: 30,
-        features: ['Legacy'],
+        features: ['PREMIUM_COURSES'],
         isActive: false,
       },
     ]);
@@ -1178,8 +1160,6 @@ async function withdraw(amount) {
       { userId: minh._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(10), expiresAt: daysFromNow(170) },
       { userId: admin._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(200), expiresAt: daysFromNow(165) },
       { userId: instructor._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(180), expiresAt: daysFromNow(185) },
-      { userId: bob._id, planId: freePlan._id, status: 'active', startedAt: daysAgo(30), expiresAt: daysFromNow(3620) },
-      { userId: huy._id, planId: freePlan._id, status: 'active', startedAt: daysAgo(14), expiresAt: daysFromNow(3636) },
       { userId: expiredPremium._id, planId: monthlyPlan._id, status: 'expired', startedAt: daysAgo(35), expiresAt: daysAgo(5) },
     ]);
 

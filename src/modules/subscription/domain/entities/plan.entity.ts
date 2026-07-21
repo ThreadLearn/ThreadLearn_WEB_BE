@@ -1,4 +1,8 @@
 import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
+import {
+  normalizeSubscriptionFeatures,
+  SubscriptionFeatureKey,
+} from '../../../../shared/domain/subscription-features';
 
 export interface PlanProps {
   id: string;
@@ -7,7 +11,7 @@ export interface PlanProps {
   price: number;
   currency: string;
   durationDays: number;
-  features: string[];
+  features: SubscriptionFeatureKey[];
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -19,7 +23,7 @@ export interface CreatePlanInput {
   price: number;
   currency?: string;
   durationDays: number;
-  features?: string[];
+  features?: SubscriptionFeatureKey[];
   isActive?: boolean;
 }
 
@@ -29,7 +33,7 @@ export interface PlanEditableProps {
   price?: number;
   currency?: string;
   durationDays?: number;
-  features?: string[];
+  features?: SubscriptionFeatureKey[];
   isActive?: boolean;
 }
 
@@ -44,16 +48,18 @@ export class Plan {
       price: input.price,
       currency: (input.currency ?? 'VND').trim().toUpperCase(),
       durationDays: input.durationDays,
-      features: input.features ?? [],
+      features: normalizeSubscriptionFeatures(input.features),
       isActive: input.isActive ?? true,
     };
     Plan.validate(props);
+    Plan.assertHasFeatures(props);
     return new Plan(props);
   }
 
   static fromPersistence(props: PlanProps): Plan {
-    Plan.validate(props);
-    return new Plan(props);
+    const normalized = { ...props, features: normalizeSubscriptionFeatures(props.features) };
+    Plan.validate(normalized);
+    return new Plan(normalized);
   }
 
   get id(): string { return this.props.id; }
@@ -66,7 +72,10 @@ export class Plan {
     if (patch.price !== undefined) this.props.price = patch.price;
     if (patch.currency !== undefined) this.props.currency = patch.currency.trim().toUpperCase();
     if (patch.durationDays !== undefined) this.props.durationDays = patch.durationDays;
-    if (patch.features !== undefined) this.props.features = patch.features;
+    if (patch.features !== undefined) {
+      this.props.features = normalizeSubscriptionFeatures(patch.features);
+      Plan.assertHasFeatures(this.props);
+    }
     if (patch.isActive !== undefined) this.props.isActive = patch.isActive;
     Plan.validate(this.props);
   }
@@ -91,6 +100,15 @@ export class Plan {
     }
     if (!props.currency?.trim()) {
       throw DomainError.badRequest(ErrorCode.SUBSCRIPTION_PLAN_INVALID_INPUT, 'Plan currency is required.');
+    }
+  }
+
+  private static assertHasFeatures(props: PlanProps): void {
+    if (props.features.length === 0) {
+      throw DomainError.badRequest(
+        ErrorCode.SUBSCRIPTION_PLAN_INVALID_INPUT,
+        'A subscription plan must include at least one available feature.',
+      );
     }
   }
 }

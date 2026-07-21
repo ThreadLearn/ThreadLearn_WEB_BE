@@ -7,6 +7,7 @@ export interface AIUserProfile {
   role?: string;
   planType?: string;
   subscriptionExpiresAt?: Date;
+  subscriptionFeatures?: string[];
 }
 
 export interface AICourseProfile {
