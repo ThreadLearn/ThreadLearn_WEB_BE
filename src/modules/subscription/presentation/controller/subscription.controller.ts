@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
@@ -9,9 +9,11 @@ import {
   PaymentWebhookDto,
   PurchasePlanDto,
   paymentWebhookSchema,
+  purchaseIdParamSchema,
   purchasePlanSchema,
 } from '../../application/dto/plan.dto';
 import { GetMySubscriptionService } from '../../application/services/get-my-subscription.service';
+import { GetMyPurchaseService } from '../../application/services/get-my-purchase.service';
 import { ProcessPaymentWebhookService } from '../../application/services/process-payment-webhook.service';
 import { PurchasePlanService } from '../../application/services/purchase-plan.service';
 import { PurchasePresenter } from '../response/purchase.presenter';
@@ -23,6 +25,7 @@ export class SubscriptionController {
   constructor(
     private readonly purchasePlan: PurchasePlanService,
     private readonly getMySubscription: GetMySubscriptionService,
+    private readonly getMyPurchase: GetMyPurchaseService,
     private readonly processPaymentWebhook: ProcessPaymentWebhookService,
   ) {}
 
@@ -51,6 +54,21 @@ export class SubscriptionController {
     return ApiResponse.success({
       message: 'Subscription fetched successfully.',
       data: SubscriptionPresenter.toResponse(subscription),
+    });
+  }
+
+  @Get('purchases/:purchaseId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC52 — get current user purchase status.' })
+  async purchaseStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('purchaseId', new ZodValidationPipe(purchaseIdParamSchema)) purchaseId: string,
+  ) {
+    const purchase = await this.getMyPurchase.execute(user.id, purchaseId);
+    return ApiResponse.success({
+      message: 'Purchase fetched successfully.',
+      data: PurchasePresenter.toResponse(purchase),
     });
   }
 

@@ -1,4 +1,5 @@
 import { ForbiddenError } from '../../../common/custom-error';
+import { ACCOUNT_LOCKED_MESSAGE } from '../auth-error-messages';
 
 export type SafeUser = {
   id: string;
@@ -50,10 +51,10 @@ export function sanitizeUser(user: SanitizableUser): SafeUser {
 
 export function assertUserCanAuthenticate(user: { isActive?: boolean; lockedAt?: Date | null }) {
   if (user.isActive === false) {
-    throw new ForbiddenError('User account is inactive.');
+    throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
   }
 
   if (user.lockedAt) {
-    throw new ForbiddenError('User account is locked.');
+    throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
   }
 }

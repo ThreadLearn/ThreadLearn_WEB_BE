@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BadRequestError, ForbiddenError } from '../../../../common/custom-error';
+import { ACCOUNT_LOCKED_MESSAGE } from '../../auth-error-messages';
 import { UserEntity } from '../../domain/entities/user.entity';
 import { RefreshTokenEntity } from '../../domain/entities/refresh-token.entity';
 import { IUserRepository, USER_REPOSITORY } from '../../domain/interfaces/user.repository';
@@ -148,10 +149,10 @@ export class GoogleLoginService {
   private assertCanAuthenticate(user: UserEntity): void {
     const p = user.toProps();
     if (p.isActive === false) {
-      throw new ForbiddenError('User account is inactive.');
+      throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
     }
     if (p.lockedAt) {
-      throw new ForbiddenError('User account is locked.');
+      throw new ForbiddenError(ACCOUNT_LOCKED_MESSAGE);
     }
   }
 
