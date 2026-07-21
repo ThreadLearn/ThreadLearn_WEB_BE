@@ -4,7 +4,10 @@ import { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
+import { ListNotesQueryDto, listNotesQuerySchema } from '../../application/dto/note.dto';
 import { ListByLessonService } from '../../application/services/list-by-lesson.service';
+import { ListMyNotesService } from '../../application/services/list-my-notes.service';
 import { RemoveNoteService } from '../../application/services/remove-note.service';
 import { SearchNotesService } from '../../application/services/search-notes.service';
 import { UpdateNoteService } from '../../application/services/update-note.service';
@@ -17,6 +20,7 @@ import { UpsertNoteService } from '../../application/services/upsert-note.servic
 export class NotesController {
   constructor(
     private readonly listByLessonSvc: ListByLessonService,
+    private readonly listMyNotesSvc: ListMyNotesService,
     private readonly searchNotesSvc: SearchNotesService,
     private readonly upsertNoteSvc: UpsertNoteService,
     private readonly updateNoteSvc: UpdateNoteService,
@@ -24,9 +28,21 @@ export class NotesController {
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const notes = lessonId ? await this.listByLessonSvc.execute(user.id, lessonId) : [];
-    return ApiResponse.success({ message: 'Notes fetched.', data: notes });
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(listNotesQuerySchema)) query: ListNotesQueryDto,
+  ) {
+    if (query.lessonId) {
+      const notes = await this.listByLessonSvc.execute(user.id, query.lessonId);
+      return ApiResponse.success({ message: 'Notes fetched.', data: notes });
+    }
+
+    const result = await this.listMyNotesSvc.execute(user.id, query.page, query.limit);
+    return ApiResponse.success({
+      message: 'Notes fetched.',
+      data: result.data,
+      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+    });
   }
 
   @Get('search')

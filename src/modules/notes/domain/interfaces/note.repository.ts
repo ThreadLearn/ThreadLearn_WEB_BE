@@ -1,7 +1,16 @@
 import { NoteEntity } from '../entities/note.entity';
 
+export interface NoteListResult {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface INoteRepository {
   findLatestByLesson(userId: string, lessonId: string): Promise<unknown | null>;
+  listByUser(userId: string, page: number, limit: number): Promise<NoteListResult>;
   upsert(note: NoteEntity): Promise<unknown>;
   findOwned(userId: string, noteId: string): Promise<NoteEntity | null>;
   update(note: NoteEntity): Promise<unknown>;
