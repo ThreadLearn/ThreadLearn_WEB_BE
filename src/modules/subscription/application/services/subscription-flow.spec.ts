@@ -7,6 +7,7 @@ import {
   IPaymentGateway,
   PaymentRequestInput,
   PaymentRequestResult,
+  PaymentReconciliationResult,
   PaymentWebhookResult,
 } from '../../domain/interfaces/payment-gateway.port';
 import { IPlanRepository } from '../../domain/interfaces/plan.repository';
@@ -21,6 +22,7 @@ import { GetMyPurchaseService } from './get-my-purchase.service';
 import { ListPlansService } from './list-plans.service';
 import { ProcessPaymentWebhookService } from './process-payment-webhook.service';
 import { PurchasePlanService } from './purchase-plan.service';
+import { ReconcilePaymentService } from './reconcile-payment.service';
 import { UpdatePlanService } from './update-plan.service';
 
 describe('Subscription UC51-52 service flow', () => {
@@ -36,6 +38,7 @@ describe('Subscription UC51-52 service flow', () => {
   let deletePlan: DeletePlanService;
   let purchasePlan: PurchasePlanService;
   let processWebhook: ProcessPaymentWebhookService;
+  let reconcilePayment: ReconcilePaymentService;
   let getMySubscription: GetMySubscriptionService;
   let getMyPurchase: GetMyPurchaseService;
 
@@ -60,6 +63,11 @@ describe('Subscription UC51-52 service flow', () => {
     deletePlan = new DeletePlanService(planRepository);
     purchasePlan = new PurchasePlanService(planRepository, purchaseRepository, paymentGateway);
     processWebhook = new ProcessPaymentWebhookService(
+      purchaseRepository,
+      paymentGateway,
+      eventEmitter as unknown as EventEmitter2,
+    );
+    reconcilePayment = new ReconcilePaymentService(
       purchaseRepository,
       paymentGateway,
       eventEmitter as unknown as EventEmitter2,
@@ -143,7 +151,7 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(processed.status).toBe('succeeded');
+    expect(processed?.status).toBe('succeeded');
     expect(eventEmitter.events).toEqual([
       {
         event: 'payment.succeeded',
@@ -201,7 +209,7 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(secondWebhookResult.status).toBe('succeeded');
+    expect(secondWebhookResult?.status).toBe('succeeded');
     expect(eventEmitter.events).toHaveLength(2);
   });
 
@@ -247,9 +255,31 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(processed.status).toBe('failed');
+    expect(processed?.status).toBe('failed');
     expect(await getMySubscription.execute('student-3')).toBeNull();
     expect(eventEmitter.events).toHaveLength(0);
+  });
+
+  it('reconciles a returned PayOS payment and activates the subscription', async () => {
+    const plan = await createPlan.execute({
+      name: 'Premium PayOS',
+      price: 99000,
+      durationDays: 30,
+      features: ['PREMIUM_COURSES'],
+    });
+    const purchase = await purchasePlan.execute('student-payos', plan.id);
+    paymentGateway.reconciliationResult = {
+      amount: 99000,
+      succeeded: true,
+      terminal: true,
+    };
+
+    const reconciled = await reconcilePayment.execute('student-payos', purchase.id);
+    await eventEmitter.waitForLastEvent();
+
+    expect(reconciled.status).toBe('succeeded');
+    expect((await getMySubscription.execute('student-payos'))?.toProps().status).toBe('active');
+    expect(userPlanAccessRepository.grants[0]?.features).toEqual(['PREMIUM_COURSES']);
   });
 });
 
@@ -389,6 +419,10 @@ class InMemoryUserPlanAccessRepository implements IUserPlanAccessRepository {
 }
 
 class FakePaymentGateway implements IPaymentGateway {
+  reconciliationResult: PaymentReconciliationResult = {
+    succeeded: false,
+    terminal: false,
+  };
   async createPayment(input: PaymentRequestInput): Promise<PaymentRequestResult> {
     return {
       transactionId: input.purchaseId,
@@ -411,6 +445,10 @@ class FakePaymentGateway implements IPaymentGateway {
       succeeded: verified && (status === 'success' || responseCode === '00'),
       verified,
     };
+  }
+
+  async reconcilePayment(): Promise<PaymentReconciliationResult> {
+    return this.reconciliationResult;
   }
 }
 

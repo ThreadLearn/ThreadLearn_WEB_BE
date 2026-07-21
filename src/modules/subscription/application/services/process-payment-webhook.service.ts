@@ -15,16 +15,18 @@ export class ProcessPaymentWebhookService {
 
   async execute(payload: PaymentWebhookDto) {
     const result = await this.paymentGateway.verifyWebhook(payload);
+    if (result.verified === false) {
+      throw DomainError.badRequest(ErrorCode.SUBSCRIPTION_PURCHASE_INVALID_INPUT, 'Payment webhook verification failed.');
+    }
+
     const purchase = result.purchaseId
       ? await this.purchaseRepository.findById(result.purchaseId)
       : await this.purchaseRepository.findByTransactionId(result.transactionId);
 
     if (!purchase) {
-      throw DomainError.notFound(ErrorCode.SUBSCRIPTION_PURCHASE_NOT_FOUND, 'Purchase not found.');
-    }
-
-    if (result.verified === false) {
-      throw DomainError.badRequest(ErrorCode.SUBSCRIPTION_PURCHASE_INVALID_INPUT, 'Payment webhook verification failed.');
+      // PayOS sends a signed validation request when registering the webhook URL.
+      // A verified event without a local purchase must be acknowledged, not activated.
+      return null;
     }
 
     const purchaseProps = purchase.toProps();

@@ -16,6 +16,7 @@ import { GetMySubscriptionService } from '../../application/services/get-my-subs
 import { GetMyPurchaseService } from '../../application/services/get-my-purchase.service';
 import { ProcessPaymentWebhookService } from '../../application/services/process-payment-webhook.service';
 import { PurchasePlanService } from '../../application/services/purchase-plan.service';
+import { ReconcilePaymentService } from '../../application/services/reconcile-payment.service';
 import { PurchasePresenter } from '../response/purchase.presenter';
 import { SubscriptionPresenter } from '../response/subscription.presenter';
 
@@ -27,6 +28,7 @@ export class SubscriptionController {
     private readonly getMySubscription: GetMySubscriptionService,
     private readonly getMyPurchase: GetMyPurchaseService,
     private readonly processPaymentWebhook: ProcessPaymentWebhookService,
+    private readonly reconcilePayment: ReconcilePaymentService,
   ) {}
 
   @Post('purchase')
@@ -72,13 +74,28 @@ export class SubscriptionController {
     });
   }
 
+  @Post('purchases/:purchaseId/reconcile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  @ApiOperation({ summary: 'UC52 — reconcile a returned PayOS payment with the gateway.' })
+  async reconcile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('purchaseId', new ZodValidationPipe(purchaseIdParamSchema)) purchaseId: string,
+  ) {
+    const purchase = await this.reconcilePayment.execute(user.id, purchaseId);
+    return ApiResponse.success({
+      message: 'Payment status reconciled successfully.',
+      data: PurchasePresenter.toResponse(purchase),
+    });
+  }
+
   @Post('webhook/payment')
   @ApiOperation({ summary: 'UC52 — payment webhook.' })
   async webhook(@Body(new ZodValidationPipe(paymentWebhookSchema)) body: PaymentWebhookDto) {
     const purchase = await this.processPaymentWebhook.execute(body);
     return ApiResponse.success({
       message: 'Payment webhook processed successfully.',
-      data: PurchasePresenter.toResponse(purchase),
+      data: purchase ? PurchasePresenter.toResponse(purchase) : null,
     });
   }
 }

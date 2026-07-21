@@ -6,6 +6,7 @@ import {
   IPaymentGateway,
   PaymentRequestInput,
   PaymentRequestResult,
+  PaymentReconciliationResult,
   PaymentWebhookResult,
 } from '../../domain/interfaces/payment-gateway.port';
 
@@ -20,6 +21,12 @@ interface PayOSPaymentRequest {
 
 interface PayOSPaymentResponse {
   checkoutUrl: string;
+}
+
+interface PayOSPaymentLink {
+  amount: number;
+  amountPaid: number;
+  status: 'PENDING' | 'CANCELLED' | 'UNDERPAID' | 'PAID' | 'EXPIRED' | 'PROCESSING' | 'FAILED';
 }
 
 interface PayOSWebhookPayload {
@@ -37,9 +44,11 @@ interface PayOSWebhookData {
 interface PayOSClientLike {
   paymentRequests: {
     create(paymentData: PayOSPaymentRequest): Promise<PayOSPaymentResponse>;
+    get(orderCode: number): Promise<PayOSPaymentLink>;
   };
   webhooks: {
     verify(webhook: PayOSWebhookPayload): Promise<PayOSWebhookData>;
+    confirm(webhookUrl: string): Promise<unknown>;
   };
 }
 
@@ -93,6 +102,24 @@ export class PayOSAdapter implements IPaymentGateway {
         verified: false,
       };
     }
+  }
+
+  async reconcilePayment(transactionId: string): Promise<PaymentReconciliationResult> {
+    const orderCode = Number(transactionId);
+    if (!Number.isSafeInteger(orderCode) || orderCode <= 0) {
+      throw new Error('Invalid PayOS order code.');
+    }
+
+    const paymentLink = await this.getClient().paymentRequests.get(orderCode);
+    return {
+      amount: paymentLink.amountPaid || paymentLink.amount,
+      succeeded: paymentLink.status === 'PAID',
+      terminal: ['PAID', 'CANCELLED', 'UNDERPAID', 'EXPIRED', 'FAILED'].includes(paymentLink.status),
+    };
+  }
+
+  async confirmWebhook(webhookUrl: string): Promise<void> {
+    await this.getClient().webhooks.confirm(webhookUrl);
   }
 
   protected getClient(): PayOSClientLike {
