@@ -30,33 +30,50 @@ import {
   PasswordResetToken,
 } from './models';
 import { hashPassword } from '../utils';
+import { calculateLevel } from '../modules/gamification/domain/services/level-calculator';
+import {
+  CURRICULUM,
+  countCurriculum,
+  daysAgo,
+  daysFromNow,
+  hoursAgo,
+  avatar,
+  thumb,
+  SeedCourse,
+  SeedLesson,
+} from './seed-data';
 
-// ── Helpers thời gian ───────────────────────────────────────────
-const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
-const daysFromNow = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
-const avatar = (seed: string) => `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`;
+type LeanLesson = {
+  _id: mongoose.Types.ObjectId;
+  courseId: mongoose.Types.ObjectId;
+  slug?: string;
+  title: string;
+  orderIndex: number;
+  def: SeedLesson;
+};
 
 /**
- * Seed dữ liệu tạm cho TOÀN HỆ THỐNG ThreadLearn.
- *
- * Chạy: `npm run db:seed`
- * ⚠️ XÓA SẠCH mọi collection rồi tạo lại — không dùng trên DB production.
- *
- * Thứ tự tạo tuân theo phụ thuộc tham chiếu:
- *   Users → Stats → Courses → Sections → Lessons → Versions → Quizzes/Exercises
- *   → Enrollments → LessonProgress → Attempts/Executions → Reviews/Comments/Notes/Bookmarks
- *   → Certificates → AIHistory → Notifications → Tokens.
+ * Full-curriculum seed — Concurrent Programming (JS + Java).
+ * Run: `npm run db:seed`
+ * ⚠️ Wipes seedable collections. Dev/demo only.
  */
 async function seed() {
   try {
-    logger.info('🚀 Database Seeding Tool Initializing...');
-    await connectToDatabase();
-    logger.info('🔌 Connected to MongoDB for seeding.');
+    const stats = countCurriculum();
+    logger.info('🚀 ThreadLearn COMPLETE curriculum seed (syllabus → full bodies → DB)...');
+    logger.info(
+      `📚 Plan: ${stats.courses} courses | ${stats.sections} sections | ${stats.lessons} lessons | ${stats.quizzes} quizzes | ${stats.exercises} exercises`,
+    );
+    logger.info(
+      `📝 Content: avg ${stats.avgCharsPerLesson} chars/lesson | thin(<800 non-quiz)=${stats.thinNonQuizLessons}`,
+    );
+    logger.info(`📋 Syllabus:\n${stats.syllabusLines}`);
 
-    // ════════════════════════════════════════════════════════════
-    // 1. WIPE — xóa toàn bộ collection seedable
-    // ════════════════════════════════════════════════════════════
-    logger.info('🗑️  Wiping all collections...');
+    await connectToDatabase();
+    logger.info('🔌 Connected to MongoDB.');
+
+    // ── 1. WIPE ─────────────────────────────────────────────────
+    logger.info('🗑️  Wiping collections...');
     await Promise.all([
       User.deleteMany({}),
       UserStats.deleteMany({}),
@@ -85,59 +102,59 @@ async function seed() {
       EmailVerificationToken.deleteMany({}),
       PasswordResetToken.deleteMany({}),
     ]);
-    logger.info('✅ All collections cleared.');
+    logger.info('✅ Cleared.');
 
-    // ════════════════════════════════════════════════════════════
-    // 2. USERS
-    // ════════════════════════════════════════════════════════════
-    logger.info('👤 Creating users...');
-    const adminPasswordHash = await hashPassword('Admin@123');
-    const studentPasswordHash = await hashPassword('Student@123');
+    // ── 2. USERS ────────────────────────────────────────────────
+    logger.info('👤 Users...');
+    const adminHash = await hashPassword('Admin@123');
+    const studentHash = await hashPassword('Student@123');
 
     const users = await User.create([
       {
         email: 'admin@threadlearn.com',
-        passwordHash: adminPasswordHash,
-        firstName: 'John',
+        passwordHash: adminHash,
+        firstName: 'System',
         lastName: 'Admin',
         role: 'ADMIN',
         planType: 'PREMIUM',
+        subscriptionExpiresAt: daysFromNow(365),
         isVerified: true,
         emailVerifiedAt: daysAgo(200),
         isActive: true,
-        avatarUrl: avatar('JohnAdmin'),
-        lastLoginAt: daysAgo(1),
+        avatarUrl: avatar('SystemAdmin'),
+        lastLoginAt: daysAgo(0),
       },
       {
         email: 'instructor@threadlearn.com',
-        passwordHash: adminPasswordHash,
-        firstName: 'Emma',
-        lastName: 'Instructor',
+        passwordHash: adminHash,
+        firstName: 'Lan',
+        lastName: 'Nguyen',
         role: 'ADMIN',
         planType: 'PREMIUM',
+        subscriptionExpiresAt: daysFromNow(365),
         isVerified: true,
         emailVerifiedAt: daysAgo(180),
         isActive: true,
-        avatarUrl: avatar('EmmaInstructor'),
-        lastLoginAt: daysAgo(2),
-      },
-      {
-        email: 'student@threadlearn.com',
-        passwordHash: studentPasswordHash,
-        firstName: 'Jane',
-        lastName: 'Student',
-        role: 'STUDENT',
-        planType: 'PREMIUM',
-        subscriptionExpiresAt: daysFromNow(180),
-        isVerified: true,
-        emailVerifiedAt: daysAgo(60),
-        isActive: true,
-        avatarUrl: avatar('JaneStudent'),
+        avatarUrl: avatar('LanNguyen'),
         lastLoginAt: daysAgo(1),
       },
       {
+        email: 'student@threadlearn.com',
+        passwordHash: studentHash,
+        firstName: 'Minh',
+        lastName: 'Tran',
+        role: 'STUDENT',
+        planType: 'PREMIUM',
+        subscriptionExpiresAt: daysFromNow(170),
+        isVerified: true,
+        emailVerifiedAt: daysAgo(60),
+        isActive: true,
+        avatarUrl: avatar('MinhTran'),
+        lastLoginAt: hoursAgo(2),
+      },
+      {
         email: 'bob@threadlearn.com',
-        passwordHash: studentPasswordHash,
+        passwordHash: studentHash,
         firstName: 'Bob',
         lastName: 'Learner',
         role: 'STUDENT',
@@ -146,603 +163,1035 @@ async function seed() {
         emailVerifiedAt: daysAgo(30),
         isActive: true,
         avatarUrl: avatar('BobLearner'),
-        lastLoginAt: daysAgo(3),
+        lastLoginAt: daysAgo(1),
       },
       {
         email: 'alice@threadlearn.com',
-        passwordHash: studentPasswordHash,
+        passwordHash: studentHash,
         firstName: 'Alice',
         lastName: 'Coder',
         role: 'STUDENT',
         planType: 'FREE',
-        isVerified: false, // chưa xác minh email → có EmailVerificationToken bên dưới
+        isVerified: false,
         isActive: true,
         avatarUrl: avatar('AliceCoder'),
       },
-    ]);
-    const [admin, instructor, jane, bob, alice] = users;
-    logger.info(`✅ Created ${users.length} users (2 ADMIN, 3 STUDENT).`);
-
-    // ════════════════════════════════════════════════════════════
-    // 3. USER STATS
-    // ════════════════════════════════════════════════════════════
-    logger.info('📊 Creating user stats...');
-    await UserStats.create([
-      { userId: admin._id, xp: 5000, level: 6, currentStreak: 12, highestStreak: 30, quizzesCompleted: 25, coursesCompleted: 4, totalLessonsCompleted: 40, lastActiveDate: daysAgo(1) },
-      { userId: instructor._id, xp: 8000, level: 9, currentStreak: 20, highestStreak: 45, quizzesCompleted: 30, coursesCompleted: 5, totalLessonsCompleted: 60, lastActiveDate: daysAgo(2) },
-      { userId: jane._id, xp: 1350, level: 2, currentStreak: 5, highestStreak: 9, quizzesCompleted: 3, coursesCompleted: 1, totalLessonsCompleted: 8, lastActiveDate: daysAgo(1) },
-      { userId: bob._id, xp: 250, level: 1, currentStreak: 1, highestStreak: 3, quizzesCompleted: 1, coursesCompleted: 0, totalLessonsCompleted: 2, lastActiveDate: daysAgo(3) },
-      { userId: alice._id, xp: 0, level: 1, currentStreak: 0, highestStreak: 0, quizzesCompleted: 0, coursesCompleted: 0, totalLessonsCompleted: 0 },
-    ]);
-    logger.info('✅ Created user stats for all users.');
-
-    // ════════════════════════════════════════════════════════════
-    // 4. COURSES
-    // ════════════════════════════════════════════════════════════
-    logger.info('📚 Creating courses...');
-    const courses = await Course.create([
       {
-        title: 'HTML & CSS Foundations',
-        slug: 'html-css-foundations',
-        shortDescription: 'Build the structural and visual foundation of the web.',
-        description: 'Learn the cornerstone technologies of the web. Build structural layouts, master responsive design, Flexbox, Grid, and advanced selectors.',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=600&q=80',
-        coverImage: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=600&q=80',
+        email: 'huy@threadlearn.com',
+        passwordHash: studentHash,
+        firstName: 'Huy',
+        lastName: 'Pham',
+        role: 'STUDENT',
+        planType: 'FREE',
+        isVerified: true,
+        emailVerifiedAt: daysAgo(14),
+        isActive: true,
+        avatarUrl: avatar('HuyPham'),
+        lastLoginAt: daysAgo(2),
+      },
+      {
+        email: 'expired@threadlearn.com',
+        passwordHash: studentHash,
+        firstName: 'Expired',
+        lastName: 'Premium',
+        role: 'STUDENT',
+        planType: 'PREMIUM',
+        subscriptionExpiresAt: daysAgo(5),
+        isVerified: true,
+        emailVerifiedAt: daysAgo(90),
+        isActive: true,
+        avatarUrl: avatar('ExpiredPremium'),
+        lastLoginAt: daysAgo(4),
+      },
+      {
+        email: 'locked@threadlearn.com',
+        passwordHash: studentHash,
+        firstName: 'Locked',
+        lastName: 'Account',
+        role: 'STUDENT',
+        planType: 'FREE',
+        isVerified: true,
+        emailVerifiedAt: daysAgo(40),
+        isActive: false,
+        lockedAt: daysAgo(3),
+        lockedReason: 'Too many failed login attempts (seed demo).',
+        failedLoginAttempts: 5,
+        lockedUntil: daysFromNow(1),
+        avatarUrl: avatar('LockedAccount'),
+      },
+    ]);
+    const [admin, instructor, minh, bob, alice, huy, expiredPremium, lockedUser] = users;
+    logger.info(`✅ ${users.length} users`);
+
+    // ── 3. STATS ────────────────────────────────────────────────
+    const statsRows = [
+      { userId: admin._id, xp: 6200, currentStreak: 15, highestStreak: 40, quizzesCompleted: 12, coursesCompleted: 2, totalLessonsCompleted: 30, lastActiveDate: daysAgo(0) },
+      { userId: instructor._id, xp: 9800, currentStreak: 22, highestStreak: 50, quizzesCompleted: 20, coursesCompleted: 3, totalLessonsCompleted: 45, lastActiveDate: daysAgo(1) },
+      { userId: minh._id, xp: 3200, currentStreak: 6, highestStreak: 12, quizzesCompleted: 4, coursesCompleted: 1, totalLessonsCompleted: 18, lastActiveDate: hoursAgo(2) },
+      { userId: bob._id, xp: 1100, currentStreak: 2, highestStreak: 5, quizzesCompleted: 2, coursesCompleted: 0, totalLessonsCompleted: 8, lastActiveDate: daysAgo(1) },
+      { userId: alice._id, xp: 0, currentStreak: 0, highestStreak: 0, quizzesCompleted: 0, coursesCompleted: 0, totalLessonsCompleted: 0, lastActiveDate: daysAgo(7) },
+      { userId: huy._id, xp: 1500, currentStreak: 3, highestStreak: 7, quizzesCompleted: 1, coursesCompleted: 0, totalLessonsCompleted: 10, lastActiveDate: daysAgo(2) },
+      { userId: expiredPremium._id, xp: 2800, currentStreak: 0, highestStreak: 14, quizzesCompleted: 3, coursesCompleted: 1, totalLessonsCompleted: 16, lastActiveDate: daysAgo(4) },
+      { userId: lockedUser._id, xp: 100, currentStreak: 0, highestStreak: 1, quizzesCompleted: 0, coursesCompleted: 0, totalLessonsCompleted: 1, lastActiveDate: daysAgo(10) },
+    ].map((s) => ({ ...s, level: calculateLevel(s.xp) }));
+    await UserStats.create(statsRows);
+    logger.info('✅ UserStats');
+
+    // ── 4. CURRICULUM INSERT ────────────────────────────────────
+    logger.info('📚 Inserting full curriculum...');
+    const courseBySlug = new Map<string, mongoose.Document & { _id: mongoose.Types.ObjectId }>();
+    const lessonsByCourseSlug = new Map<string, LeanLesson[]>();
+    const quizByLessonSlug = new Map<string, mongoose.Document & { _id: mongoose.Types.ObjectId }>();
+    const exerciseByTitle = new Map<string, mongoose.Document & { _id: mongoose.Types.ObjectId }>();
+    let globalLessonOrderHint = 0;
+
+    for (const def of CURRICULUM) {
+      const course = await Course.create(mapCourseDoc(def, instructor._id, admin._id));
+      courseBySlug.set(def.slug, course as never);
+
+      const courseLessons: LeanLesson[] = [];
+      let orderIndex = 0;
+
+      for (let si = 0; si < def.sections.length; si++) {
+        const secDef = def.sections[si];
+        const section = await Section.create({
+          courseId: course._id,
+          title: secDef.title,
+          description: secDef.description,
+          orderIndex: si,
+          isPublished: def.status === 'published',
+          status: 'active',
+        });
+
+        for (const lesDef of secDef.lessons) {
+          const lesson = await Lesson.create({
+            courseId: course._id,
+            sectionId: section._id,
+            title: lesDef.title,
+            slug: lesDef.slug,
+            description: lesDef.description,
+            contentMarkdown: lesDef.contentMarkdown,
+            content: lesDef.contentMarkdown.slice(0, 280),
+            lessonType: lesDef.lessonType,
+            videoUrl: lesDef.videoUrl,
+            attachments: [],
+            codeSnippets: lesDef.codeSnippets ?? [],
+            orderIndex,
+            order: orderIndex,
+            estimatedTime: lesDef.estimatedTime,
+            isPreview: Boolean(lesDef.isPreview),
+            isLocked: Boolean(lesDef.isLocked),
+            status: lesDef.status ?? 'active',
+          });
+
+          courseLessons.push({
+            _id: lesson._id,
+            courseId: course._id,
+            slug: lesDef.slug,
+            title: lesDef.title,
+            orderIndex,
+            def: lesDef,
+          });
+          orderIndex += 1;
+          globalLessonOrderHint += 1;
+
+          if (lesDef.quiz) {
+            const q = lesDef.quiz;
+            const quiz = await Quiz.create({
+              lessonId: lesson._id,
+              title: q.title,
+              description: q.description,
+              passingScorePercent: q.passingScorePercent,
+              passingScore: q.passingScorePercent,
+              timeLimitSeconds: q.timeLimitSeconds,
+              timeLimit: q.timeLimitSeconds,
+              xpReward: q.xpReward,
+              isDeleted: false,
+              questions: q.questions,
+            });
+            quizByLessonSlug.set(lesDef.slug, quiz as never);
+          }
+
+          for (const ex of lesDef.exercises ?? []) {
+            const created = await Exercise.create({
+              lessonId: lesson._id,
+              title: ex.title,
+              description: ex.description,
+              starterCode: ex.starterCode,
+              language: ex.language,
+              timeLimitMs: ex.timeLimitMs,
+              testCases: ex.testCases,
+            });
+            exerciseByTitle.set(ex.title, created as never);
+          }
+        }
+      }
+
+      await Course.findByIdAndUpdate(course._id, { totalLessons: courseLessons.length });
+      lessonsByCourseSlug.set(def.slug, courseLessons);
+      logger.info(`  ✓ ${def.slug}: ${def.sections.length} sections, ${courseLessons.length} lessons`);
+    }
+
+    // Prerequisites by slug
+    for (const def of CURRICULUM) {
+      if (!def.prerequisiteSlugs?.length) continue;
+      const course = courseBySlug.get(def.slug);
+      const prereqIds = def.prerequisiteSlugs
+        .map((s) => courseBySlug.get(s)?._id)
+        .filter(Boolean);
+      await Course.findByIdAndUpdate(course!._id, { prerequisites: prereqIds });
+    }
+
+    // Lesson versions (sample history on race + synchronized lessons)
+    const raceLesson = lessonsByCourseSlug.get('js-concurrency-fundamentals')?.find((l) =>
+      l.slug?.includes('logic-race'),
+    );
+    if (raceLesson) {
+      await LessonVersion.create({
+        lessonId: raceLesson._id,
+        version: 1,
+        contentMarkdown: '# Race Condition v1\n\nBản rút gọn ban đầu.',
+        createdBy: instructor._id,
+      });
+      const v2 = await LessonVersion.create({
+        lessonId: raceLesson._id,
+        version: 2,
+        contentMarkdown: raceLesson.def.contentMarkdown,
+        createdBy: instructor._id,
+      });
+      await Lesson.findByIdAndUpdate(raceLesson._id, { currentVersionId: v2._id });
+    }
+
+    const jsFund = courseBySlug.get('js-concurrency-fundamentals')!;
+    const javaFund = courseBySlug.get('java-multithreading-foundations')!;
+    const jsParallel = courseBySlug.get('parallel-js-workers-shared-memory')!;
+    const javaAdv = courseBySlug.get('advanced-concurrent-java-patterns')!;
+    const jsLessons = lessonsByCourseSlug.get('js-concurrency-fundamentals')!;
+    const javaLessons = lessonsByCourseSlug.get('java-multithreading-foundations')!;
+    const parallelLessons = lessonsByCourseSlug.get('parallel-js-workers-shared-memory')!;
+    const advJavaLessons = lessonsByCourseSlug.get('advanced-concurrent-java-patterns')!;
+
+    logger.info(`✅ Curriculum inserted (${globalLessonOrderHint} lessons total).`);
+
+    // ── 5. ENROLLMENTS + PROGRESS ───────────────────────────────
+    logger.info('🎓 Enrollments & progress...');
+
+    // Minh: completed entire JS fund
+    await enrollWithProgress({
+      userId: minh._id,
+      courseId: jsFund._id,
+      lessons: jsLessons,
+      completedCount: jsLessons.length,
+      enrolledDaysAgo: 45,
+    });
+    // Minh: 60% Java fund
+    await enrollWithProgress({
+      userId: minh._id,
+      courseId: javaFund._id,
+      lessons: javaLessons,
+      completedCount: Math.ceil(javaLessons.length * 0.6),
+      enrolledDaysAgo: 25,
+    });
+    // Minh: first 3 parallel lessons
+    await enrollWithProgress({
+      userId: minh._id,
+      courseId: jsParallel._id,
+      lessons: parallelLessons,
+      completedCount: Math.min(3, parallelLessons.length),
+      enrolledDaysAgo: 10,
+    });
+
+    // Bob: ~50% JS fund
+    await enrollWithProgress({
+      userId: bob._id,
+      courseId: jsFund._id,
+      lessons: jsLessons,
+      completedCount: Math.ceil(jsLessons.length * 0.5),
+      enrolledDaysAgo: 20,
+    });
+    await enrollWithProgress({
+      userId: bob._id,
+      courseId: javaFund._id,
+      lessons: javaLessons,
+      completedCount: Math.min(3, javaLessons.length),
+      enrolledDaysAgo: 12,
+    });
+
+    // Huy: ~70% JS
+    await enrollWithProgress({
+      userId: huy._id,
+      courseId: jsFund._id,
+      lessons: jsLessons,
+      completedCount: Math.ceil(jsLessons.length * 0.7),
+      enrolledDaysAgo: 16,
+    });
+
+    // Expired: completed JS fund + half parallel (when still premium)
+    await enrollWithProgress({
+      userId: expiredPremium._id,
+      courseId: jsFund._id,
+      lessons: jsLessons,
+      completedCount: jsLessons.length,
+      enrolledDaysAgo: 70,
+    });
+    await enrollWithProgress({
+      userId: expiredPremium._id,
+      courseId: jsParallel._id,
+      lessons: parallelLessons,
+      completedCount: Math.ceil(parallelLessons.length * 0.45),
+      enrolledDaysAgo: 40,
+    });
+
+    // Alice: enrolled 0%
+    await Enrollment.create({
+      userId: alice._id,
+      courseId: jsFund._id,
+      progress: 0,
+      progressPercent: 0,
+      completedLessons: [],
+      totalLessons: jsLessons.length,
+      completed: false,
+      enrolledAt: daysAgo(2),
+    });
+
+    await Course.findByIdAndUpdate(jsFund._id, { totalEnrollments: 5 });
+    await Course.findByIdAndUpdate(javaFund._id, { totalEnrollments: 2 });
+    await Course.findByIdAndUpdate(jsParallel._id, { totalEnrollments: 2 });
+    await Course.findByIdAndUpdate(javaAdv._id, { totalEnrollments: 0 });
+    logger.info('✅ Enrollments');
+
+    // ── 6. QUIZ ATTEMPTS + XP ────────────────────────────────────
+    logger.info('✍️  Quiz attempts...');
+    const jsFinalQuiz = quizByLessonSlug.get('js-final-quiz');
+    const jsMidQuiz = quizByLessonSlug.get('js-midterm-quiz');
+    const javaFinalQuiz = quizByLessonSlug.get('java-final-quiz');
+    const parallelFinal = quizByLessonSlug.get('js-parallel-final-quiz');
+
+    const attemptDocs = [];
+    if (jsFinalQuiz) {
+      attemptDocs.push({
+        quizId: jsFinalQuiz._id,
+        userId: minh._id,
+        score: 100,
+        passed: true,
+        passingScorePercent: 75,
+        xpRewarded: 150,
+        answers: buildAnswers(6, true),
+        startedAt: daysAgo(14),
+      });
+      attemptDocs.push({
+        quizId: jsFinalQuiz._id,
+        userId: bob._id,
+        score: 50,
+        passed: false,
+        passingScorePercent: 75,
+        xpRewarded: 0,
+        answers: buildAnswers(6, false),
+        startedAt: daysAgo(6),
+      });
+      attemptDocs.push({
+        quizId: jsFinalQuiz._id,
+        userId: bob._id,
+        score: 83,
+        passed: true,
+        passingScorePercent: 75,
+        xpRewarded: 150,
+        answers: buildAnswers(6, true),
+        startedAt: daysAgo(5),
+      });
+      attemptDocs.push({
+        quizId: jsFinalQuiz._id,
+        userId: expiredPremium._id,
+        score: 100,
+        passed: true,
+        passingScorePercent: 75,
+        xpRewarded: 150,
+        answers: buildAnswers(6, true),
+        startedAt: daysAgo(35),
+      });
+    }
+    if (jsMidQuiz) {
+      attemptDocs.push({
+        quizId: jsMidQuiz._id,
+        userId: minh._id,
+        score: 100,
+        passed: true,
+        passingScorePercent: 70,
+        xpRewarded: 100,
+        answers: buildAnswers(5, true),
+        startedAt: daysAgo(28),
+      });
+      attemptDocs.push({
+        quizId: jsMidQuiz._id,
+        userId: huy._id,
+        score: 60,
+        passed: false,
+        passingScorePercent: 70,
+        xpRewarded: 0,
+        isTimeout: true,
+        answers: buildAnswers(5, false),
+        startedAt: daysAgo(4),
+      });
+    }
+    if (javaFinalQuiz) {
+      attemptDocs.push({
+        quizId: javaFinalQuiz._id,
+        userId: minh._id,
+        score: 83,
+        passed: true,
+        passingScorePercent: 75,
+        xpRewarded: 150,
+        answers: buildAnswers(6, true),
+        startedAt: daysAgo(8),
+      });
+    }
+    if (parallelFinal) {
+      attemptDocs.push({
+        quizId: parallelFinal._id,
+        userId: minh._id,
+        score: 80,
+        passed: true,
+        passingScorePercent: 75,
+        xpRewarded: 180,
+        answers: buildAnswers(5, true),
+        startedAt: daysAgo(3),
+      });
+    }
+
+    const attempts = attemptDocs.length ? await QuizAttempt.create(attemptDocs) : [];
+    await XpAwardLog.create([
+      ...attempts
+        .filter((a) => a.passed && (a.xpRewarded ?? 0) > 0)
+        .map((a) => ({
+          sourceType: 'quiz_attempt',
+          sourceId: a._id.toString(),
+          userId: a.userId.toString(),
+        })),
+      { sourceType: 'course_completion', sourceId: jsFund._id.toString(), userId: minh._id.toString() },
+      { sourceType: 'course_completion', sourceId: jsFund._id.toString(), userId: expiredPremium._id.toString() },
+      { sourceType: 'lesson_completion', sourceId: jsLessons[0]._id.toString(), userId: minh._id.toString() },
+      { sourceType: 'lesson_completion', sourceId: jsLessons[1]._id.toString(), userId: minh._id.toString() },
+    ]);
+    logger.info(`✅ ${attempts.length} attempts + XP logs`);
+
+    // ── 7. CODE EXECUTIONS ──────────────────────────────────────
+    logger.info('💻 Code executions...');
+    const sumEx = exerciseByTitle.get('Parallel sum với Promise.all');
+    const counterEx = exerciseByTitle.get('Thread-safe Counter');
+    const atomEx = exerciseByTitle.get('safeAdd với Atomics');
+    const execs = await CodeExecution.create([
+      {
+        userId: minh._id,
+        courseId: jsFund._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-async-await-mastery')?._id,
+        exerciseId: sumEx?._id?.toString(),
+        sourceCode: `async function sumParallel(nums) {
+  if (!nums.length) return 0;
+  const parts = await Promise.all(nums.map((n) => Promise.resolve(n)));
+  return parts.reduce((a, b) => a + b, 0);
+}`,
         language: 'javascript',
-        level: 'BEGINNER',
-        tags: ['html', 'css', 'web', 'frontend'],
-        category: 'Web Development',
-        isPremium: false,
-        price: 0,
-        status: 'published',
-        isPublished: true,
-        publishedAt: daysAgo(150),
-        estimatedDuration: 240,
-        instructorId: instructor._id,
-        createdBy: instructor._id,
+        languageId: 63,
+        status: 'Accepted',
+        stdout: '6\n',
+        runtime: '0.04',
+        memory: 1400,
+        exitCode: 0,
+        executedAt: daysAgo(20),
       },
       {
-        title: 'JavaScript Programming Fundamentals',
-        slug: 'javascript-fundamentals',
-        shortDescription: 'Master modern JavaScript from variables to async.',
-        description: 'Unlock the programming power of modern JavaScript: types, control flow, arrays, callbacks, async operations, DOM, and scope.',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?auto=format&fit=crop&w=600&q=80',
-        coverImage: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?auto=format&fit=crop&w=600&q=80',
+        userId: bob._id,
+        courseId: jsFund._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-event-loop-deep')?._id,
+        sourceCode: `console.log(1);
+setTimeout(() => console.log(2), 0);
+Promise.resolve().then(() => console.log(3));
+console.log(4);`,
         language: 'javascript',
-        level: 'BEGINNER',
-        tags: ['javascript', 'programming', 'frontend'],
-        category: 'Programming',
-        isPremium: false,
-        price: 0,
-        status: 'published',
-        isPublished: true,
-        publishedAt: daysAgo(120),
-        estimatedDuration: 360,
-        instructorId: instructor._id,
-        createdBy: instructor._id,
+        languageId: 63,
+        status: 'Accepted',
+        stdout: '1\n4\n3\n2\n',
+        exitCode: 0,
+        executedAt: daysAgo(7),
       },
       {
-        title: 'Advanced React & Redux Toolkit',
-        slug: 'advanced-react-redux',
-        shortDescription: 'Level up frontend engineering with React 19 + RTK.',
-        description: 'Deep dive into state design, high-performance context, custom hooks, suspense boundaries, and RTK Query integration.',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1633356122102-3fd601ee4377?auto=format&fit=crop&w=600&q=80',
-        coverImage: 'https://images.unsplash.com/photo-1633356122102-3fd601ee4377?auto=format&fit=crop&w=600&q=80',
+        userId: bob._id,
+        courseId: jsFund._id,
+        lessonId: jsLessons[0]._id,
+        sourceCode: 'console.log("broken"',
         language: 'javascript',
-        level: 'ADVANCED',
-        tags: ['react', 'redux', 'frontend'],
-        category: 'Frontend',
-        isPremium: true,
-        price: 49,
-        status: 'draft', // còn nháp
-        isPublished: false,
-        estimatedDuration: 480,
-        instructorId: instructor._id,
-        createdBy: instructor._id,
+        languageId: 63,
+        status: 'Compilation Error',
+        stderr: 'SyntaxError: missing ) after argument list',
+        exitCode: 1,
+        errorMessage: 'SyntaxError',
+        executedAt: daysAgo(6),
       },
       {
-        title: 'Python for Beginners',
-        slug: 'python-for-beginners',
-        shortDescription: 'Start coding with the most beginner-friendly language.',
-        description: 'A gentle introduction to Python: syntax, data structures, functions, and writing your first real programs.',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&w=600&q=80',
-        coverImage: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&w=600&q=80',
-        language: 'python',
-        level: 'BEGINNER',
-        tags: ['python', 'programming', 'basics'],
-        category: 'Programming',
-        isPremium: false,
-        price: 0,
-        status: 'published',
-        isPublished: true,
-        publishedAt: daysAgo(90),
-        estimatedDuration: 300,
-        instructorId: instructor._id,
-        createdBy: instructor._id,
+        userId: minh._id,
+        courseId: javaFund._id,
+        lessonId: javaLessons.find((l) => l.slug === 'java-synchronized-deep')?._id,
+        exerciseId: counterEx?._id?.toString(),
+        sourceCode: `public class Counter {
+  private int count = 0;
+  public synchronized void inc() { count++; }
+  public synchronized int get() { return count; }
+}`,
+        language: 'java',
+        languageId: 62,
+        status: 'Accepted',
+        stdout: '2000\n',
+        runtime: '0.11',
+        memory: 22000,
+        exitCode: 0,
+        executedAt: daysAgo(12),
+      },
+      {
+        userId: minh._id,
+        courseId: jsParallel._id,
+        lessonId: parallelLessons.find((l) => l.slug === 'js-atomics-rmw')?._id,
+        exerciseId: atomEx?._id?.toString(),
+        sourceCode: `function safeAdd(view, delta) {
+  return Atomics.add(view, 0, delta);
+}`,
+        language: 'javascript',
+        languageId: 63,
+        status: 'Accepted',
+        stdout: 'ok\n',
+        exitCode: 0,
+        executedAt: daysAgo(2),
+      },
+      {
+        userId: huy._id,
+        courseId: jsFund._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-event-loop-deep')?._id,
+        sourceCode: `console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');`,
+        language: 'javascript',
+        languageId: 63,
+        status: 'Accepted',
+        stdout: 'A\nD\nC\nB\n',
+        exitCode: 0,
+        executedAt: daysAgo(3),
       },
     ]);
-    const [htmlCourse, jsCourse, reactCourse, pyCourse] = courses;
-    logger.info(`✅ Created ${courses.length} courses (3 published, 1 draft).`);
+    logger.info(`✅ ${execs.length} executions`);
 
-    // ════════════════════════════════════════════════════════════
-    // 5. SECTIONS
-    // ════════════════════════════════════════════════════════════
-    logger.info('🗂️  Creating sections...');
-    const htmlSections = await Section.create([
-      { courseId: htmlCourse._id, title: 'Getting Started with HTML', orderIndex: 0, description: 'Document structure & semantic tags.' },
-      { courseId: htmlCourse._id, title: 'Styling & Layout with CSS', orderIndex: 1, description: 'Selectors, cascade and Flexbox.' },
-    ]);
-    const jsSections = await Section.create([
-      { courseId: jsCourse._id, title: 'Language Basics', orderIndex: 0, description: 'Variables, types and operators.' },
-      { courseId: jsCourse._id, title: 'Working with Data & Async', orderIndex: 1, description: 'Arrays, functions and the event loop.' },
-    ]);
-    const pySections = await Section.create([
-      { courseId: pyCourse._id, title: 'Python Essentials', orderIndex: 0, description: 'Syntax and data types.' },
-    ]);
-    const reactSections = await Section.create([
-      { courseId: reactCourse._id, title: 'Advanced State', orderIndex: 0, description: 'Context and Redux Toolkit.' },
-    ]);
-    logger.info(`✅ Created ${htmlSections.length + jsSections.length + pySections.length + reactSections.length} sections.`);
-
-    // ════════════════════════════════════════════════════════════
-    // 6. LESSONS
-    // ════════════════════════════════════════════════════════════
-    logger.info('📖 Creating lessons...');
-    const htmlLessons = await Lesson.create([
-      {
-        courseId: htmlCourse._id, sectionId: htmlSections[0]._id, title: 'Introduction to HTML & Document Structure',
-        slug: 'intro-to-html', description: 'Basic tags, attributes and boilerplate.',
-        contentMarkdown: '# HTML Basics\n\nHTML defines the structure of web content using tags like `<h1>`, `<p>`, `<a>`, and `<div>`.',
-        lessonType: 'article', orderIndex: 0, estimatedTime: 20, isPreview: true, status: 'active',
-      },
-      {
-        courseId: htmlCourse._id, sectionId: htmlSections[1]._id, title: 'CSS Selectors & the Cascade',
-        slug: 'css-selectors-cascade', description: 'ID, class, attribute selectors and specificity.',
-        contentMarkdown: '# CSS Selectors\n\nSpecificity decides which rule wins: ID (1-0-0) > class (0-1-0) > element (0-0-1).',
-        lessonType: 'article', orderIndex: 1, estimatedTime: 30, isPreview: false, status: 'active',
-      },
-      {
-        courseId: htmlCourse._id, sectionId: htmlSections[1]._id, title: 'Responsive Flexbox Layout',
-        slug: 'responsive-flexbox', description: 'Build flexible layouts with Flexbox.',
-        contentMarkdown: '# Flexbox\n\nUse `display: flex` plus `justify-content` and `align-items` to align items along an axis.',
-        lessonType: 'article', orderIndex: 2, estimatedTime: 35, isPreview: false, status: 'active',
-      },
-    ]);
-
-    const jsLessons = await Lesson.create([
-      {
-        courseId: jsCourse._id, sectionId: jsSections[0]._id, title: 'Variables, Types & Truthy/Falsy',
-        slug: 'js-variables-types', description: 'let/const/var and strict equality.',
-        contentMarkdown: '# Variables\n\nPrefer `const`, then `let`. Use `===` for strict comparison.',
-        lessonType: 'article', orderIndex: 0, estimatedTime: 25, isPreview: true, status: 'active',
-      },
-      {
-        courseId: jsCourse._id, sectionId: jsSections[1]._id, title: 'Array Methods: map, filter & reduce',
-        slug: 'js-array-methods', description: 'Declarative list manipulation.',
-        contentMarkdown: '# Array Methods\n\n`.map()`, `.filter()` and `.reduce()` keep code functional and clean.',
-        lessonType: 'coding', orderIndex: 1, estimatedTime: 40, isPreview: false, status: 'active',
-        codeSnippets: [
-          { language: 'javascript', code: 'const doubled = [1,2,3].map(n => n * 2);', description: 'Map example' },
-        ],
-      },
-      {
-        courseId: jsCourse._id, sectionId: jsSections[1]._id, title: 'Async JS: Promises, Async/Await & Event Loop',
-        slug: 'js-async-event-loop', description: 'Concurrency model of JavaScript.',
-        contentMarkdown: '# Asynchronous JavaScript\n\nMicrotasks (promises) run before macrotasks (setTimeout).',
-        lessonType: 'quiz', orderIndex: 2, estimatedTime: 45, isPreview: false, status: 'active',
-      },
-    ]);
-
-    const pyLessons = await Lesson.create([
-      {
-        courseId: pyCourse._id, sectionId: pySections[0]._id, title: 'Python Syntax & Variables',
-        slug: 'python-syntax-variables', description: 'Indentation, variables and printing.',
-        contentMarkdown: '# Python Basics\n\nPython uses indentation for blocks. `print("Hello")` outputs text.',
-        lessonType: 'article', orderIndex: 0, estimatedTime: 20, isPreview: true, status: 'active',
-      },
-      {
-        courseId: pyCourse._id, sectionId: pySections[0]._id, title: 'Lists, Dicts & Loops',
-        slug: 'python-lists-dicts', description: 'Core data structures and iteration.',
-        contentMarkdown: '# Data Structures\n\nLists `[]`, dicts `{}` and `for` loops are the workhorses of Python.',
-        lessonType: 'coding', orderIndex: 1, estimatedTime: 35, isPreview: false, status: 'active',
-      },
-    ]);
-
-    const reactLessons = await Lesson.create([
-      {
-        courseId: reactCourse._id, sectionId: reactSections[0]._id, title: 'Designing Global State',
-        slug: 'react-global-state', description: 'When to lift state and when to use Redux.',
-        contentMarkdown: '# State Design\n\nKeep state as local as possible; reach for Redux Toolkit only for shared global state.',
-        lessonType: 'article', orderIndex: 0, estimatedTime: 30, isPreview: true, status: 'active',
-      },
-    ]);
-    const totalLessons = htmlLessons.length + jsLessons.length + pyLessons.length + reactLessons.length;
-    logger.info(`✅ Created ${totalLessons} lessons.`);
-
-    // Cập nhật totalLessons cho từng course
-    await Promise.all([
-      Course.findByIdAndUpdate(htmlCourse._id, { totalLessons: htmlLessons.length }),
-      Course.findByIdAndUpdate(jsCourse._id, { totalLessons: jsLessons.length }),
-      Course.findByIdAndUpdate(pyCourse._id, { totalLessons: pyLessons.length }),
-      Course.findByIdAndUpdate(reactCourse._id, { totalLessons: reactLessons.length }),
-    ]);
-
-    // ════════════════════════════════════════════════════════════
-    // 7. LESSON VERSIONS (lịch sử nội dung)
-    // ════════════════════════════════════════════════════════════
-    logger.info('📝 Creating lesson versions...');
-    const cssVersion = await LessonVersion.create({
-      lessonId: htmlLessons[1]._id,
-      version: 1,
-      contentMarkdown: '# CSS Selectors (v1)\n\nFirst published version of the CSS selectors lesson.',
-      createdBy: instructor._id,
-    });
-    await Lesson.findByIdAndUpdate(htmlLessons[1]._id, { currentVersionId: cssVersion._id });
-    logger.info('✅ Created 1 lesson version.');
-
-    // ════════════════════════════════════════════════════════════
-    // 8. QUIZZES (lessonId là unique → 1 quiz / lesson)
-    // ════════════════════════════════════════════════════════════
-    logger.info('🧠 Creating quizzes...');
-    const cssQuiz = await Quiz.create({
-      lessonId: htmlLessons[1]._id,
-      title: 'CSS Selectors Specificity Quiz',
-      description: 'Test your understanding of CSS specificity, pseudo-classes and combinators.',
-      passingScorePercent: 80,
-      passingScore: 80,
-      timeLimitSeconds: 300,
-      timeLimit: 300,
-      xpReward: 100,
-      questions: [
-        {
-          questionText: 'Which selector has the highest CSS specificity?',
-          options: ['Class selector (.button)', 'ID selector (#submit)', 'Element selector (button)', 'Universal selector (*)'],
-          correctAnswerIndex: 1,
-        },
-        {
-          questionText: 'What does the :hover pseudo-class do?',
-          options: ['Styles on click', 'Styles on keyboard focus', 'Styles when the mouse rolls over', 'Removes the element'],
-          correctAnswerIndex: 2,
-        },
-        {
-          questionText: 'How do you select all descendants inside .main?',
-          options: ['.main > *', '#main *', '.main *', 'None of the above'],
-          correctAnswerIndex: 2,
-        },
-      ],
-    });
-
-    const jsQuiz = await Quiz.create({
-      lessonId: jsLessons[2]._id,
-      title: 'JavaScript Concurrency & Event Loop Quiz',
-      description: 'Verify your knowledge of task queues, microtasks and async execution order.',
-      passingScorePercent: 66,
-      passingScore: 66,
-      timeLimitSeconds: 420,
-      timeLimit: 420,
-      xpReward: 150,
-      questions: [
-        {
-          questionText: 'Which queue holds promise callbacks (.then / await)?',
-          options: ['Task/Callback Queue', 'Microtask Queue', 'Render Queue', 'Call Stack'],
-          correctAnswerIndex: 1,
-        },
-        {
-          questionText: 'Output order of: log(1); setTimeout(()=>log(2),0); Promise.resolve().then(()=>log(3)); log(4);',
-          options: ['1,2,3,4', '1,4,2,3', '1,4,3,2', '1,3,4,2'],
-          correctAnswerIndex: 2,
-        },
-        {
-          questionText: 'Is the JavaScript engine inherently multithreaded?',
-          options: ['Yes, virtual threads', 'No, single-threaded with an event loop', 'Yes, native CPU cores', 'No, it uses DB locks'],
-          correctAnswerIndex: 1,
-        },
-      ],
-    });
-    logger.info(`✅ Created 2 quizzes.`);
-
-    // ════════════════════════════════════════════════════════════
-    // 9. EXERCISES (.create() để chạy pre-save hook tính totalPoints)
-    // ════════════════════════════════════════════════════════════
-    logger.info('🧪 Creating coding exercises...');
-    await Exercise.create({
-      lessonId: jsLessons[1]._id,
-      title: 'Sum of an Array',
-      description: 'Write a function that returns the sum of all numbers in an array.',
-      starterCode: 'function sumArray(nums) {\n  // your code here\n}',
-      language: 'javascript',
-      timeLimitMs: 5000,
-      testCases: [
-        { input: '[1,2,3]', expectedOutput: '6', isHidden: false, points: 1 },
-        { input: '[10,-5,5]', expectedOutput: '10', isHidden: false, points: 1 },
-        { input: '[]', expectedOutput: '0', isHidden: true, points: 2 },
-      ],
-    });
-    await Exercise.create({
-      lessonId: pyLessons[1]._id,
-      title: 'Reverse a String',
-      description: 'Return the reversed version of the given string.',
-      starterCode: 'def reverse_string(s):\n    # your code here\n    pass',
-      language: 'python',
-      timeLimitMs: 5000,
-      testCases: [
-        { input: 'hello', expectedOutput: 'olleh', isHidden: false, points: 1 },
-        { input: 'abc', expectedOutput: 'cba', isHidden: true, points: 1 },
-      ],
-    });
-    logger.info('✅ Created 2 exercises.');
-
-    // ════════════════════════════════════════════════════════════
-    // 10. ENROLLMENTS (unique theo {userId, courseId})
-    // ════════════════════════════════════════════════════════════
-    logger.info('🎓 Creating enrollments...');
-    await Enrollment.create([
-      {
-        userId: jane._id, courseId: htmlCourse._id,
-        progress: 100, progressPercent: 100,
-        completedLessons: htmlLessons.map((l) => l._id),
-        totalLessons: htmlLessons.length,
-        lastLessonId: htmlLessons[2]._id,
-        completed: true, completedAt: daysAgo(10),
-        enrolledAt: daysAgo(40), lastAccessedAt: daysAgo(10),
-      },
-      {
-        userId: jane._id, courseId: jsCourse._id,
-        progress: 33, progressPercent: 33,
-        completedLessons: [jsLessons[0]._id],
-        totalLessons: jsLessons.length,
-        lastLessonId: jsLessons[0]._id,
-        completed: false,
-        enrolledAt: daysAgo(20), lastAccessedAt: daysAgo(2),
-      },
-      {
-        userId: bob._id, courseId: jsCourse._id,
-        progress: 66, progressPercent: 66,
-        completedLessons: [jsLessons[0]._id, jsLessons[1]._id],
-        totalLessons: jsLessons.length,
-        lastLessonId: jsLessons[1]._id,
-        completed: false,
-        enrolledAt: daysAgo(15), lastAccessedAt: daysAgo(3),
-      },
-      {
-        userId: alice._id, courseId: pyCourse._id,
-        progress: 0, progressPercent: 0,
-        totalLessons: pyLessons.length,
-        completed: false,
-        enrolledAt: daysAgo(2),
-      },
-    ]);
-    logger.info('✅ Created 4 enrollments.');
-
-    // ════════════════════════════════════════════════════════════
-    // 11. LESSON PROGRESS (unique theo {userId, lessonId})
-    // ════════════════════════════════════════════════════════════
-    logger.info('📈 Creating lesson progress...');
-    await LessonProgress.create([
-      ...htmlLessons.map((l, i) => ({
-        userId: jane._id, courseId: htmlCourse._id, lessonId: l._id,
-        isCompleted: true, timeSpent: 1200 + i * 300, completedAt: daysAgo(12 - i), lastAccessedAt: daysAgo(12 - i),
-      })),
-      { userId: jane._id, courseId: jsCourse._id, lessonId: jsLessons[0]._id, isCompleted: true, timeSpent: 1500, completedAt: daysAgo(2), lastAccessedAt: daysAgo(2) },
-      { userId: bob._id, courseId: jsCourse._id, lessonId: jsLessons[0]._id, isCompleted: true, timeSpent: 1000, completedAt: daysAgo(5) },
-      { userId: bob._id, courseId: jsCourse._id, lessonId: jsLessons[1]._id, isCompleted: true, timeSpent: 1800, completedAt: daysAgo(3) },
-    ]);
-    logger.info('✅ Created lesson progress records.');
-
-    // ════════════════════════════════════════════════════════════
-    // 12. QUIZ ATTEMPTS (answers: questionIndex -> chosen option)
-    // ════════════════════════════════════════════════════════════
-    logger.info('✍️  Creating quiz attempts...');
-    await QuizAttempt.create([
-      { quizId: cssQuiz._id, userId: jane._id, score: 100, passed: true, answers: { '0': 1, '1': 2, '2': 2 }, startedAt: daysAgo(11) },
-      { quizId: jsQuiz._id, userId: bob._id, score: 33, passed: false, answers: { '0': 1, '1': 0, '2': 0 }, startedAt: daysAgo(4) },
-      { quizId: jsQuiz._id, userId: bob._id, score: 100, passed: true, answers: { '0': 1, '1': 2, '2': 1 }, startedAt: daysAgo(3) },
-    ]);
-    logger.info('✅ Created 3 quiz attempts.');
-
-    // ════════════════════════════════════════════════════════════
-    // 13. CODE EXECUTIONS
-    // ════════════════════════════════════════════════════════════
-    logger.info('💻 Creating code executions...');
-    await CodeExecution.create([
-      {
-        userId: jane._id, courseId: jsCourse._id, lessonId: jsLessons[1]._id,
-        sourceCode: 'console.log([1,2,3].reduce((a,b)=>a+b,0));',
-        language: 'javascript', languageId: 63, stdin: '',
-        status: 'Accepted', stdout: '6\n', runtime: '0.05', memory: 1200, exitCode: 0, executedAt: daysAgo(2),
-      },
-      {
-        userId: bob._id, lessonId: jsLessons[1]._id,
-        sourceCode: 'console.log("hello"',
-        language: 'javascript', languageId: 63,
-        status: 'Compilation Error', stderr: 'SyntaxError: missing ) after argument list', exitCode: 1, executedAt: daysAgo(3),
-      },
-    ]);
-    logger.info('✅ Created 2 code executions.');
-
-    // ════════════════════════════════════════════════════════════
-    // 14. COURSE REVIEWS (unique theo {userId, courseId})
-    // ════════════════════════════════════════════════════════════
-    logger.info('⭐ Creating course reviews...');
+    // ── 8. SOCIAL + CERTS + AI + NOTIFS ─────────────────────────
+    logger.info('⭐ Reviews, comments, notes, bookmarks...');
     await CourseReview.create([
-      { userId: jane._id, courseId: htmlCourse._id, rating: 5, content: 'Fantastic intro to web development. Crystal clear explanations!', helpfulCount: 8, status: 'active' },
-      { userId: bob._id, courseId: jsCourse._id, rating: 4, content: 'Solid fundamentals course, the async section is gold.', helpfulCount: 3, status: 'active' },
+      {
+        userId: minh._id,
+        courseId: jsFund._id,
+        rating: 5,
+        content:
+          'Full path từ event loop đến JobQueue capstone — đúng thứ SV cần trước khi học Workers.',
+        helpfulCount: 14,
+        status: 'active',
+      },
+      {
+        userId: bob._id,
+        courseId: jsFund._id,
+        rating: 4,
+        content: 'Quiz giữa kỳ + final khá chặt. Lab SafeCounter giúp hiểu race rõ.',
+        helpfulCount: 6,
+        status: 'active',
+      },
+      {
+        userId: huy._id,
+        courseId: jsFund._id,
+        rating: 5,
+        content: 'Module race condition và AbortController rất thực tế.',
+        helpfulCount: 4,
+        status: 'active',
+      },
+      {
+        userId: minh._id,
+        courseId: javaFund._id,
+        rating: 5,
+        content: 'synchronized → AtomicInteger → deadlock → BankAccount: lộ trình logic.',
+        helpfulCount: 8,
+        status: 'active',
+      },
+      {
+        userId: expiredPremium._id,
+        courseId: jsParallel._id,
+        rating: 4,
+        content: 'Atomics + worker pool đáng Premium. Mong thêm video.',
+        helpfulCount: 5,
+        status: 'active',
+      },
     ]);
-    // cập nhật rating tổng hợp cho course
-    await Promise.all([
-      Course.findByIdAndUpdate(htmlCourse._id, { averageRating: 5, totalReviews: 1, totalEnrollments: 2 }),
-      Course.findByIdAndUpdate(jsCourse._id, { averageRating: 4, totalReviews: 1, totalEnrollments: 2 }),
-      Course.findByIdAndUpdate(pyCourse._id, { totalEnrollments: 1 }),
-    ]);
-    logger.info('✅ Created 2 course reviews.');
+    await Course.findByIdAndUpdate(jsFund._id, { averageRating: 4.7, totalReviews: 3 });
+    await Course.findByIdAndUpdate(javaFund._id, { averageRating: 5, totalReviews: 1 });
+    await Course.findByIdAndUpdate(jsParallel._id, { averageRating: 4, totalReviews: 1 });
 
-    // ════════════════════════════════════════════════════════════
-    // 15. COMMENTS (polymorphic targetType/targetId + threaded reply)
-    // ════════════════════════════════════════════════════════════
-    logger.info('💬 Creating comments...');
-    const rootComment = await Comment.create({
-      targetType: 'LESSON', targetId: jsLessons[2]._id, lessonId: jsLessons[2]._id, courseId: jsCourse._id,
-      userId: bob._id, content: 'The event loop diagram really made microtasks click for me.', status: 'active',
+    const eventLoopLesson = jsLessons.find((l) => l.slug === 'js-event-loop-deep')!;
+    const root = await Comment.create({
+      targetType: 'LESSON',
+      targetId: eventLoopLesson._id,
+      lessonId: eventLoopLesson._id,
+      courseId: jsFund._id,
+      userId: bob._id,
+      content: 'Microtask vs macrotask — có mnemonic nào nhớ lâu không ạ?',
+      status: 'active',
+      reactionCount: 3,
     });
     await Comment.create([
       {
-        targetType: 'LESSON', targetId: jsLessons[2]._id, lessonId: jsLessons[2]._id, courseId: jsCourse._id,
-        userId: instructor._id, parentId: rootComment._id,
-        content: 'Glad it helped, Bob! Try logging timestamps to see it live.', status: 'active',
+        targetType: 'LESSON',
+        targetId: eventLoopLesson._id,
+        lessonId: eventLoopLesson._id,
+        courseId: jsFund._id,
+        userId: instructor._id,
+        parentId: root._id,
+        content: 'Promise (micro) chen trước setTimeout (macro). Drain hết micro rồi mới lấy 1 macro.',
+        status: 'active',
+        reactionCount: 7,
+        mentionUserIds: [bob._id],
       },
       {
-        targetType: 'COURSE', targetId: htmlCourse._id, courseId: htmlCourse._id,
-        userId: jane._id, content: 'Best beginner course on the platform.', status: 'active', reactionCount: 4,
+        targetType: 'LESSON',
+        targetId: eventLoopLesson._id,
+        lessonId: eventLoopLesson._id,
+        courseId: jsFund._id,
+        userId: minh._id,
+        parentId: root._id,
+        content: 'Em log timestamp trong then vs setTimeout để tự verify — recommend!',
+        status: 'active',
+        isEdited: true,
+        editedAt: daysAgo(4),
+        reactionCount: 2,
+      },
+      {
+        targetType: 'COURSE',
+        targetId: javaFund._id,
+        courseId: javaFund._id,
+        userId: minh._id,
+        content: 'Pair cực tốt với JS fund: cùng concurrent mindset khác runtime.',
+        status: 'active',
+        reactionCount: 5,
+      },
+      {
+        targetType: 'LESSON',
+        targetId: javaLessons.find((l) => l.slug === 'java-synchronized-deep')!._id,
+        lessonId: javaLessons.find((l) => l.slug === 'java-synchronized-deep')!._id,
+        courseId: javaFund._id,
+        userId: huy._id,
+        content: 'Exercise Counter 2 threads giúp hiểu lost update ngay.',
+        status: 'active',
+      },
+      {
+        targetType: 'LESSON',
+        targetId: parallelLessons.find((l) => l.slug === 'js-atomics-rmw')!._id,
+        lessonId: parallelLessons.find((l) => l.slug === 'js-atomics-rmw')!._id,
+        courseId: jsParallel._id,
+        userId: minh._id,
+        content: 'Atomics.wait giống Condition Java — đúng hướng so sánh!',
+        status: 'active',
+        reactionCount: 2,
       },
     ]);
-    logger.info('✅ Created 3 comments (1 thread + 1 course comment).');
 
-    // ════════════════════════════════════════════════════════════
-    // 16. BOOKMARKS (unique theo {userId, targetType, targetId})
-    // ════════════════════════════════════════════════════════════
-    logger.info('🔖 Creating bookmarks...');
     await Bookmark.create([
-      { userId: jane._id, targetType: 'COURSE', targetId: jsCourse._id, title: 'JavaScript Programming Fundamentals', folder: 'To Learn', tags: ['js'], status: 'active' },
-      { userId: jane._id, targetType: 'LESSON', targetId: jsLessons[2]._id, title: 'Async JS: Promises, Async/Await & Event Loop', anchorText: 'microtask queue', position: 320, note: 'Re-read before the interview.', status: 'active' },
-      { userId: bob._id, targetType: 'COURSE', targetId: pyCourse._id, title: 'Python for Beginners', status: 'active' },
+      {
+        userId: minh._id,
+        targetType: 'COURSE',
+        targetId: javaAdv._id,
+        title: 'Advanced Concurrent Java Patterns',
+        thumbnailUrl: (javaAdv as { thumbnailUrl?: string }).thumbnailUrl,
+        folder: 'Next up',
+        tags: ['java', 'premium'],
+        status: 'active',
+      },
+      {
+        userId: minh._id,
+        targetType: 'LESSON',
+        targetId: raceLesson?._id ?? jsLessons[0]._id,
+        title: raceLesson?.title ?? jsLessons[0].title,
+        anchorText: 'check-then-act',
+        position: 200,
+        note: 'Interview prep',
+        folder: 'Interview',
+        tags: ['race'],
+        status: 'active',
+      },
+      {
+        userId: bob._id,
+        targetType: 'LESSON',
+        targetId: eventLoopLesson._id,
+        title: eventLoopLesson.title,
+        anchorText: 'Microtask',
+        folder: 'Fundamentals',
+        tags: ['event-loop'],
+        status: 'active',
+      },
+      {
+        userId: huy._id,
+        targetType: 'COURSE',
+        targetId: jsParallel._id,
+        title: 'Parallel JavaScript: Workers & Shared Memory',
+        folder: 'Premium wishlist',
+        tags: ['premium'],
+        status: 'active',
+      },
     ]);
-    logger.info('✅ Created 3 bookmarks.');
 
-    // ════════════════════════════════════════════════════════════
-    // 17. NOTES
-    // ════════════════════════════════════════════════════════════
-    logger.info('🗒️  Creating notes...');
     await Note.create([
-      { userId: jane._id, lessonId: jsLessons[2]._id, noteText: 'Microtasks always drain before the next macrotask.', codeSnippet: 'Promise.resolve().then(() => console.log("micro"));', anchorText: 'event loop', anchorStart: 0, anchorEnd: 10 },
-      { userId: bob._id, lessonId: jsLessons[1]._id, noteText: 'reduce takes an accumulator and the current value.' },
+      {
+        userId: minh._id,
+        lessonId: eventLoopLesson._id,
+        noteText: 'Microtask drain hết trước macrotask kế tiếp.',
+        codeSnippet: 'Promise.resolve().then(() => console.log("micro"));',
+        anchorText: 'Microtask',
+        anchorStart: 0,
+        anchorEnd: 9,
+      },
+      {
+        userId: minh._id,
+        lessonId: javaLessons.find((l) => l.slug === 'java-synchronized-deep')!._id,
+        noteText: 'synchronized method = lock this.',
+        codeSnippet: 'public synchronized void inc() { count++; }',
+      },
+      {
+        userId: bob._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-promise-combinators')!._id,
+        noteText: 'all fail-fast; allSettled soft; race first settled.',
+      },
+      {
+        userId: huy._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-async-await-mastery')!._id,
+        noteText: 'I/O độc lập → Promise.all, không for-await.',
+      },
+      {
+        userId: minh._id,
+        lessonId: parallelLessons.find((l) => l.slug === 'js-atomics-rmw')!._id,
+        noteText: 'Atomics.add thay RMW không an toàn trên SAB.',
+        codeSnippet: 'Atomics.add(view, 0, 1);',
+      },
     ]);
-    logger.info('✅ Created 2 notes.');
 
-    // ════════════════════════════════════════════════════════════
-    // 18. CERTIFICATES (certificateCode unique; {userId,courseId} unique)
-    // ════════════════════════════════════════════════════════════
-    logger.info('🏆 Creating certificates...');
-    await Certificate.create({
-      userId: jane._id, courseId: htmlCourse._id,
-      certificateCode: 'CERT-2026-HTML-0001',
-      pdfUrl: 'https://cdn.threadlearn.com/certs/CERT-2026-HTML-0001.pdf',
-      issuedAt: daysAgo(10),
+    await Certificate.create([
+      {
+        userId: minh._id,
+        courseId: jsFund._id,
+        certificateCode: 'TL-2026-JSCONC-0001',
+        pdfUrl: 'https://cdn.threadlearn.com/certs/TL-2026-JSCONC-0001.pdf',
+        issuedAt: daysAgo(13),
+      },
+      {
+        userId: expiredPremium._id,
+        courseId: jsFund._id,
+        certificateCode: 'TL-2026-JSCONC-0002',
+        pdfUrl: 'https://cdn.threadlearn.com/certs/TL-2026-JSCONC-0002.pdf',
+        issuedAt: daysAgo(34),
+      },
+    ]);
+
+    await AIHistory.create([
+      {
+        userId: minh._id,
+        courseId: jsFund._id,
+        lessonId: raceLesson?._id,
+        codeExecutionId: execs[0]._id,
+        inputCode: `let balance = 100;
+async function withdraw(amount) {
+  const current = balance;
+  await delay(10);
+  balance = current - amount;
+}`,
+        language: 'javascript',
+        prompt: 'Analyze this javascript snippet for concurrent programming issues.',
+        response:
+          '### AI Code Analysis\n\n1. [high] Read-modify-write after await on shared balance.\n2. [medium] Shared mutable global state.\n',
+        suggestions: ['[high] Serialize withdraw', '[medium] Encapsulate wallet state'],
+        raceConditions: ['withdraw interleaving can overdraw'],
+        optimizedCode: `class Wallet {
+  constructor(b) { this.balance = b; this.chain = Promise.resolve(); }
+  withdraw(amount) {
+    this.chain = this.chain.then(async () => {
+      if (this.balance < amount) throw new Error('insufficient');
+      this.balance -= amount;
     });
-    logger.info('✅ Created 1 certificate.');
+    return this.chain;
+  }
+}`,
+        explanation: 'Promise-chain mutex serializes critical section.',
+        tokenUsage: 420,
+        modelName: 'threadlearn-ai2-server',
+        feedbackRating: 5,
+        status: 'completed',
+        category: 'code-analysis',
+        issues: [
+          {
+            patternId: 'async-rmw-race',
+            lineRange: 'L3-L6',
+            severity: 'high',
+            description: 'RMW after await on shared balance.',
+            fix: 'Serialize with mutex/queue.',
+            codeSnippet: 'const current = balance; await delay(10);',
+          },
+        ],
+        docsUsed: [
+          {
+            id: 'kb-js-race-001',
+            title: 'Logic races in async JS',
+            category: 'race-condition',
+            score: 12.4,
+          },
+        ],
+        cached: false,
+        analyzeTimeMs: 980,
+      },
+      {
+        userId: minh._id,
+        courseId: javaFund._id,
+        lessonId: javaLessons.find((l) => l.slug === 'java-lost-updates')?._id,
+        inputCode: 'class C { int count; void inc(){ count++; } }',
+        language: 'java',
+        prompt: 'Analyze this java snippet for concurrent programming issues.',
+        response: '### AI Code Analysis\n\n1. [high] count++ non-atomic multi-thread lost updates.\n',
+        suggestions: ['[high] synchronized or AtomicInteger'],
+        raceConditions: ['lost updates on count++'],
+        optimizedCode: 'AtomicInteger count = new AtomicInteger();',
+        explanation: 'Use atomic RMW for counters.',
+        tokenUsage: 300,
+        modelName: 'threadlearn-ai2-server',
+        feedbackRating: 4,
+        status: 'completed',
+        category: 'code-analysis',
+        issues: [
+          {
+            patternId: 'java-non-atomic-increment',
+            lineRange: 'L1',
+            severity: 'high',
+            description: 'Non-atomic increment.',
+            fix: 'AtomicInteger.incrementAndGet()',
+          },
+        ],
+        docsUsed: [{ id: 'kb-java-atomic-010', title: 'Atomic counters', category: 'java', score: 11 }],
+        cached: true,
+        analyzeTimeMs: 140,
+      },
+      {
+        userId: bob._id,
+        courseId: jsFund._id,
+        lessonId: jsLessons.find((l) => l.slug === 'js-promise-combinators')?._id,
+        inputCode: 'await Promise.all(urls.map(fetch));',
+        language: 'javascript',
+        prompt: 'Analyze this javascript snippet for concurrent programming issues.',
+        response: '### AI Code Analysis\n\nNo concurrency issues detected in this code.\n',
+        suggestions: [],
+        raceConditions: [],
+        explanation: 'Parallel I/O without shared mutable state is fine.',
+        tokenUsage: 120,
+        modelName: 'threadlearn-ai2-server',
+        status: 'completed',
+        category: 'code-analysis',
+        issues: [],
+        docsUsed: [],
+        cached: false,
+        analyzeTimeMs: 350,
+      },
+      {
+        userId: expiredPremium._id,
+        courseId: jsParallel._id,
+        lessonId: parallelLessons.find((l) => l.slug === 'js-atomics-rmw')?._id,
+        inputCode: 'view[0] = view[0] + 1;',
+        language: 'javascript',
+        prompt: 'Analyze shared memory increment.',
+        response: '### AI Code Analysis\n\n1. [high] Data race without Atomics.\n',
+        suggestions: ['[high] Atomics.add(view,0,1)'],
+        raceConditions: ['SAB non-atomic RMW'],
+        optimizedCode: 'Atomics.add(view, 0, 1);',
+        explanation: 'Shared memory needs atomic primitives.',
+        tokenUsage: 200,
+        modelName: 'threadlearn-ai2-server',
+        status: 'completed',
+        category: 'code-analysis',
+        issues: [
+          {
+            patternId: 'sab-data-race',
+            lineRange: 'L1',
+            severity: 'high',
+            description: 'Non-atomic shared increment.',
+            fix: 'Atomics.add',
+          },
+        ],
+        docsUsed: [{ id: 'kb-atomics-001', title: 'Atomics RMW', category: 'shared-memory', score: 14 }],
+        cached: false,
+        analyzeTimeMs: 700,
+      },
+    ]);
 
-    // ════════════════════════════════════════════════════════════
-    // 19. AI HISTORY
-    // ════════════════════════════════════════════════════════════
-    logger.info('🤖 Creating AI history...');
-    await AIHistory.create({
-      userId: jane._id, courseId: jsCourse._id, lessonId: jsLessons[1]._id,
-      inputCode: 'const sum = arr => arr.reduce((a,b)=>a+b);',
-      language: 'javascript',
-      prompt: 'Review my reduce usage and suggest improvements.',
-      response: 'Your reduce works but throws on empty arrays. Provide an initial value of 0.',
-      suggestions: ['Add an initial accumulator value', 'Handle the empty-array case'],
-      raceConditions: [
-        'If this reducer later mutates shared state across workers, protect the accumulator or keep the calculation immutable.',
-      ],
-      optimizedCode: 'const sum = arr => arr.reduce((a,b)=>a+b, 0);',
-      explanation: 'Supplying 0 as the initial value avoids the "Reduce of empty array with no initial value" error.',
-      tokenUsage: 180,
-      modelName: 'claude-opus-4-8',
-      status: 'completed',
-      category: 'code-review',
-    });
-    logger.info('✅ Created 1 AI history record.');
-
-    // ════════════════════════════════════════════════════════════
-    // 20. NOTIFICATIONS (type theo enum hợp lệ)
-    // ════════════════════════════════════════════════════════════
-    logger.info('🔔 Creating notifications...');
     await Notification.create([
-      { userId: jane._id, title: 'Course Completed! 🎉', message: 'You completed "HTML & CSS Foundations" and earned a certificate.', type: 'COURSE_COMPLETED', link: '/courses/html-css-foundations', isRead: true, readAt: daysAgo(9) },
-      { userId: jane._id, title: 'Quiz Passed!', message: 'You passed the CSS Selectors Specificity Quiz with 100%.', type: 'QUIZ_PASSED', isRead: false },
-      { userId: bob._id, title: 'Keep going!', message: 'You did not reach the passing score yet. Try the JS quiz again.', type: 'QUIZ_FAILED', isRead: false },
-      { userId: bob._id, title: 'Enrolled', message: 'You enrolled in "JavaScript Programming Fundamentals".', type: 'COURSE_ENROLLED', isRead: true, readAt: daysAgo(14) },
-      { userId: alice._id, title: 'Welcome to ThreadLearn!', message: 'Verify your email to unlock all features.', type: 'SYSTEM', isRead: false },
-      { userId: jane._id, title: 'Premium plan active', message: 'Your ThreadLearn Premium plan is active until the end of the term.', type: 'PAYMENT_SUCCESS', link: '/pricing', isRead: false },
-      { userId: bob._id, title: 'Level up!', message: 'You reached level 1 after completing JavaScript practice.', type: 'LEVEL_UP', link: '/leaderboard', isRead: false },
+      {
+        userId: minh._id,
+        title: 'Hoàn thành khóa học 🎉',
+        message: 'Bạn hoàn thành JavaScript Concurrency Fundamentals và nhận chứng chỉ.',
+        type: 'COURSE_COMPLETED',
+        link: '/certificates',
+        metadata: { courseId: jsFund._id.toString() },
+        isRead: true,
+        readAt: daysAgo(12),
+      },
+      {
+        userId: minh._id,
+        title: 'Quiz final passed',
+        message: 'JS Final 100% — +150 XP',
+        type: 'QUIZ_PASSED',
+        isRead: true,
+        readAt: daysAgo(13),
+      },
+      {
+        userId: minh._id,
+        title: 'Premium active',
+        message: 'Premium Semester mở Workers & Advanced Java.',
+        type: 'PAYMENT_SUCCESS',
+        link: '/subscription',
+        isRead: false,
+      },
+      {
+        userId: minh._id,
+        title: 'AI phân tích xong',
+        message: 'Phát hiện race trên withdraw(balance).',
+        type: 'AI_FEEDBACK',
+        link: '/ai/history',
+        isRead: false,
+      },
+      {
+        userId: bob._id,
+        title: 'Enrolled',
+        message: 'Đăng ký JS Concurrency Fundamentals.',
+        type: 'COURSE_ENROLLED',
+        isRead: true,
+        readAt: daysAgo(19),
+      },
+      {
+        userId: bob._id,
+        title: 'Quiz chưa đạt',
+        message: 'Final JS 50% — ôn event loop rồi thử lại.',
+        type: 'QUIZ_FAILED',
+        isRead: false,
+      },
+      {
+        userId: bob._id,
+        title: 'Comment reply',
+        message: 'Lan Nguyen trả lời câu hỏi event loop.',
+        type: 'COMMENT_REPLY',
+        link: `/lessons/${eventLoopLesson._id}`,
+        isRead: false,
+      },
+      {
+        userId: huy._id,
+        title: 'Lesson completed',
+        message: 'Tiếp tục module race condition nhé!',
+        type: 'LESSON_COMPLETED',
+        isRead: false,
+      },
+      {
+        userId: alice._id,
+        title: 'Welcome ThreadLearn',
+        message: 'Verify email để mở đủ tính năng concurrent learning.',
+        type: 'SYSTEM',
+        isRead: false,
+      },
+      {
+        userId: expiredPremium._id,
+        title: 'Premium expired',
+        message: 'Gói Premium hết hạn — gia hạn để học Workers tiếp.',
+        type: 'SYSTEM',
+        link: '/pricing',
+        isRead: false,
+      },
+      {
+        userId: admin._id,
+        title: 'New user',
+        message: 'alice@threadlearn.com registered (unverified).',
+        type: 'NEW_USER_REGISTERED',
+        isRead: true,
+        readAt: daysAgo(2),
+      },
+      {
+        userId: instructor._id,
+        title: 'Leaderboard',
+        message: 'Minh Tran đang top concurrent learners tuần này.',
+        type: 'LEADERBOARD',
+        link: '/leaderboard',
+        isRead: false,
+      },
     ]);
-    logger.info('✅ Created 7 notifications.');
+    logger.info('✅ Social + AI + notifications');
 
-    // ════════════════════════════════════════════════════════════
-    // 21. SUBSCRIPTION PLANS / USER SUBSCRIPTIONS / PURCHASES
-    // ════════════════════════════════════════════════════════════
-    logger.info('💳 Creating subscription plans and purchases...');
+    // ── 9. SUBSCRIPTIONS ────────────────────────────────────────
+    logger.info('💳 Subscriptions...');
     const [freePlan, monthlyPlan, semesterPlan] = await SubscriptionPlan.create([
       {
         name: 'Free',
-        description: 'Core courses, quizzes, progress tracking, and limited AI recommendations for students getting started.',
+        description: 'JS + Java foundations, quiz, IDE, AI 10/day.',
         price: 0,
         currency: 'VND',
-        durationDays: 30,
+        durationDays: 3650,
         features: [
-          'Basic courses',
-          'Unlimited quiz practice',
-          'IDE access',
-          '10 AI recommendations per day',
+          'JS Concurrency Fundamentals (full)',
+          'Java Multithreading Foundations (full)',
+          'Unlimited quiz & IDE',
+          'AI 10/day',
         ],
         isActive: true,
       },
       {
         name: 'Premium Monthly',
-        description: 'Unlock advanced concurrent programming courses, deeper AI feedback, and saved analysis history.',
+        description: 'Workers/Atomics + Advanced Java + AI 40/day + history.',
         price: 99000,
         currency: 'VND',
         durationDays: 30,
         features: [
-          'Advanced courses',
-          'Premium AI code analysis',
-          '30 AI recommendations per day',
-          'Saved AI history',
-          'Priority practice feedback',
+          'All premium concurrent courses',
+          'AI 40/day + history',
+          'Capstone premium tracks',
         ],
         isActive: true,
       },
       {
         name: 'Premium Semester',
-        description: 'Best value for WDP301 students working through the full concurrent programming roadmap.',
+        description: '180 ngày — lộ trình WDP301 / đồ án.',
         price: 399000,
         currency: 'VND',
         durationDays: 180,
-        features: [
-          'All Premium Monthly features',
-          '40 AI recommendations per day',
-          'Long-term progress retention',
-          'Certificate-ready learning path',
-        ],
+        features: ['All Premium Monthly', 'Long retention', 'Demo-ready path'],
         isActive: true,
+      },
+      {
+        name: 'Premium Promo (inactive)',
+        description: 'Legacy promo',
+        price: 49000,
+        currency: 'VND',
+        durationDays: 30,
+        features: ['Legacy'],
+        isActive: false,
       },
     ]);
 
     await UserSubscription.create([
-      {
-        userId: jane._id,
-        planId: semesterPlan._id,
-        status: 'active',
-        startedAt: daysAgo(10),
-        expiresAt: daysFromNow(170),
-      },
-      {
-        userId: bob._id,
-        planId: freePlan._id,
-        status: 'active',
-        startedAt: daysAgo(20),
-        expiresAt: daysFromNow(10),
-      },
+      { userId: minh._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(10), expiresAt: daysFromNow(170) },
+      { userId: admin._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(200), expiresAt: daysFromNow(165) },
+      { userId: instructor._id, planId: semesterPlan._id, status: 'active', startedAt: daysAgo(180), expiresAt: daysFromNow(185) },
+      { userId: bob._id, planId: freePlan._id, status: 'active', startedAt: daysAgo(30), expiresAt: daysFromNow(3620) },
+      { userId: huy._id, planId: freePlan._id, status: 'active', startedAt: daysAgo(14), expiresAt: daysFromNow(3636) },
+      { userId: expiredPremium._id, planId: monthlyPlan._id, status: 'expired', startedAt: daysAgo(35), expiresAt: daysAgo(5) },
     ]);
 
     await SubscriptionPurchase.create([
       {
-        userId: jane._id,
+        userId: minh._id,
         planId: semesterPlan._id,
         amount: 399000,
         currency: 'VND',
         status: 'succeeded',
-        transactionId: `seed-vnpay-${jane._id.toString()}`,
+        transactionId: `seed-payos-minh`,
         paidAt: daysAgo(10),
       },
       {
@@ -751,47 +1200,160 @@ async function seed() {
         amount: 99000,
         currency: 'VND',
         status: 'pending',
-        transactionId: `seed-pending-${bob._id.toString()}`,
         paymentUrl: 'http://localhost:3001/mock-payment/vnpay?status=success',
       },
+      {
+        userId: huy._id,
+        planId: monthlyPlan._id,
+        amount: 99000,
+        currency: 'VND',
+        status: 'failed',
+        transactionId: 'seed-failed-huy',
+      },
+      {
+        userId: expiredPremium._id,
+        planId: monthlyPlan._id,
+        amount: 99000,
+        currency: 'VND',
+        status: 'succeeded',
+        transactionId: 'seed-old-exp',
+        paidAt: daysAgo(35),
+      },
+      {
+        userId: expiredPremium._id,
+        planId: monthlyPlan._id,
+        amount: 99000,
+        currency: 'VND',
+        status: 'pending',
+        paymentUrl: 'http://localhost:3001/mock-payment/payos?renew=1',
+      },
     ]);
-    logger.info('✅ Created 3 plans, 2 subscriptions, and 2 purchase records.');
 
-    // ════════════════════════════════════════════════════════════
-    // 22. AUTH TOKENS (expiresAt phải ở TƯƠNG LAI — RefreshToken có TTL)
-    // ════════════════════════════════════════════════════════════
-    logger.info('🔑 Creating auth tokens...');
     await RefreshToken.create([
-      { userId: jane._id, token: `seed-refresh-${jane._id.toString()}`, expiresAt: daysFromNow(7) },
-      { userId: bob._id, token: `seed-refresh-${bob._id.toString()}`, expiresAt: daysFromNow(7) },
+      { userId: minh._id, token: `seed-refresh-minh`, expiresAt: daysFromNow(7) },
+      { userId: bob._id, token: `seed-refresh-bob`, expiresAt: daysFromNow(7) },
+      { userId: huy._id, token: `seed-refresh-huy`, expiresAt: daysFromNow(3) },
+      { userId: admin._id, token: `seed-refresh-admin`, expiresAt: daysFromNow(7) },
     ]);
     await EmailVerificationToken.create({
-      userId: alice._id, tokenHash: `seed-email-verify-${alice._id.toString()}`, expiresAt: daysFromNow(1),
+      userId: alice._id,
+      tokenHash: `seed-email-verify-alice`,
+      expiresAt: daysFromNow(1),
     });
     await PasswordResetToken.create({
-      userId: bob._id, tokenHash: `seed-pwd-reset-${bob._id.toString()}`, expiresAt: daysFromNow(1),
+      userId: bob._id,
+      tokenHash: `seed-pwd-reset-bob`,
+      expiresAt: daysFromNow(1),
     });
-    logger.info('✅ Created auth tokens (2 refresh, 1 email-verify, 1 password-reset).');
 
-    // ════════════════════════════════════════════════════════════
-    logger.info('🎉 DATABASE SEEDING COMPLETED SUCCESSFULLY!');
-    logger.info('──────────────────────────────────────────────');
-    logger.info('🔐 Login credentials:');
-    logger.info('   ADMIN    → admin@threadlearn.com      / Admin@123');
-    logger.info('   ADMIN    → instructor@threadlearn.com / Admin@123');
-    logger.info('   STUDENT  → student@threadlearn.com    / Student@123');
-    logger.info('   STUDENT  → bob@threadlearn.com        / Student@123');
-    logger.info('   STUDENT  → alice@threadlearn.com      / Student@123 (chưa verify email)');
-    logger.info('──────────────────────────────────────────────');
+    const finalStats = countCurriculum();
+    logger.info('🎉 FULL CURRICULUM SEED COMPLETE');
+    logger.info('────────────────────────────────────────');
+    logger.info(
+      `Courses ${finalStats.courses} | Sections ${finalStats.sections} | Lessons ${finalStats.lessons} | Quizzes ${finalStats.quizzes} | Exercises ${finalStats.exercises}`,
+    );
+    logger.info('FREE  js-concurrency-fundamentals (~15 lessons + mid/final quiz + labs + capstone)');
+    logger.info('FREE  java-multithreading-foundations (~14 lessons + mid/final + labs + capstone)');
+    logger.info('PREMIUM parallel-js-workers-shared-memory (~11 lessons + final + capstone)');
+    logger.info('PREMIUM advanced-concurrent-java-patterns (~11 lessons + final + pipeline capstone)');
+    logger.info('DRAFT ai-assisted-concurrency-debugging (~5 lessons)');
+    logger.info('────────────────────────────────────────');
+    logger.info('admin@threadlearn.com / Admin@123');
+    logger.info('instructor@threadlearn.com / Admin@123');
+    logger.info('student@threadlearn.com / Student@123  (PREMIUM, completed JS fund)');
+    logger.info('bob@threadlearn.com / Student@123');
+    logger.info('huy@threadlearn.com / Student@123');
+    logger.info('alice@threadlearn.com / Student@123 (unverified)');
+    logger.info('expired@threadlearn.com / Student@123');
+    logger.info('locked@threadlearn.com / Student@123');
+    logger.info('────────────────────────────────────────');
   } catch (error) {
-    logger.error('❌ SEEDING PROCESS ENCOUNTERED CRITICAL ERROR:', error);
+    logger.error('❌ SEED FAILED:', error);
     await mongoose.connection.close();
     process.exit(1);
   } finally {
     await mongoose.connection.close();
-    logger.info('🔌 Database connection closed gracefully.');
+    logger.info('🔌 Connection closed.');
     process.exit(0);
   }
+}
+
+function mapCourseDoc(
+  def: SeedCourse,
+  instructorId: mongoose.Types.ObjectId,
+  adminId: mongoose.Types.ObjectId,
+) {
+  const published = def.status === 'published';
+  return {
+    title: def.title,
+    slug: def.slug,
+    shortDescription: def.shortDescription,
+    description: def.description,
+    thumbnailUrl: thumb(def.thumbnailPhotoId),
+    coverImage: thumb(def.thumbnailPhotoId),
+    language: def.language,
+    level: def.level,
+    tags: def.tags,
+    category: def.category,
+    isPremium: def.isPremium,
+    price: def.price,
+    status: def.status,
+    isPublished: published,
+    publishedAt: published ? daysAgo(90) : undefined,
+    estimatedDuration: def.estimatedDuration,
+    prerequisiteThreshold: def.prerequisiteThreshold ?? 80,
+    instructorId,
+    createdBy: def.status === 'draft' ? adminId : instructorId,
+  };
+}
+
+function buildAnswers(n: number, mostlyCorrect: boolean): Record<string, number> {
+  const answers: Record<string, number> = {};
+  for (let i = 0; i < n; i++) {
+    answers[String(i)] = mostlyCorrect ? 1 : i % 2;
+  }
+  return answers;
+}
+
+async function enrollWithProgress(input: {
+  userId: mongoose.Types.ObjectId;
+  courseId: mongoose.Types.ObjectId;
+  lessons: LeanLesson[];
+  completedCount: number;
+  enrolledDaysAgo: number;
+}) {
+  const { userId, courseId, lessons, completedCount, enrolledDaysAgo } = input;
+  const completed = lessons.slice(0, completedCount);
+  const pct = lessons.length ? Math.round((completed.length / lessons.length) * 100) : 0;
+  const isDone = completed.length === lessons.length && lessons.length > 0;
+
+  await Enrollment.create({
+    userId,
+    courseId,
+    progress: pct,
+    progressPercent: pct,
+    completedLessons: completed.map((l) => l._id),
+    totalLessons: lessons.length,
+    lastLessonId: completed[completed.length - 1]?._id ?? lessons[0]?._id,
+    completed: isDone,
+    completedAt: isDone ? daysAgo(Math.max(1, enrolledDaysAgo - 20)) : undefined,
+    enrolledAt: daysAgo(enrolledDaysAgo),
+    lastAccessedAt: daysAgo(Math.min(3, enrolledDaysAgo)),
+  });
+
+  if (!completed.length) return;
+
+  await LessonProgress.create(
+    completed.map((l, i) => ({
+      userId,
+      courseId,
+      lessonId: l._id,
+      isCompleted: true,
+      timeSpent: 800 + i * 90 + l.def.estimatedTime * 20,
+      completedAt: daysAgo(enrolledDaysAgo - i - 1),
+      lastAccessedAt: daysAgo(Math.max(0, enrolledDaysAgo - i - 1)),
+    })),
+  );
 }
 
 seed();
