@@ -26,6 +26,7 @@ export class CommentMapper {
       userId: String(idOf(doc.userId) ?? ''),
       parentId: idOf(doc.parentId) ?? null,
       content: String(doc.content ?? ''),
+      isAnonymous: !!doc.isAnonymous,
       status: doc.status ?? 'active',
       isEdited: !!doc.isEdited,
       editedAt: dateOf(doc.editedAt),
@@ -47,6 +48,7 @@ export class CommentMapper {
       userId: props.userId,
       parentId: props.parentId,
       content: props.content,
+      isAnonymous: props.isAnonymous,
       status: props.status,
       isEdited: props.isEdited,
       editedAt: props.editedAt,
@@ -59,16 +61,20 @@ export class CommentMapper {
   static formatView(comment: any) {
     if (!comment) return null;
     const user = comment.userId;
+    const authorId = idOf(user) ?? '';
+    const isAnonymous = !!comment.isAnonymous;
     return {
       ...comment,
-      userId:
-        user && typeof user === 'object' && user.firstName !== undefined
+      userId: authorId,
+      isAnonymous,
+      user:
+        !isAnonymous && user && typeof user === 'object' && user.firstName !== undefined
           ? {
-              _id: user._id,
-              fullName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+              _id: String(user._id),
+              name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'ThreadLearn member',
               avatarUrl: user.avatarUrl ?? null,
             }
-          : user,
+          : undefined,
     };
   }
 }

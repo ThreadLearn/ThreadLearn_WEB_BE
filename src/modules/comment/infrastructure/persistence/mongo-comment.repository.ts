@@ -66,6 +66,9 @@ export class MongoCommentRepository implements ICommentRepository {
       if (!parent || parent.status === 'deleted') {
         throw new BadRequestError('Parent comment not found or has been deleted.');
       }
+      if (parent.parentId) {
+        throw new BadRequestError('Replies can only be added to a top-level comment.');
+      }
       if (parent.targetType !== props.targetType || String(parent.targetId) !== props.targetId) {
         throw new BadRequestError('Parent comment does not belong to the same target.');
       }

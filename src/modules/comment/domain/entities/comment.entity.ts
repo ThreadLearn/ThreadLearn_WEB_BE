@@ -12,6 +12,7 @@ export interface CommentProps {
   userId: string;
   parentId?: string | null;
   content: string;
+  isAnonymous: boolean;
   status: CommentStatus;
   isEdited: boolean;
   editedAt?: Date;
@@ -34,6 +35,7 @@ export class CommentEntity {
     targetId: string;
     userId: string;
     content: string;
+    isAnonymous?: boolean;
     courseId?: string;
     parentId?: string | null;
     mentionUserIds?: string[];
@@ -48,6 +50,7 @@ export class CommentEntity {
       userId: input.userId,
       parentId: input.parentId ?? null,
       content: input.content.trim(),
+      isAnonymous: input.isAnonymous ?? false,
       status: 'active',
       isEdited: false,
       mentionUserIds: input.mentionUserIds ?? [],
@@ -68,6 +71,10 @@ export class CommentEntity {
 
   get targetId(): string {
     return this.props.targetId;
+  }
+
+  get parentId(): string | null | undefined {
+    return this.props.parentId;
   }
 
   ensureCanModify(userId: string, userRole: 'STUDENT' | 'ADMIN'): void {

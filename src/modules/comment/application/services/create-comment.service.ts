@@ -18,7 +18,11 @@ export class CreateCommentService {
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
   ) {}
 
-  async execute(userId: string, userRole: 'STUDENT' | 'ADMIN', input: CreateCommentDto) {
+  async execute(
+    userId: string,
+    userRole: 'STUDENT' | 'ADMIN',
+    input: Omit<CreateCommentDto, 'isAnonymous'> & { isAnonymous?: boolean },
+  ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
     const created = await this.comments.create(
       CommentEntity.createNew({
@@ -28,6 +32,7 @@ export class CreateCommentService {
         courseId: access.courseId,
         content: input.content,
         parentId: input.parentId,
+        isAnonymous: input.isAnonymous ?? false,
         mentionUserIds: input.mentionUserIds?.filter(isObjectId),
       }),
     );
