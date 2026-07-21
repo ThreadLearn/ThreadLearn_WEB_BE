@@ -11,31 +11,32 @@ import { NotificationsService } from '../services/notifications.service';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
 export class NotificationsController {
+  constructor(private readonly notificationsService: NotificationsService) {}
   @Get()
   async getNotificationsForUser(
     @CurrentUser() user: AuthenticatedUser,
     @Query('unread') unread?: string
   ) {
-    const notifications = await NotificationsService.getNotificationsForUser(
+    const notifications = await this.notificationsService.getNotificationsForUser(
       user.id,
-      unread === 'true'
+      unread === 'true' ? false : undefined
     );
 
     return ApiResponse.success({
       message: 'Notifications fetched successfully.',
-      data: notifications,
+      data: notifications.items,
     });
   }
 
   @Get('unread-count')
   async unreadCount(@CurrentUser() user: AuthenticatedUser) {
-    const count = await NotificationsService.unreadCount(user.id);
+    const count = await this.notificationsService.unreadCount(user.id);
     return ApiResponse.success({ message: 'Unread count fetched.', data: { count } });
   }
 
   @Patch('read-all')
   async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
-    const result = await NotificationsService.markAllAsRead(user.id);
+    const result = await this.notificationsService.markAllAsRead(user.id);
     return ApiResponse.success({
       message: 'Notifications marked as read.',
       data: result,
@@ -54,7 +55,7 @@ export class NotificationsController {
 
   @Patch(':id')
   async markAsRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const notification = await NotificationsService.markAsRead(id, user.id);
+    const notification = await this.notificationsService.markAsRead(id, user.id);
     return ApiResponse.success({
       message: 'Notification marked as read.',
       data: notification,

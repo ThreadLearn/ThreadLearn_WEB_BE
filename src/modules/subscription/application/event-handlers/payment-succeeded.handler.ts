@@ -7,6 +7,7 @@ import {
   USER_PLAN_ACCESS_REPOSITORY,
 } from '../../domain/interfaces/user-plan-access.repository';
 import { Subscription } from '../../domain/entities/subscription.entity';
+import { NotificationsService } from '../../../notifications/services/notifications.service';
 
 interface PaymentSucceededEvent {
   purchaseId: string;
@@ -21,6 +22,7 @@ export class PaymentSucceededHandler {
     @Inject(SUBSCRIPTION_REPOSITORY) private readonly subscriptionRepository: ISubscriptionRepository,
     @Inject(USER_PLAN_ACCESS_REPOSITORY)
     private readonly userPlanAccessRepository: IUserPlanAccessRepository,
+    private readonly notificationsService?: NotificationsService,
   ) {}
 
   @OnEvent('payment.succeeded')
@@ -36,6 +38,7 @@ export class PaymentSucceededHandler {
       existing.extend(plan.id, planProps.durationDays, now);
       const subscription = await this.subscriptionRepository.update(existing);
       await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
+      await this.notificationsService?.notifyAdminPaymentSuccess(event);
       return;
     }
 
@@ -48,5 +51,6 @@ export class PaymentSucceededHandler {
       }),
     );
     await this.userPlanAccessRepository.grantPremiumAccess(event.userId, subscription.expiresAt);
+    await this.notificationsService?.notifyAdminPaymentSuccess(event);
   }
 }
