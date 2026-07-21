@@ -89,7 +89,7 @@ describe('RequestRecommendationService', () => {
     const result: any = await service.execute('user-1', payload);
 
     expect(result.props.suggestions).toEqual([]);
-    expect(result.props.explanation).toBe('No concurrency issues detected.');
+    expect(result.props.explanation).toBe('No concurrency issues detected in this code.');
   });
 
   it('rejects when inputCode is missing', async () => {
