@@ -24,8 +24,10 @@ import { MongoSubscriptionRepository } from './infrastructure/persistence/mongo-
 import { MongoUserPlanAccessRepository } from './infrastructure/persistence/mongo-user-plan-access.repository';
 import { PlanController } from './presentation/controller/plan.controller';
 import { SubscriptionController } from './presentation/controller/subscription.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [PlanController, SubscriptionController],
   providers: [
     MongoPlanRepository,

@@ -13,6 +13,7 @@ export type NotificationType =
   | 'LEVEL_UP'
   | 'BOOKMARK_COURSE_UPDATED'
   | 'PAYMENT_SUCCESS'
+  | 'USER_REGISTERED'
   | 'NEW_USER_REGISTERED'
   | 'STUDENT_COMMENT_REPORT'
   | 'COMMENT_REPLY'
@@ -25,6 +26,7 @@ export interface INotification extends Document {
   message: string;
   type: NotificationType;
   metadata?: Record<string, unknown>;
+  eventKey?: string;
   link?: string;
   isRead: boolean;
   readAt?: Date;
@@ -51,6 +53,7 @@ const NotificationSchema: Schema<INotification> = new Schema(
         'LEVEL_UP',
         'BOOKMARK_COURSE_UPDATED',
         'PAYMENT_SUCCESS',
+        'USER_REGISTERED',
         'NEW_USER_REGISTERED',
         'STUDENT_COMMENT_REPORT',
         'COMMENT_REPLY',
@@ -60,14 +63,17 @@ const NotificationSchema: Schema<INotification> = new Schema(
       default: 'SYSTEM',
     },
     metadata: { type: Schema.Types.Mixed },
+    eventKey: { type: String, trim: true },
     link: { type: String, trim: true },
     isRead: { type: Boolean, default: false, index: true },
     readAt: { type: Date },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: true }
 );
 
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+// Each active admin receives their own read state; this pair also makes webhook retries safe.
+NotificationSchema.index({ userId: 1, eventKey: 1 }, { unique: true, sparse: true });
 
 export const Notification: Model<INotification> =
   mongoose.models.Notification || mongoose.model<INotification>('Notification', NotificationSchema);
