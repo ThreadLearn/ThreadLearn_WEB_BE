@@ -128,7 +128,8 @@ describe('reported bug regressions', () => {
         '507f1f77bcf86cd799439012'
       )
     ).rejects.toMatchObject({
-      message: 'COURSE_PREMIUM_REQUIRED',
+      message: 'An active Premium plan is required to enroll in this course.',
+      code: 'COURSE_PREMIUM_REQUIRED',
       statusCode: 403,
     });
   });
