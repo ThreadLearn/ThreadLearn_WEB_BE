@@ -6,7 +6,18 @@ import { INoteRepository, NOTE_REPOSITORY } from '../../domain/interfaces/note.r
 export class UpdateNoteService {
   constructor(@Inject(NOTE_REPOSITORY) private readonly notes: INoteRepository) {}
 
-  async execute(userId: string, noteId: string, input: { noteText?: string; content?: string; codeSnippet?: string }) {
+  async execute(
+    userId: string,
+    noteId: string,
+    input: {
+      noteText?: string;
+      content?: string;
+      codeSnippet?: string;
+      anchorText?: string;
+      anchorStart?: number;
+      anchorEnd?: number;
+    }
+  ) {
     const note = await this.notes.findOwned(userId, noteId);
     if (!note) throw new NotFoundError('Note not found.');
     note.applyPatch(input);

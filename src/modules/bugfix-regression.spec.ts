@@ -208,17 +208,24 @@ describe('reported bug regressions', () => {
     ]);
   });
 
-  it('returns only the most recently updated note for a lesson', async () => {
-    const latest = { _id: 'latest-note', noteText: 'Current note' };
-    const sort = jest.fn().mockResolvedValue(latest);
-    jest.spyOn(Note, 'findOne').mockReturnValue({ sort } as never);
+  it('returns every note for a lesson, newest first', async () => {
+    const notes = [
+      { _id: 'newer-note', userId: 'user', lessonId: 'lesson', noteText: 'Newer note' },
+      { _id: 'older-note', userId: 'user', lessonId: 'lesson', noteText: 'Older note' },
+    ];
+    const lean = jest.fn().mockResolvedValue(notes);
+    const sort = jest.fn().mockReturnValue({ lean });
+    jest.spyOn(Note, 'find').mockReturnValue({ sort } as never);
 
     await expect(
-      new MongoNoteRepository().findLatestByLesson(
+      new MongoNoteRepository().listByLesson(
         '507f1f77bcf86cd799439011',
         '507f1f77bcf86cd799439012',
       )
-    ).resolves.toEqual(latest);
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ _id: 'newer-note', noteText: 'Newer note' }),
+      expect.objectContaining({ _id: 'older-note', noteText: 'Older note' }),
+    ]));
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
   });
 
