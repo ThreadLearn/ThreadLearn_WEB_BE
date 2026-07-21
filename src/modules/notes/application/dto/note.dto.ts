@@ -1,5 +1,11 @@
 import { z } from '../../../../common/zod/z';
 
+export const listNotesQuerySchema = z.object({
+  lessonId: z.string().min(1).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(12),
+});
+
 export const upsertNoteSchema = z.object({
   lessonId: z.string().min(1),
   noteText: z.string().min(1).optional(),
@@ -15,3 +21,4 @@ export const updateNoteSchema = z.object({
 
 export type UpsertNoteDto = z.infer<typeof upsertNoteSchema>;
 export type UpdateNoteDto = z.infer<typeof updateNoteSchema>;
+export type ListNotesQueryDto = z.infer<typeof listNotesQuerySchema>;

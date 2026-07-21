@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
 import { ListByLessonService } from './application/services/list-by-lesson.service';
+import { ListMyNotesService } from './application/services/list-my-notes.service';
 import { RemoveNoteService } from './application/services/remove-note.service';
 import { SearchNotesService } from './application/services/search-notes.service';
 import { UpdateNoteService } from './application/services/update-note.service';
@@ -16,6 +17,7 @@ import { LessonNotesController, NotesController } from './presentation/controlle
     MongoNoteRepository,
     { provide: NOTE_REPOSITORY, useExisting: MongoNoteRepository },
     ListByLessonService,
+    ListMyNotesService,
     SearchNotesService,
     UpsertNoteService,
     UpdateNoteService,
