@@ -97,3 +97,7 @@ Gamification failures are logged with the event name and user identity; the hand
 +## Verification
 
 Publisher, enrollment handlers, gamification idempotency, and the shared regression suite are covered; the Nest production build must also pass.
+
++## Merge strategy
+
+Use **Create a merge commit** so the individual authored and committed timestamps remain intact on the default branch.
