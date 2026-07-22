@@ -1,4 +1,4 @@
-import { Notification, NotificationType } from '../models/notification.model';
+import { Notification, NotificationRecipientRole, NotificationType } from '../models/notification.model';
 import { NotFoundError } from '../../../common/custom-error';
 import { getSocketServer } from '../../../socket';
 import { User } from '../../auth/models/user.model';
@@ -7,6 +7,8 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class NotificationsService {
+  private static readonly ADMIN_NOTIFICATION_TYPES: NotificationType[] = ['USER_REGISTERED', 'PAYMENT_SUCCESS'];
+
   async getNotificationsForUser(userId: string, isRead?: boolean, page?: number, limit?: number, type?: NotificationType) {
     const query: any = { userId };
     if (isRead !== undefined) query.isRead = isRead;
@@ -21,6 +23,22 @@ export class NotificationsService {
 
   async unreadCount(userId: string) {
     return Notification.countDocuments({ userId, isRead: false });
+  }
+
+  async getAdminNotifications(userId: string, isRead?: boolean, page?: number, limit?: number, type?: NotificationType) {
+    const query: Record<string, unknown> = this.adminNotificationScope(userId);
+    if (isRead !== undefined) query.isRead = isRead;
+    if (type) query.type = type;
+    const pagination = page && limit ? { skip: (page - 1) * limit, limit } : {};
+    const [items, total] = await Promise.all([
+      Notification.find(query).sort({ createdAt: -1 }).skip(pagination.skip ?? 0).limit(pagination.limit ?? 0),
+      Notification.countDocuments(query),
+    ]);
+    return { items, total };
+  }
+
+  async unreadAdminCount(userId: string) {
+    return Notification.countDocuments({ ...this.adminNotificationScope(userId), isRead: false });
   }
 
   async markAsRead(notificationId: string, userId: string) {
@@ -40,17 +58,39 @@ export class NotificationsService {
     return { updated: true };
   }
 
+  async markAdminAsRead(notificationId: string, userId: string) {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: notificationId, ...this.adminNotificationScope(userId) },
+      { isRead: true, readAt: new Date() },
+      { new: true }
+    );
+    if (!notification) {
+      throw new NotFoundError('Notification not found or access denied.');
+    }
+    return notification;
+  }
+
+  async markAllAdminAsRead(userId: string) {
+    await Notification.updateMany(
+      { ...this.adminNotificationScope(userId), isRead: false },
+      { isRead: true, readAt: new Date() }
+    );
+    return { updated: true };
+  }
+
   static async sendNotification(data: {
     userId: string;
     title: string;
     message: string;
     type: NotificationType;
+    recipientRole?: NotificationRecipientRole;
     metadata?: Record<string, unknown>;
     link?: string;
     eventKey?: string;
   }) {
     const notification = await Notification.create({
       userId: data.userId,
+      recipientRole: data.recipientRole,
       title: data.title,
       message: data.message,
       type: data.type,
@@ -108,11 +148,21 @@ export class NotificationsService {
 
   private async createAdminNotification(data: Parameters<typeof NotificationsService.sendNotification>[0]) {
     try {
-      return await NotificationsService.sendNotification(data);
+      return await NotificationsService.sendNotification({ ...data, recipientRole: 'ADMIN' });
     } catch (error: any) {
       if (error?.code === 11000) return null;
       throw error;
     }
+  }
+
+  private adminNotificationScope(userId: string) {
+    return {
+      userId,
+      $or: [
+        { recipientRole: 'ADMIN' },
+        { type: { $in: NotificationsService.ADMIN_NOTIFICATION_TYPES } },
+      ],
+    };
   }
 }
 export default NotificationsService;
