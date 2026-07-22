@@ -21,22 +21,22 @@ export class AdminNotificationsController {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const readFilter = isRead === undefined ? undefined : isRead === 'true';
-    const result = await this.notifications.getNotificationsForUser(user.id, readFilter, safePage, safeLimit, type);
+    const result = await this.notifications.getAdminNotifications(user.id, readFilter, safePage, safeLimit, type);
     return ApiResponse.success({ message: 'Admin notifications fetched.', data: result.items, meta: { page: safePage, limit: safeLimit, total: result.total } });
   }
 
   @Get('unread-count')
   async unreadCount(@CurrentUser() user: AuthenticatedUser) {
-    return ApiResponse.success({ message: 'Unread count fetched.', data: { count: await this.notifications.unreadCount(user.id) } });
+    return ApiResponse.success({ message: 'Unread count fetched.', data: { count: await this.notifications.unreadAdminCount(user.id) } });
   }
 
   @Patch('read-all')
   async readAll(@CurrentUser() user: AuthenticatedUser) {
-    return ApiResponse.success({ message: 'Admin notifications marked as read.', data: await this.notifications.markAllAsRead(user.id) });
+    return ApiResponse.success({ message: 'Admin notifications marked as read.', data: await this.notifications.markAllAdminAsRead(user.id) });
   }
 
   @Patch(':id/read')
   async read(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return ApiResponse.success({ message: 'Notification marked as read.', data: await this.notifications.markAsRead(id, user.id) });
+    return ApiResponse.success({ message: 'Notification marked as read.', data: await this.notifications.markAdminAsRead(id, user.id) });
   }
 }

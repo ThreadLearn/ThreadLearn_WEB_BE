@@ -20,8 +20,11 @@ export type NotificationType =
   | 'AI_FEEDBACK'
   | 'SYSTEM_ERROR';
 
+export type NotificationRecipientRole = 'ADMIN';
+
 export interface INotification extends Document {
   userId: mongoose.Types.ObjectId;
+  recipientRole?: NotificationRecipientRole;
   title: string;
   message: string;
   type: NotificationType;
@@ -36,6 +39,7 @@ export interface INotification extends Document {
 const NotificationSchema: Schema<INotification> = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    recipientRole: { type: String, enum: ['ADMIN'], index: true },
     title: { type: String, required: true, trim: true },
     message: { type: String, required: true },
     type: {
@@ -72,6 +76,7 @@ const NotificationSchema: Schema<INotification> = new Schema(
 );
 
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, recipientRole: 1, isRead: 1, createdAt: -1 });
 // Each active admin receives their own read state; this pair also makes webhook retries safe.
 NotificationSchema.index({ userId: 1, eventKey: 1 }, { unique: true, sparse: true });
 
