@@ -93,3 +93,7 @@ The lesson event completes before the course event, ensuring the returned stats 
 +## Handler error behavior
 
 Gamification failures are logged with the event name and user identity; the handler returns `{ xpRewarded: 0, stats: null }`.
+
++## Verification
+
+Publisher, enrollment handlers, gamification idempotency, and the shared regression suite are covered; the Nest production build must also pass.
