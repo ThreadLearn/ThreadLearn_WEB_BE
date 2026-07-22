@@ -18,8 +18,6 @@ import { QuizAttemptRepository } from './quiz-attempts/infrastructure/persistenc
 import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
-import { CertificatesService } from './certificates/services/certificates.service';
-import { NotificationsService } from './notifications/services/notifications.service';
 import { CourseEntity } from './course/domain/entities/course.entity';
 import { QuizMapper } from './quiz/infrastructure/mapper/quiz.mapper';
 import { IQuizRepository } from './quiz/domain/interfaces/quiz.repository';
@@ -230,16 +228,12 @@ describe('reported bug regressions', () => {
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
   });
 
-  it('handles course.completed with certificate and XP side effects', async () => {
-    const certificateSpy = jest
-      .spyOn(CertificatesService, 'issueCertificate')
-      .mockResolvedValue({ _id: 'certificate' } as never);
-    jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
+  it('publishes course.completed through EventEmitter2', async () => {
+    const events = new EventEmitter2();
+    const listener = jest.fn().mockResolvedValue({ xpRewarded: 500, stats: { xp: 600 } });
+    events.on('course.completed', listener);
 
-    // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
-    // TODO DEV4: LeaderboardService.invalidateCache removed — leaderboard uses @OnEvent now
-
-    await EnrollmentCompletionPublisher.publishCourseCompleted({
+    const effects = await new EnrollmentCompletionPublisher(events).publishCourseCompleted({
       userId: '507f1f77bcf86cd799439011',
       courseId: '507f1f77bcf86cd799439012',
       progressPercent: 100,
@@ -247,11 +241,11 @@ describe('reported bug regressions', () => {
       completedLessons: 1,
     });
 
-    expect(certificateSpy).toHaveBeenCalledWith(
-      '507f1f77bcf86cd799439011',
-      '507f1f77bcf86cd799439012',
-    );
-    // TODO DEV2: assert qua EventEmitter2
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      userId: '507f1f77bcf86cd799439011',
+      courseId: '507f1f77bcf86cd799439012',
+    }));
+    expect(effects).toEqual({ xpRewarded: 500, stats: { xp: 600 } });
   });
 
   it('grades quiz answers by question id', async () => {

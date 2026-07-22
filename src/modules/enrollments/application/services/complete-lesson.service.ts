@@ -26,6 +26,7 @@ export class CompleteLessonService {
     @Inject(LESSON_READ_PORT) private readonly lessons: ILessonReadPort,
     @Inject(ENROLLMENT_REPOSITORY) private readonly enrollments: IEnrollmentRepository,
     @Inject(LESSON_PROGRESS_REPOSITORY) private readonly progress: ILessonProgressRepository,
+    private readonly completionPublisher: EnrollmentCompletionPublisher,
   ) {}
 
   async execute(userId: string, lessonId: string) {
@@ -51,7 +52,7 @@ export class CompleteLessonService {
     const updated = await this.enrollments.update(enrollment);
     const props = updated.toProps();
 
-    const effects = await EnrollmentCompletionPublisher.publishLessonCompleted({
+    const effects = await this.completionPublisher.publishLessonCompleted({
       userId,
       lessonId: lesson.id,
       lessonTitle: lesson.title,

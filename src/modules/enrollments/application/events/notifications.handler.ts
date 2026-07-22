@@ -1,20 +1,17 @@
+import { Injectable } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
-import { CourseCompletedEvent, LessonCompletedEvent } from './enrollment-completion.events';
+import {
+  CourseCompletedEvent,
+  ENROLLMENT_COMPLETION_EVENTS,
+  LessonCompletedEvent,
+} from './enrollment-completion.events';
 
+@Injectable()
 export class NotificationsHandler {
-  static async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
-    if (event.alreadyCompleted) return;
-    if (event.courseCompleted) {
-      await NotificationsService.sendNotification({
-        userId: event.userId,
-        title: 'Course completed 🏆',
-        message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
-        type: 'COURSE_COMPLETED',
-        metadata: { courseId: event.courseId },
-        link: `/courses/${event.courseId}`,
-      });
-      return;
-    }
+  @OnEvent(ENROLLMENT_COMPLETION_EVENTS.lessonCompleted)
+  async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
+    if (event.alreadyCompleted || event.courseCompleted) return;
 
     await NotificationsService.sendNotification({
       userId: event.userId,
@@ -26,7 +23,8 @@ export class NotificationsHandler {
     });
   }
 
-  static async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
+  @OnEvent(ENROLLMENT_COMPLETION_EVENTS.courseCompleted)
+  async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
     await NotificationsService.sendNotification({
       userId: event.userId,
       title: 'Course completed 🏆',

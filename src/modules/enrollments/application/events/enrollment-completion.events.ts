@@ -1,3 +1,8 @@
+export const ENROLLMENT_COMPLETION_EVENTS = {
+  lessonCompleted: 'lesson.completed',
+  courseCompleted: 'course.completed',
+} as const;
+
 export interface LessonCompletedEvent {
   userId: string;
   lessonId: string;
