@@ -105,3 +105,7 @@ Use **Create a merge commit** so the individual authored and committed timestamp
 +## Rollout checks
 
 After merge, verify one notification and certificate for a final lesson, 600 combined XP, and no additional XP after replaying the same completion.
+
++## Handoff
+
+DEV2 completion events are isolated, idempotent, tested, buildable, and ready for pull-request review.
