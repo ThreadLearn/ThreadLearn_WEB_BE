@@ -48,7 +48,7 @@ export const dashboardStatisticsQuerySchema = z
   .object({
     from: optionalDateQuery,
     to: optionalDateQuery,
-    months: z.coerce.number().int().positive().max(24).default(6),
+    months: z.coerce.number().int().min(1).max(12).default(6),
   })
   .refine(
     (data) => {
