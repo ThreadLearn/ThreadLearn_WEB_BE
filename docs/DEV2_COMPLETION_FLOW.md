@@ -101,3 +101,7 @@ Publisher, enrollment handlers, gamification idempotency, and the shared regress
 +## Merge strategy
 
 Use **Create a merge commit** so the individual authored and committed timestamps remain intact on the default branch.
+
++## Rollout checks
+
+After merge, verify one notification and certificate for a final lesson, 600 combined XP, and no additional XP after replaying the same completion.
