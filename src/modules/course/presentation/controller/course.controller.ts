@@ -20,6 +20,7 @@ import { BadRequestError } from '../../../../common/custom-error';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../../../common/guards/optional-jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import { saveUploadedFile } from '../../../../configs/upload';
 import {
@@ -61,6 +62,7 @@ export class CourseController {
   ) {}
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'UC24 — list / search / filter courses.' })
   async list(
     @Query(new ZodValidationPipe(listCoursesQuerySchema)) query: ListCoursesQueryDto,
@@ -78,6 +80,7 @@ export class CourseController {
   }
 
   @Get('search')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'UC24 — alias của list.' })
   async search(
     @Query(new ZodValidationPipe(listCoursesQuerySchema)) query: ListCoursesQueryDto,
@@ -87,6 +90,7 @@ export class CourseController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'UC23 — course detail (course + sections + lessons).' })
   async detail(@Param('id') id: string, @CurrentUser() user?: AuthenticatedUser) {
     const result = await this.getDetail.execute(id, user);
@@ -177,6 +181,9 @@ export class CourseController {
     if (!file) throw new BadRequestError('No thumbnail file provided in FormData.');
     if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
       throw new BadRequestError(`Unsupported image type: ${file.mimetype}.`);
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      throw new BadRequestError('Thumbnail must not exceed 2 MB.');
     }
     const url = await saveUploadedFile(file, 'thumbnails');
     const course = await this.updateCourse.execute(id, { thumbnailUrl: url });
