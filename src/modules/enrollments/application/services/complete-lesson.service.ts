@@ -62,6 +62,7 @@ export class CompleteLessonService {
       completedLessons: props.completedLessons.length,
       alreadyCompleted: !markResult.firstTime,
       courseCompleted: markResult.justCompleted,
+      enrollmentCompleted: props.completed,
     });
 
     return {
