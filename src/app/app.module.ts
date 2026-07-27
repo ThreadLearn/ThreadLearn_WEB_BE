@@ -5,6 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CorrelationIdMiddleware } from '../middlewares/correlation-id.middleware';
 import { RateLimitMiddleware } from '../middlewares/rate-limit.middleware';
 import { LearningAccessModule } from '../shared/application/learning-access/learning-access.module';
+import { SharedEventsModule } from '../shared/infrastructure/events/shared-events.module';
 import { SocketGateway } from '../socket';
 import { AdminModule } from '../modules/admin/admin.module';
 import { AIModule } from '../modules/ai/ai.module';
@@ -35,6 +36,7 @@ import { AppController } from './app.controller';
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     LearningAccessModule,
+    SharedEventsModule,
     AdminModule,
     AIModule,
     AnalyticsModule,

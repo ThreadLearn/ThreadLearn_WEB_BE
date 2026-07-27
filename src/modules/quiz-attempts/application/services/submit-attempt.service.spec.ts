@@ -1,11 +1,9 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Quiz } from '../../../quiz/domain/entities/quiz.entity';
 import { Question } from '../../../quiz/domain/entities/question.entity';
 import { IQuizRepository } from '../../../quiz/domain/interfaces/quiz.repository';
 import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
 import { IQuizAttemptRepository } from '../../domain/interfaces/quiz-attempt.repository';
 import { QuizGradingService } from '../../domain/services/quiz-grading.service';
-import { DomainEventPublisher } from '../events/domain-event.publisher';
 import { SubmitAttemptService } from './submit-attempt.service';
 
 describe('SubmitAttemptService', () => {
@@ -41,7 +39,7 @@ describe('SubmitAttemptService', () => {
     const service = new SubmitAttemptService(
       attemptRepository,
       quizRepository,
-      new DomainEventPublisher(new EventEmitter2()),
+      { publish: jest.fn() },
       new QuizGradingService(),
     );
 

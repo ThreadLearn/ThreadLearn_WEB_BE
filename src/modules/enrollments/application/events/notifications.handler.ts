@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
 import {
   CourseCompletedEvent,
@@ -8,8 +11,23 @@ import {
 } from './enrollment-completion.events';
 
 @Injectable()
-export class NotificationsHandler {
-  @OnEvent(ENROLLMENT_COMPLETION_EVENTS.lessonCompleted)
+export class NotificationsHandler implements OnModuleInit {
+  constructor(
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
+  ) {}
+
+  onModuleInit(): void {
+    this.eventBus.subscribe<LessonCompletedEvent>(
+      ENROLLMENT_COMPLETION_EVENTS.lessonCompleted,
+      this.onLessonCompleted.bind(this),
+    );
+    this.eventBus.subscribe<CourseCompletedEvent>(
+      ENROLLMENT_COMPLETION_EVENTS.courseCompleted,
+      this.onCourseCompleted.bind(this),
+    );
+  }
+
   async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
     if (event.alreadyCompleted || event.courseCompleted) return;
 
@@ -23,7 +41,6 @@ export class NotificationsHandler {
     });
   }
 
-  @OnEvent(ENROLLMENT_COMPLETION_EVENTS.courseCompleted)
   async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
     await NotificationsService.sendNotification({
       userId: event.userId,

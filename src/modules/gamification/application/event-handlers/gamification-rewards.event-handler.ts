@@ -1,5 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { COURSE_COMPLETION_XP, LESSON_COMPLETION_XP } from '../../constants';
 import {
   GAMIFICATION_REALTIME_PORT,
@@ -24,7 +27,7 @@ interface RewardEffects {
 }
 
 @Injectable()
-export class GamificationRewardsEventHandler {
+export class GamificationRewardsEventHandler implements OnModuleInit {
   private readonly logger = new Logger(GamificationRewardsEventHandler.name);
 
   constructor(
@@ -32,9 +35,27 @@ export class GamificationRewardsEventHandler {
     private readonly updateStreakService: UpdateStreakService,
     @Inject(GAMIFICATION_REALTIME_PORT)
     private readonly realtimePort: IGamificationRealtimePort,
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
   ) {}
 
-  @OnEvent('lesson.completed')
+  onModuleInit(): void {
+    this.eventBus.subscribe<LessonCompletedEvent>(
+      'lesson.completed',
+      this.handleLessonCompleted.bind(this),
+    );
+    this.eventBus.subscribe<CourseCompletedEvent>(
+      'course.completed',
+      this.handleCourseCompleted.bind(this),
+    );
+    this.eventBus.subscribe<{
+      userId: string;
+      quizId: string;
+      attemptId?: string;
+      xpReward: number;
+    }>('quiz.passed', this.handleQuizPassed.bind(this));
+  }
+
   async handleLessonCompleted(event: LessonCompletedEvent): Promise<RewardEffects> {
     return this.awardCompletionXp({
       userId: event.userId,
@@ -45,7 +66,6 @@ export class GamificationRewardsEventHandler {
     });
   }
 
-  @OnEvent('course.completed')
   async handleCourseCompleted(event: CourseCompletedEvent): Promise<RewardEffects> {
     return this.awardCompletionXp({
       userId: event.userId,
@@ -56,7 +76,6 @@ export class GamificationRewardsEventHandler {
     });
   }
 
-  @OnEvent('quiz.passed')
   async handleQuizPassed(event: {
     userId: string;
     quizId: string;

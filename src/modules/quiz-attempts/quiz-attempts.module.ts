@@ -8,16 +8,17 @@ import { GetStudentQuizByLessonService } from './application/services/get-studen
 import { QuizGradingService } from './domain/services/quiz-grading.service';
 import { QuizAttemptRepository } from './infrastructure/persistence/repositories/mongo-quiz-attempt.repository';
 import { QUIZ_ATTEMPT_REPOSITORY } from './domain/interfaces/quiz-attempt.repository';
-import { DomainEventPublisher } from './application/events/domain-event.publisher';
+import { SharedEventsModule } from '../../shared/infrastructure/events/shared-events.module';
 
 /**
  * QuizAttemptsModule — luồng học viên làm quiz.
- * Side-effect (XP/leaderboard/notification) phát qua EventEmitter2 (bus toàn cục),
- * các module sở hữu tự nghe bằng @OnEvent.
+ * Side-effect (XP/leaderboard/notification) phát qua shared event bus,
+ * các module sở hữu tự đăng ký listener.
  */
 @Module({
   imports: [
     QuizModule,
+    SharedEventsModule,
   ],
   controllers: [QuizAttemptsController],
   providers: [
@@ -27,7 +28,6 @@ import { DomainEventPublisher } from './application/events/domain-event.publishe
     GetStudentQuizByLessonService,
     QuizGradingService,
     QuizAttemptRepository,
-    DomainEventPublisher,
     {
       provide: QUIZ_ATTEMPT_REPOSITORY,
       useExisting: QuizAttemptRepository,
