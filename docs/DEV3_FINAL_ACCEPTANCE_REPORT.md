@@ -58,9 +58,10 @@ Date: 2026-07-28
 
 1. Complete the remaining endpoint/component/Socket integration and browser E2E tests for the partial UC rows.
 2. Configure and smoke-test Redis, Judge0 and the AI provider. This environment has MongoDB listening on port 27017 but no Redis listener on port 6379, and no usable Judge0/AI credentials were provided.
-3. Configure GitHub credentials for the execution environment. Both feature pushes failed with `SEC_E_NO_CREDENTIALS`; no remote branch or `develop` was changed.
+3. Complete the outstanding integration/E2E evidence before merging. Both feature branches are now pushed, but `develop` intentionally remains unchanged until the remaining acceptance rows can be proven.
 
 ## Environment notes
 
 - Live Judge0 and AI-provider verification was not performed. The code-run endpoint deliberately returns `503 JUDGE0_NOT_CONFIGURED` rather than silently executing a local sandbox when Judge0 is not configured.
-- No force push, reset, or direct commit to `develop` was performed.
+- Pushed feature branches: `ThreadLearn/ThreadLearn_WEB_BE:feature/dev3-completion` and `Curt1s167/ThreadLearn_WEB_FE:feature/dev3-completion`.
+- No force push, reset, merge, or direct commit to `develop` was performed.
