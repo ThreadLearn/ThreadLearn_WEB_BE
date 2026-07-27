@@ -54,6 +54,7 @@ describe('Subscription UC51-52 service flow', () => {
       planRepository,
       subscriptionRepository,
       userPlanAccessRepository,
+      { subscribe: jest.fn() },
     );
     eventEmitter.handlePaymentSucceeded = (payload) => paymentSucceededHandler.handle(payload);
 

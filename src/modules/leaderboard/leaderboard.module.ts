@@ -8,9 +8,10 @@ import { RedisLeaderboardCacheAdapter } from './infrastructure/adapters/redis-le
 import { LEADERBOARD_CACHE_PORT } from './domain/interfaces/leaderboard-cache.port';
 import { MongoUserProfileAdapter } from './infrastructure/adapters/mongo-user-profile.adapter';
 import { USER_PROFILE_PORT } from './domain/interfaces/user-profile.port';
+import { SharedEventsModule } from '../../shared/infrastructure/events/shared-events.module';
 
 @Module({
-  imports: [GamificationModule],
+  imports: [GamificationModule, SharedEventsModule],
   controllers: [LeaderboardController],
   providers: [
     GetTopRankingsService,

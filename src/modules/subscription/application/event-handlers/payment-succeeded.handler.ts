@@ -1,5 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { PLAN_REPOSITORY, IPlanRepository } from '../../domain/interfaces/plan.repository';
 import { ISubscriptionRepository, SUBSCRIPTION_REPOSITORY } from '../../domain/interfaces/subscription.repository';
 import {
@@ -16,16 +19,24 @@ interface PaymentSucceededEvent {
 }
 
 @Injectable()
-export class PaymentSucceededHandler {
+export class PaymentSucceededHandler implements OnModuleInit {
   constructor(
     @Inject(PLAN_REPOSITORY) private readonly planRepository: IPlanRepository,
     @Inject(SUBSCRIPTION_REPOSITORY) private readonly subscriptionRepository: ISubscriptionRepository,
     @Inject(USER_PLAN_ACCESS_REPOSITORY)
     private readonly userPlanAccessRepository: IUserPlanAccessRepository,
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
     private readonly notificationsService?: NotificationsService,
   ) {}
 
-  @OnEvent('payment.succeeded')
+  onModuleInit(): void {
+    this.eventBus.subscribe<PaymentSucceededEvent>(
+      'payment.succeeded',
+      this.handle.bind(this),
+    );
+  }
+
   async handle(event: PaymentSucceededEvent): Promise<void> {
     const plan = await this.planRepository.findById(event.planId);
     if (!plan) return;

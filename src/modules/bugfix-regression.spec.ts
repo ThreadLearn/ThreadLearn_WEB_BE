@@ -22,7 +22,6 @@ import { CourseEntity } from './course/domain/entities/course.entity';
 import { QuizMapper } from './quiz/infrastructure/mapper/quiz.mapper';
 import { IQuizRepository } from './quiz/domain/interfaces/quiz.repository';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DomainEventPublisher } from './quiz-attempts/application/events/domain-event.publisher';
 
 describe('reported bug regressions', () => {
   const createQuizAttemptUseCases = () => {
@@ -42,7 +41,7 @@ describe('reported bug regressions', () => {
         new SubmitAttemptService(
           attemptsRepo,
           quizRepo,
-          new DomainEventPublisher(new EventEmitter2()),
+          { publish: jest.fn() },
           new QuizGradingService(),
         ).execute(userId, quizId, answers, startTime),
       getAttemptById: (userId: string, attemptId: string) =>

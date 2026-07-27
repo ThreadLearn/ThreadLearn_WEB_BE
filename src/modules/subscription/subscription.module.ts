@@ -27,9 +27,10 @@ import { MongoUserPlanAccessRepository } from './infrastructure/persistence/mong
 import { PlanController } from './presentation/controller/plan.controller';
 import { SubscriptionController } from './presentation/controller/subscription.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SharedEventsModule } from '../../shared/infrastructure/events/shared-events.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, SharedEventsModule],
   controllers: [PlanController, SubscriptionController],
   providers: [
     MongoPlanRepository,

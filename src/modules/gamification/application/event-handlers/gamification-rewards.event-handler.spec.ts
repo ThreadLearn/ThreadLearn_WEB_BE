@@ -19,6 +19,7 @@ describe('GamificationRewardsEventHandler', () => {
       new AwardXpService(statsRepository),
       new UpdateStreakService(statsRepository),
       realtime,
+      { subscribe: jest.fn() },
     );
 
     const firstLesson = await handler.handleLessonCompleted({
@@ -56,6 +57,7 @@ describe('GamificationRewardsEventHandler', () => {
       new AwardXpService(statsRepository),
       new UpdateStreakService(statsRepository),
       realtime,
+      { subscribe: jest.fn() },
     );
     const event = {
       userId: 'student-1',

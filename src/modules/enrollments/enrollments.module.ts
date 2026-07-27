@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
+import { SharedEventsModule } from '../../shared/infrastructure/events/shared-events.module';
 import { CourseModule } from '../course/course.module';
 import { LessonsModule } from '../lessons/lessons.module';
 import { CertificatesHandler } from './application/events/certificates.handler';
@@ -21,7 +22,7 @@ import {
 } from './presentation/controller/enrollments.controller';
 
 @Module({
-  imports: [LearningAccessModule, CourseModule, LessonsModule],
+  imports: [LearningAccessModule, SharedEventsModule, CourseModule, LessonsModule],
   controllers: [EnrollmentsController, StudentMeController, LessonCompletionController],
   providers: [
     MongoEnrollmentRepository,

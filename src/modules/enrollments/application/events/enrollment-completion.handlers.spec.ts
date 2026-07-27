@@ -23,7 +23,7 @@ describe('enrollment completion event handlers', () => {
   it('sends a lesson notification for a non-final lesson', async () => {
     const send = jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
 
-    await new NotificationsHandler().onLessonCompleted(lessonEvent);
+    await new NotificationsHandler({ subscribe: jest.fn() }).onLessonCompleted(lessonEvent);
 
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'student-1',
@@ -34,7 +34,7 @@ describe('enrollment completion event handlers', () => {
 
   it('lets course.completed own the notification for the final lesson', async () => {
     const send = jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
-    const handler = new NotificationsHandler();
+    const handler = new NotificationsHandler({ subscribe: jest.fn() });
 
     await handler.onLessonCompleted({ ...lessonEvent, courseCompleted: true });
     await handler.onCourseCompleted({
@@ -55,7 +55,7 @@ describe('enrollment completion event handlers', () => {
   it('issues the certificate from the course completion event', async () => {
     const issue = jest.spyOn(CertificatesService, 'issueCertificate').mockResolvedValue({} as never);
 
-    await new CertificatesHandler().onCourseCompleted({
+    await new CertificatesHandler({ subscribe: jest.fn() }).onCourseCompleted({
       userId: 'student-1',
       courseId: 'course-1',
       progressPercent: 100,
