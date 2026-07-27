@@ -30,7 +30,7 @@ export class NoteEntity {
     anchorEnd?: number;
   }): NoteEntity {
     if (!input.noteText?.trim()) throw new BadRequestError('noteText is required.');
-    return new NoteEntity({
+    const props: NoteProps = {
       id: '',
       userId: input.userId,
       lessonId: input.lessonId,
@@ -39,7 +39,9 @@ export class NoteEntity {
       anchorText: input.anchorText?.trim() || undefined,
       anchorStart: input.anchorStart,
       anchorEnd: input.anchorEnd,
-    });
+    };
+    this.assertValidAnchorRange(props);
+    return new NoteEntity(props);
   }
 
   get id(): string {
@@ -54,16 +56,29 @@ export class NoteEntity {
     anchorStart?: number;
     anchorEnd?: number;
   }): void {
+    const next = { ...this.props };
     const nextText = input.noteText ?? input.content;
     if (nextText !== undefined) {
       if (!nextText.trim()) throw new BadRequestError('noteText is required.');
-      this.props.noteText = nextText.trim();
+      next.noteText = nextText.trim();
     }
-    if (input.codeSnippet !== undefined) this.props.codeSnippet = input.codeSnippet;
+    if (input.codeSnippet !== undefined) next.codeSnippet = input.codeSnippet;
     if (input.anchorText !== undefined)
-      this.props.anchorText = input.anchorText.trim() || undefined;
-    if (input.anchorStart !== undefined) this.props.anchorStart = input.anchorStart;
-    if (input.anchorEnd !== undefined) this.props.anchorEnd = input.anchorEnd;
+      next.anchorText = input.anchorText.trim() || undefined;
+    if (input.anchorStart !== undefined) next.anchorStart = input.anchorStart;
+    if (input.anchorEnd !== undefined) next.anchorEnd = input.anchorEnd;
+    NoteEntity.assertValidAnchorRange(next);
+    Object.assign(this.props, next);
+  }
+
+  private static assertValidAnchorRange(props: Pick<NoteProps, 'anchorStart' | 'anchorEnd'>): void {
+    if (
+      props.anchorStart !== undefined &&
+      props.anchorEnd !== undefined &&
+      props.anchorEnd <= props.anchorStart
+    ) {
+      throw new BadRequestError('anchorEnd must be greater than anchorStart.');
+    }
   }
 
   toProps(): NoteProps {

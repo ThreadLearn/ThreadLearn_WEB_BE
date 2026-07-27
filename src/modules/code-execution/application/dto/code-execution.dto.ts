@@ -2,12 +2,25 @@ import { z } from '../../../../common/zod/z';
 
 export const runCodeSchema = z.object({
   sourceCode: z.string().min(1).max(50000),
-  language: z.string().optional(),
-  languageId: z.number().int().positive().optional(),
+  language: z.enum(['javascript', 'python']),
   stdin: z.string().max(10000).optional(),
   courseId: z.string().optional(),
   lessonId: z.string().optional(),
-  exerciseId: z.string().optional(),
 });
 
-export type CodeSubmitPayload = z.infer<typeof runCodeSchema>;
+/** Payload accepted from the student-facing /run endpoint. */
+export type RunCodePayload = z.infer<typeof runCodeSchema>;
+
+/**
+ * Internal execution payload. Exercise grading and protected admin tooling may
+ * provide a resolved Judge0 language id; public students never can.
+ */
+export interface CodeSubmitPayload {
+  sourceCode: string;
+  language?: string;
+  languageId?: number;
+  stdin?: string;
+  courseId?: string;
+  lessonId?: string;
+  exerciseId?: string;
+}

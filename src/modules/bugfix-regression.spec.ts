@@ -63,6 +63,9 @@ describe('reported bug regressions', () => {
     await expect(
       new CodeExecutionService({ countFreeRunsToday: jest.fn().mockResolvedValue(0) } as any, {
         assertLessonViewAccess: accessSpy,
+      } as any, {
+        reserve: jest.fn().mockResolvedValue({ userId: 'student', scope: 'code-execution', day: '2026-07-28', count: 1 }),
+        release: jest.fn(),
       } as any).executeCode(
         '507f1f77bcf86cd799439011',
         {

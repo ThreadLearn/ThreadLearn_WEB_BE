@@ -18,6 +18,7 @@ export interface AICourseProfile {
 export interface IAIHistoryRepository {
   create(history: AIHistoryEntity): Promise<unknown>;
   listByUser(userId: string): Promise<unknown[]>;
+  listByUserPage(userId: string, page: number, limit: number): Promise<{ items: unknown[]; total: number }>;
   findByUserAndId(userId: string, id: string): Promise<unknown | null>;
   updateFeedback(userId: string, id: string, feedbackRating: number): Promise<unknown | null>;
   countToday(userId: string, since: Date): Promise<number>;

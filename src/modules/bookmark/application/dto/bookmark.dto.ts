@@ -3,7 +3,9 @@ import { z } from '../../../../common/zod/z';
 export const toggleBookmarkSchema = z.object({
   targetType: z.enum(['COURSE', 'LESSON']),
   targetId: z.string().min(1, 'targetId is required.'),
-  title: z.string().min(1, 'title is required.'),
+  // Snapshot metadata is resolved on the server from the target. These fields
+  // remain optional only so older clients can call the compatibility aliases.
+  title: z.string().min(1).optional(),
   thumbnailUrl: z.string().optional(),
   anchorText: z.string().optional(),
   position: z.number().optional(),

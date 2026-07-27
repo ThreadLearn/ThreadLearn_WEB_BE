@@ -15,16 +15,29 @@ export class NotificationsController {
   @Get()
   async getNotificationsForUser(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('unread') unread?: string
+    @Query('unread') unread?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
   ) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const notifications = await this.notificationsService.getNotificationsForUser(
       user.id,
-      unread === 'true' ? false : undefined
+      unread === 'true' ? false : undefined,
+      safePage,
+      safeLimit,
     );
 
     return ApiResponse.success({
       message: 'Notifications fetched successfully.',
       data: notifications.items,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total: notifications.total,
+        totalPages: Math.max(1, Math.ceil(notifications.total / safeLimit)),
+        hasMore: safePage * safeLimit < notifications.total,
+      },
     });
   }
 
@@ -44,8 +57,13 @@ export class NotificationsController {
   }
 
   @Get('me')
-  async getMine(@CurrentUser() user: AuthenticatedUser, @Query('unread') unread?: string) {
-    return this.getNotificationsForUser(user, unread);
+  async getMine(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('unread') unread?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.getNotificationsForUser(user, unread, page, limit);
   }
 
   @Patch(':id/read')
