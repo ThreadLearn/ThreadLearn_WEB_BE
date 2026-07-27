@@ -27,7 +27,9 @@ export const createCourseSchema = z.object({
   prerequisites: z.array(z.string()).optional(),
   prerequisiteThreshold: z.number().min(0).max(100).optional(),
   estimatedDuration: z.number().min(0).optional(),
-  status: z.enum(['draft', 'published', 'hidden', 'archived']).optional(),
+  // A course can only be published through PATCH /:id/publish, which verifies
+  // that it has active lessons before exposing it to learners.
+  status: z.enum(['draft', 'hidden']).optional(),
 });
 
 export const updateCourseSchema = createCourseSchema.partial();
@@ -38,7 +40,7 @@ export const setVisibilitySchema = z.object({
 
 export const listCoursesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
   q: z.string().optional(),
   search: z.string().optional(),
   level: courseLevelSchema.optional(),
