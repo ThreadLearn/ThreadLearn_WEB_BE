@@ -53,7 +53,6 @@ export interface UpdateMyProfileInput {
   userId: string;
   firstName?: string;
   lastName?: string;
-  avatarUrl?: string;
 }
 
 /**

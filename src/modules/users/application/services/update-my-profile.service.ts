@@ -8,11 +8,11 @@ import { ProfileUserPresenter } from '../presenters/profile-user.presenter';
 /**
  * UC09 — Update My Profile. Mirror `UsersService.updateProfile(userId, data)`:
  * findById → reject nếu không có (`User not found.`) → chặn inactive/locked →
- * cập nhật ĐÚNG tập field legacy (firstName/lastName/avatarUrl) qua
- * `UserEntity.updateProfile` (undefined ⇒ giữ; trim idempotent với zod đã trim) →
+ * cập nhật ĐÚNG whitelist `firstName`/`lastName` qua `UserEntity.updateProfile`
+ * (undefined ⇒ giữ; trim idempotent với zod đã trim) →
  * lưu qua repo → trả safe user phẳng (mirror `data: sanitizeUser`).
  *
- * KHÔNG validate unique/email. KHÔNG cho update field ngoài legacy. KHÔNG đổi shape.
+ * KHÔNG validate unique/email. KHÔNG cho update email/role/password/account state/avatar. KHÔNG đổi shape.
  * Phase DEV1.6C: đăng ký provider; CHƯA inject vào controller.
  */
 @Injectable()
@@ -29,10 +29,9 @@ export class UpdateMyProfileService {
     user.updateProfile({
       firstName: input.firstName,
       lastName: input.lastName,
-      avatarUrl: input.avatarUrl,
     });
 
-    const saved = await this.userRepo.update(user);
+    const saved = await this.userRepo.updateProfileNames(user);
     return ProfileUserPresenter.toSafeUser(saved);
   }
 

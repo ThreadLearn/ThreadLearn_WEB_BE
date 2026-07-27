@@ -48,6 +48,17 @@ export class MongoUserRepository implements IUserRepository {
     return UserMapper.toEntity(doc!);
   }
 
+  /** UC09: persist the personal-profile whitelist only; never overwrite account/security fields. */
+  async updateProfileNames(entity: UserEntity): Promise<UserEntity> {
+    const p = entity.toProps();
+    const doc = await User.findByIdAndUpdate(
+      entity.id,
+      { $set: { firstName: p.firstName, lastName: p.lastName } },
+      { new: true }
+    );
+    return UserMapper.toEntity(doc!);
+  }
+
   async updateEmailVerificationState(entity: UserEntity): Promise<UserEntity> {
     const p = entity.toProps();
     const set: Record<string, unknown> = {
