@@ -5,12 +5,15 @@ export interface LessonAccessSnapshot {
   isPreview: boolean;
   isLocked: boolean;
   title: string;
+  thumbnailUrl?: string;
 }
 
 export interface CourseAccessSnapshot {
   id: string;
   status: string;
   isPremium: boolean;
+  title: string;
+  thumbnailUrl?: string;
 }
 
 export interface ILearningAccessData {

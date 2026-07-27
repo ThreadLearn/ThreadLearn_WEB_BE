@@ -19,16 +19,16 @@ export class ToggleBookmarkService {
 
   async execute(userId: string, dto: ToggleBookmarkDto) {
     if (!isObjectId(dto.targetId)) throw new BadRequestError('Invalid targetId format.');
-    if (dto.targetType === 'LESSON') {
-      await this.learningAccess.assertLessonViewAccess(dto.targetId, { id: userId, role: 'STUDENT' });
-    }
+    const target = dto.targetType === 'LESSON'
+      ? await this.learningAccess.assertLessonViewAccess(dto.targetId, { id: userId, role: 'STUDENT' })
+      : await this.learningAccess.assertCourseInteractionAccess(dto.targetId, { id: userId, role: 'STUDENT' });
     return this.bookmarks.toggle(
       BookmarkEntity.createNew({
         userId,
         targetType: dto.targetType,
         targetId: dto.targetId,
-        title: dto.title,
-        thumbnailUrl: dto.thumbnailUrl,
+        title: target.title,
+        thumbnailUrl: target.thumbnailUrl,
         anchorText: dto.anchorText,
         position: dto.position,
         note: dto.note,

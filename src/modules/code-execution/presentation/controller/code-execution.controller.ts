@@ -5,7 +5,7 @@ import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { CodeSubmitPayload, runCodeSchema } from '../../application/dto/code-execution.dto';
+import { RunCodePayload, runCodeSchema } from '../../application/dto/code-execution.dto';
 import { CodeExecutionService } from '../../application/services/code-execution.service';
 
 @ApiTags('Code Execution')
@@ -16,7 +16,7 @@ export class CodeExecutionController {
   constructor(private readonly codeExecution: CodeExecutionService) {}
 
   @Post('run')
-  async run(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(runCodeSchema)) body: CodeSubmitPayload) {
+  async run(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(runCodeSchema)) body: RunCodePayload) {
     const result = await this.codeExecution.executeCode(user.id, body, user.role);
     return ApiResponse.success({ message: 'Code executed successfully.', data: result });
   }

@@ -2,9 +2,11 @@ import { HttpService } from '@nestjs/axios';
 import { Inject, Injectable } from '@nestjs/common';
 import jwt from 'jsonwebtoken';
 import { firstValueFrom } from 'rxjs';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../../../common/custom-error';
+import { BadRequestError, NotFoundError, TooManyRequestsError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
+import mongoose from 'mongoose';
+import { CodeExecution } from '../../../code-execution/models/code-execution.model';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
@@ -58,7 +60,14 @@ export class RequestRecommendationService {
       subscriptionFeatures: user.subscriptionFeatures,
       feature: 'AI_ADVANCED_ANALYSIS',
     });
-    await this.assertDailyLimit(userId, isPremiumTier);
+    const quota = await this.assertDailyLimit(userId, isPremiumTier);
+    if (payload.codeExecutionId) {
+      if (!mongoose.isValidObjectId(payload.codeExecutionId)) {
+        throw new NotFoundError('Code execution not found.');
+      }
+      const execution = await CodeExecution.exists({ _id: payload.codeExecutionId, userId });
+      if (!execution) throw new NotFoundError('Code execution not found.');
+    }
 
     const aiToken = jwt.sign({ sub: userId }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
 
@@ -83,7 +92,7 @@ export class RequestRecommendationService {
       explanation,
     ].join('\n');
 
-    return this.histories.create(
+    const history = await this.histories.create(
       AIHistoryEntity.createNew({
         userId,
         codeExecutionId: payload.codeExecutionId,
@@ -93,7 +102,7 @@ export class RequestRecommendationService {
         response,
         suggestions,
         raceConditions,
-        optimizedCode,
+        optimizedCode: isPremiumTier ? optimizedCode : undefined,
         explanation,
         modelName: 'threadlearn-ai2-server',
         category: 'code-analysis',
@@ -114,6 +123,7 @@ export class RequestRecommendationService {
         cached: data.cached ?? false,
       }),
     );
+    return this.withQuota(history, quota);
   }
 
   private async assertDailyLimit(userId: string, isPremium: boolean) {
@@ -121,6 +131,14 @@ export class RequestRecommendationService {
     since.setHours(0, 0, 0, 0);
     const usedToday = await this.histories.countToday(userId, since);
     const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-    if (usedToday >= limit) throw new ForbiddenError('AI_USAGE_LIMIT_EXCEEDED');
+    if (usedToday >= limit) throw new TooManyRequestsError('Daily AI analysis quota exceeded.', 'AI_QUOTA_EXCEEDED');
+    return { limit, remaining: Math.max(0, limit - usedToday - 1) };
+  }
+
+  private withQuota(history: unknown, quota: { limit: number; remaining: number }) {
+    const value = history && typeof (history as any).toObject === 'function'
+      ? (history as any).toObject()
+      : history;
+    return { ...(value as Record<string, unknown>), quotaLimit: quota.limit, remainingQuota: quota.remaining };
   }
 }

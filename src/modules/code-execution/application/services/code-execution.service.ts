@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import vm from 'vm';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { BadRequestError, NotFoundError, TooManyRequestsError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { logger } from '../../../../configs/logger';
 import {
@@ -154,7 +154,12 @@ export class CodeExecutionService {
       const since = new Date();
       since.setHours(0, 0, 0, 0);
       const usedToday = await this.executions.countFreeRunsToday(userId, since);
-      if (usedToday >= 20) throw new BadRequestError('CODE_RUN_LIMIT - you have used your 20 daily code executions.');
+      if (usedToday >= 20) {
+        throw new TooManyRequestsError(
+          'You have used your 20 daily code executions.',
+          'CODE_RUN_LIMIT',
+        );
+      }
     }
 
     const languageId = CodeExecutionService.resolveLanguageId(payload.language, payload.languageId);
@@ -180,13 +185,32 @@ export class CodeExecutionService {
   }
 
   async listHistory(userId: string, lessonId?: string) {
-    return this.executions.listHistory(userId, lessonId);
+    const executions = await this.executions.listHistory(userId, lessonId);
+    return executions.map((execution) => this.presentExecution(execution));
   }
 
   async getById(userId: string, id: string) {
     const execution = await this.executions.findByUserAndId(userId, id);
     if (!execution) throw new NotFoundError('Code execution not found.');
-    return execution;
+    return this.presentExecution(execution);
+  }
+
+  private presentExecution(execution: any) {
+    return {
+      _id: String(execution._id ?? execution.id),
+      sourceCode: execution.sourceCode,
+      language: execution.language,
+      languageId: execution.languageId,
+      stdin: execution.stdin,
+      status: { id: execution.exitCode ?? 0, description: execution.status },
+      stdout: execution.stdout ?? '',
+      stderr: execution.stderr ?? '',
+      compileOutput: execution.compileOutput ?? '',
+      runtime: execution.runtime ?? '0.000',
+      memory: execution.memory ?? 0,
+      createdAt: execution.createdAt,
+      executedAt: execution.executedAt,
+    };
   }
 
   private async persistExecution(userId: string, payload: CodeSubmitPayload, language: string, languageId: number, courseId: string | undefined, result: ExecutionResult) {

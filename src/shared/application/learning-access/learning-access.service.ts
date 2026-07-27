@@ -3,6 +3,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../../common/
 import {
   ILearningAccessData,
   LEARNING_ACCESS_DATA,
+  CourseAccessSnapshot,
   LessonAccessSnapshot,
 } from '../../domain/interfaces/learning-access-data.port';
 import {
@@ -96,11 +97,11 @@ export class LearningAccessService implements ILearningAccess {
   async assertCourseInteractionAccess(
     courseId: string,
     viewer: LearningAccessViewer,
-  ): Promise<void> {
+  ): Promise<CourseAccessSnapshot> {
     if (!isObjectId(courseId)) throw new NotFoundError('Course not found.');
     const course = await this.data.findCourse(courseId);
     if (!course) throw new NotFoundError('Course not found.');
-    if (viewer.role === 'ADMIN') return;
+    if (viewer.role === 'ADMIN') return course;
 
     if (course.status !== 'published') {
       throw new ForbiddenError('Comments are disabled on this course.');
@@ -114,6 +115,7 @@ export class LearningAccessService implements ILearningAccess {
 
     const enrolled = await this.data.isEnrolled(viewer.id, courseId);
     if (!enrolled) throw new ForbiddenError('You must enroll to comment on this course.');
+    return course;
   }
 
   async touchLessonCursor(userId: string, courseId: string, lessonId: string): Promise<void> {

@@ -1,4 +1,4 @@
-import type { LessonAccessSnapshot } from './learning-access-data.port';
+import type { CourseAccessSnapshot, LessonAccessSnapshot } from './learning-access-data.port';
 
 export type LearningAccessReason =
   | 'ADMIN'
@@ -32,7 +32,7 @@ export interface ILearningAccess {
   ): Promise<LessonAccessSnapshot>;
   assertLessonViewAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
   assertLessonInteractionAccess(lessonId: string, viewer: LearningAccessViewer): Promise<LessonAccessSnapshot>;
-  assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<void>;
+  assertCourseInteractionAccess(courseId: string, viewer: LearningAccessViewer): Promise<CourseAccessSnapshot>;
   /** Best-effort: ghi cursor resume (lastLessonId/lastAccessedAt) khi học viên mở bài. */
   touchLessonCursor(userId: string, courseId: string, lessonId: string): Promise<void>;
 }

@@ -63,7 +63,9 @@ describe('RequestRecommendationService', () => {
     expect(repo.create).toHaveBeenCalled();
     expect(result.props.suggestions).toEqual(['[high] Closure captures loop variable declared with var.']);
     expect(result.props.raceConditions).toEqual(['1-3: Closure captures loop variable declared with var.']);
-    expect(result.props.optimizedCode).toBe('Use let instead of var.');
+    expect(result.props.optimizedCode).toBeUndefined();
+    expect(result.remainingQuota).toBe(9);
+    expect(result.quotaLimit).toBe(10);
     expect(result.props.modelName).toBe('threadlearn-ai2-server');
     expect(result.props.category).toBe('code-analysis');
     expect(result.props.issues).toEqual([
@@ -117,7 +119,10 @@ describe('RequestRecommendationService', () => {
     const http = buildHttp({ issues: [] });
     const service = new RequestRecommendationService(repo, http as any);
 
-    await expect(service.execute('user-1', payload)).rejects.toMatchObject({ message: 'AI_USAGE_LIMIT_EXCEEDED' });
+    await expect(service.execute('user-1', payload)).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'AI_QUOTA_EXCEEDED',
+    });
     expect(http.post).not.toHaveBeenCalled();
   });
 
