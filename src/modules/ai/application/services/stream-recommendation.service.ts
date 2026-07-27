@@ -11,6 +11,8 @@ import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
+import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
+import { AIAnalysisCacheService, CachedAnalysisResult } from './ai-analysis-cache.service';
 
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
@@ -47,6 +49,8 @@ interface AnalyzeResultData {
 export class StreamRecommendationService {
   constructor(
     @Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository,
+    private readonly quotas: DailyQuotaService,
+    private readonly cache: AIAnalysisCacheService,
   ) {}
 
   async execute(userId: string, payload: AIRecommendationPayload, res: Response) {
@@ -63,7 +67,6 @@ export class StreamRecommendationService {
       subscriptionFeatures: user.subscriptionFeatures,
       feature: 'AI_ADVANCED_ANALYSIS',
     });
-    await this.assertDailyLimit(userId, isPremiumTier);
     if (payload.codeExecutionId) {
       if (!mongoose.isValidObjectId(payload.codeExecutionId)) {
         throw new NotFoundError('Code execution not found.');
@@ -72,18 +75,35 @@ export class StreamRecommendationService {
       if (!execution) throw new NotFoundError('Code execution not found.');
     }
 
+    const limit = isPremiumTier ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+    const cacheKey = this.cache.key(payload.inputCode, payload.language);
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      await this.persistHistory(userId, payload, cached, isPremiumTier, true, 0);
+      res.write(`event: result\ndata: ${JSON.stringify({ ...cached, cached: true })}\n\n`);
+      res.end();
+      return;
+    }
+
+    const reservation = await this.reserveQuota(userId, limit);
+
     const aiToken = jwt.sign({ sub: userId }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
     const startTime = Date.now();
-
-    const upstream = await axios.post(
-      `${env.AI_API_URL}/api/v1/ai/analyze/stream`,
-      { code: payload.inputCode, language: payload.language, user_id: userId },
-      {
-        timeout: env.AI_API_TIMEOUT_MS,
-        headers: { Authorization: `Bearer ${aiToken}` },
-        responseType: 'stream',
-      },
-    );
+    let upstream: { data: any };
+    try {
+      upstream = await axios.post(
+        `${env.AI_API_URL}/api/v1/ai/analyze/stream`,
+        { code: payload.inputCode, language: payload.language, user_id: userId },
+        { timeout: env.AI_API_TIMEOUT_MS, headers: { Authorization: `Bearer ${aiToken}` }, responseType: 'stream' },
+      );
+    } catch (error) {
+      await this.quotas.release(reservation);
+      throw error;
+    }
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -92,53 +112,11 @@ export class StreamRecommendationService {
 
     let buffer = '';
 
+    let analysisCompleted = false;
     const persist = async (resultData: AnalyzeResultData) => {
-      const issues = resultData.issues ?? [];
-      const suggestions = issues.map((issue) => `[${issue.severity}] ${issue.description}`);
-      const raceConditions = issues.map((issue) => `${issue.line_range}: ${issue.description}`);
-      const optimizedCode = issues[0]?.fix;
-      const explanation = buildExplanation(issues.length, (resultData.docs_used ?? []).length);
-      const response = [
-        '### AI Code Analysis',
-        '',
-        ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`),
-        '',
-        explanation,
-      ].join('\n');
-
-      await this.histories.create(
-        AIHistoryEntity.createNew({
-          userId,
-          codeExecutionId: payload.codeExecutionId,
-          inputCode: payload.inputCode,
-          language: payload.language,
-          prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`,
-          response,
-          suggestions,
-          raceConditions,
-          optimizedCode: isPremiumTier ? optimizedCode : undefined,
-          explanation,
-          modelName: 'threadlearn-ai2-server',
-          category: 'code-analysis',
-          issues: issues.map((issue) => ({
-            patternId: issue.pattern_id ?? 'unknown',
-            lineRange: issue.line_range,
-            severity: issue.severity,
-            description: issue.description,
-            fix: issue.fix,
-            codeSnippet: issue.code_snippet,
-          })),
-          docsUsed: (resultData.docs_used ?? []).map((doc) => ({
-            id: doc.id,
-            title: doc.title,
-            category: doc.category,
-            content: doc.content,
-            score: doc.bm25_score,
-          })),
-          cached: resultData.cached ?? false,
-          analyzeTimeMs: Date.now() - startTime,
-        }),
-      );
+      await this.cache.set(cacheKey, { issues: resultData.issues ?? [], docs_used: resultData.docs_used ?? [] });
+      await this.persistHistory(userId, payload, resultData, isPremiumTier, false, Date.now() - startTime);
+      analysisCompleted = true;
     };
 
     // Client (browser) can abort mid-stream (tab close, reload) — that's normal,
@@ -195,16 +173,40 @@ export class StreamRecommendationService {
           res.write(`event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`);
           res.end();
         }
+        if (!analysisCompleted) this.quotas.release(reservation).catch(() => undefined);
         resolve();
       });
     });
   }
 
-  private async assertDailyLimit(userId: string, isPremium: boolean) {
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const usedToday = await this.histories.countToday(userId, since);
-    const limit = isPremium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-    if (usedToday >= limit) throw new TooManyRequestsError('Daily AI analysis quota exceeded.', 'AI_QUOTA_EXCEEDED');
+  private async reserveQuota(userId: string, limit: number): Promise<DailyQuotaReservation> {
+    const reservation = await this.quotas.reserve(userId, 'ai-recommendation', limit);
+    if (!reservation) throw new TooManyRequestsError('Daily AI analysis quota exceeded.', 'AI_QUOTA_EXCEEDED');
+    return reservation;
+  }
+
+  private async persistHistory(
+    userId: string,
+    payload: AIRecommendationPayload,
+    resultData: AnalyzeResultData | CachedAnalysisResult,
+    isPremiumTier: boolean,
+    cached: boolean,
+    analyzeTimeMs: number,
+  ) {
+    const issues = (resultData.issues ?? []) as AnalyzeIssue[];
+    const docsUsed = (resultData.docs_used ?? []) as AnalyzeKnowledgeDoc[];
+    const suggestions = issues.map((issue) => `[${issue.severity}] ${issue.description}`);
+    const raceConditions = issues.map((issue) => `${issue.line_range}: ${issue.description}`);
+    const explanation = buildExplanation(issues.length, docsUsed.length);
+    const response = ['### AI Code Analysis', '', ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`), '', explanation].join('\n');
+    return this.histories.create(AIHistoryEntity.createNew({
+      userId, codeExecutionId: payload.codeExecutionId, inputCode: payload.inputCode, language: payload.language,
+      prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
+      raceConditions, optimizedCode: isPremiumTier ? issues[0]?.fix : undefined, explanation,
+      modelName: 'threadlearn-ai2-server', category: 'code-analysis',
+      issues: issues.map((issue) => ({ patternId: issue.pattern_id ?? 'unknown', lineRange: issue.line_range, severity: issue.severity, description: issue.description, fix: issue.fix, codeSnippet: issue.code_snippet })),
+      docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
+      cached, analyzeTimeMs,
+    }));
   }
 }

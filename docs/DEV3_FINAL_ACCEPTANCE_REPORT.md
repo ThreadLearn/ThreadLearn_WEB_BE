@@ -17,6 +17,9 @@ Date: 2026-07-28
 - The public code-run API only accepts JavaScript or Python and no longer accepts a caller-controlled Judge0 language ID or exercise ID. Daily execution exhaustion returns `429 CODE_RUN_LIMIT`.
 - `/ide` now uses Monaco through `@monaco-editor/react`, persists a local draft, runs through the protected execution API, renders stdout/stderr/compiler output/runtime/memory, and displays recent execution history.
 - The AI page runs code through the execution API rather than a browser iframe and forwards its execution id to analysis. AI input is limited to 5,000 characters, validates execution ownership, enforces a 429 quota response, and only persists optimized code for Premium users.
+- Code execution and AI quota now reserve a slot through an atomic MongoDB conditional update backed by a unique `(userId, scope, day)` index. Failed Judge0/AI-provider requests release their reservation.
+- AI analysis responses are cached by a SHA-256 key of normalized request inputs for one hour. Cache hits create user-owned history while not consuming AI quota.
+- Code-execution and AI history now return paginated `items` plus `page`, `limit`, `total`, `totalPages`, and `hasMore`. AI history/detail redact `optimizedCode` for users without the Premium feature.
 - Student notifications now paginate at 20 per page and use navigation links after marking a notification read.
 - Socket.IO authenticates a JWT handshake and derives the room from its verified user id; the client no longer sends a room-selecting user id.
 - Jest now has test-only environment defaults so unit tests are independent of developer secrets.
@@ -26,9 +29,11 @@ Date: 2026-07-28
 | Check | Result |
 | --- | --- |
 | Backend type-check/build | Passed |
-| Backend Jest | Passed: 23 suites, 90 tests |
+| Backend Jest | Passed: 26 suites, 95 tests |
+| Backend ESLint | Passed: 0 errors, 0 warnings |
 | Frontend type-check | Passed |
 | Frontend production build | Passed |
+| Frontend ESLint | Passed: 0 errors, 0 warnings |
 | Added note anchor regression test | Passed |
 | Added/updated AI quota and tier assertions | Passed |
 
@@ -43,21 +48,19 @@ Date: 2026-07-28
 | UC33 View Bookmarks | Partial | Server paging exists and FE has next/previous navigation; add component/API pagination tests. |
 | UC34 Save Bookmark | Partial | Server target snapshot and check endpoint state are implemented; add concurrent toggle integration test. |
 | UC35 Add Note | Partial | Privacy/multi-note model exists and anchor range validation is tested; selected-text offsets still need browser E2E coverage. |
-| UC44 Run Code | Partial | Monaco IDE and protected public payload are implemented; daily quota is not yet an atomic Redis/Mongo counter. |
-| UC45 View Output | Partial | Output details and recent history UI are implemented; history API paging and execution integration tests remain. |
-| UC46 AI Recommendation | Partial | Execution ownership, size, quota response and Premium optimized-code rule are implemented; SHA-256 shared cache and atomic quota remain. |
-| UC47 AI History | Partial | Per-user history and retention service already exist; history pagination/chat-thread acceptance tests remain. |
+| UC44 Run Code | Partial | Monaco IDE, protected public payload and atomic daily quota are implemented. Live Judge0 smoke and endpoint/browser integration tests remain. |
+| UC45 View Output | Partial | Output details, recent-history UI and paginated history API are implemented; execution integration tests remain. |
+| UC46 AI Recommendation | Partial | Atomic quota, SHA-256 one-hour cache, execution ownership, size and Premium rule are implemented; provider integration and browser acceptance tests remain. |
+| UC47 AI History | Partial | Per-user history, retention, pagination and Free-tier optimized-code redaction are implemented; chat-thread acceptance tests remain. |
 | UC53 Notifications | Partial | HTTP paging/link behavior and JWT socket room authorization are implemented; Socket.IO integration tests remain. |
 
 ## Blocking items before merging to develop
 
-1. Complete the remaining endpoint/component/Socket integration tests for the partial UC rows.
-2. Replace count-then-create code/AI quota checks with an atomic counter (Redis or MongoDB conditional update).
-3. Add the SHA-256 one-hour AI recommendation cache required by the SRS.
-4. Add pagination metadata and UI paging for code execution and AI history.
-5. Configure GitHub credentials for the execution environment. Both feature pushes failed with `SEC_E_NO_CREDENTIALS`; no remote branch or `develop` was changed.
+1. Complete the remaining endpoint/component/Socket integration and browser E2E tests for the partial UC rows.
+2. Configure and smoke-test Redis, Judge0 and the AI provider. This environment has MongoDB listening on port 27017 but no Redis listener on port 6379, and no usable Judge0/AI credentials were provided.
+3. Configure GitHub credentials for the execution environment. Both feature pushes failed with `SEC_E_NO_CREDENTIALS`; no remote branch or `develop` was changed.
 
 ## Environment notes
 
-- Live Judge0 and AI-provider verification was not performed. Automated tests use local/mocked behavior; production requires `JUDGE0_*` and `AI_API_*` configuration.
+- Live Judge0 and AI-provider verification was not performed. The code-run endpoint deliberately returns `503 JUDGE0_NOT_CONFIGURED` rather than silently executing a local sandbox when Judge0 is not configured.
 - No force push, reset, or direct commit to `develop` was performed.

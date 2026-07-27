@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AuthenticatedUser } from '../../../../common/api-handler';
@@ -61,8 +61,8 @@ export class AIController {
   }
 
   @Get('history')
-  async history(@CurrentUser() user: AuthenticatedUser) {
-    const histories = await this.getHistoryLogsSvc.execute(user.id);
+  async history(@CurrentUser() user: AuthenticatedUser, @Query('page') page?: string, @Query('limit') limit?: string) {
+    const histories = await this.getHistoryLogsSvc.execute(user.id, Number(page) || 1, Number(limit) || 20);
     return ApiResponse.success({ message: 'AI history fetched successfully.', data: histories });
   }
 

@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import vm from 'vm';
-import { BadRequestError, NotFoundError, TooManyRequestsError } from '../../../../common/custom-error';
+import { BadRequestError, NotFoundError, ServiceUnavailableError, TooManyRequestsError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { logger } from '../../../../configs/logger';
 import {
@@ -13,6 +12,7 @@ import {
   ICodeExecutionRepository,
 } from '../../domain/interfaces/code-execution.repository';
 import { CodeSubmitPayload } from '../dto/code-execution.dto';
+import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
 
 type ExecutionResult = {
   stdout: string;
@@ -26,21 +26,7 @@ type ExecutionResult = {
 
 const LANGUAGE_IDS: Record<string, number> = { javascript: 63, js: 63, python: 71, py: 71, java: 62, cpp: 54, c: 50 };
 const isRapidApi = (url: string) => /rapidapi\.com/i.test(url);
-const resolveJudge0Mode = (url: string | undefined, key: string | undefined): 'remote' | 'local' => {
-  if (!url) return 'local';
-  if (url.includes('api.judge0.com')) return 'local';
-  if (isRapidApi(url) && !key) return 'local';
-  return 'remote';
-};
-
-const stringifyArg = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
+const isJudge0Configured = (url: string | undefined, key: string | undefined) => Boolean(url && key);
 
 const callJudge0 = async (
   url: string,
@@ -82,58 +68,12 @@ const callJudge0 = async (
   };
 };
 
-const runLocalSandbox = async (language: string, sourceCode: string, stdin: string): Promise<ExecutionResult> => {
-  if (process.env.NODE_ENV === 'production') {
-    return {
-      stdout: '',
-      stderr: 'Code execution sandbox is disabled in production. Configure JUDGE0_API_URL + JUDGE0_API_KEY to enable real grading.',
-      compileOutput: '',
-      status: { id: 11, description: 'Sandbox Disabled' },
-      time: '0.000',
-      memory: 0,
-    };
-  }
-  const lang = language.toLowerCase();
-  const start = process.hrtime.bigint();
-  if (lang === 'javascript' || lang === 'js') {
-    const stdoutChunks: string[] = [];
-    const stderrChunks: string[] = [];
-    const consoleProxy = {
-      log: (...a: unknown[]) => stdoutChunks.push(a.map(stringifyArg).join(' ')),
-      info: (...a: unknown[]) => stdoutChunks.push(a.map(stringifyArg).join(' ')),
-      warn: (...a: unknown[]) => stderrChunks.push(a.map(stringifyArg).join(' ')),
-      error: (...a: unknown[]) => stderrChunks.push(a.map(stringifyArg).join(' ')),
-    };
-    const inputLines = stdin.split(/\r?\n/);
-    let lineIdx = 0;
-    const sandbox: Record<string, unknown> = {
-      console: consoleProxy,
-      readLine: () => (lineIdx < inputLines.length ? inputLines[lineIdx++] : ''),
-      readInt: () => parseInt(lineIdx < inputLines.length ? inputLines[lineIdx++] : '0', 10),
-      input: stdin,
-    };
-    try {
-      const ctx = vm.createContext(sandbox);
-      const script = new vm.Script(sourceCode, { filename: 'student-submission.js' });
-      await Promise.race([
-        Promise.resolve().then(() => script.runInContext(ctx, { timeout: 3000 })),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('time_limit_exceeded')), 5000)),
-      ]);
-      const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000;
-      return { stdout: stdoutChunks.join('\n'), stderr: stderrChunks.join('\n'), compileOutput: '', status: { id: 3, description: 'Accepted' }, time: (elapsedMs / 1000).toFixed(3), memory: process.memoryUsage().heapUsed >> 10 };
-    } catch (err) {
-      const msg = (err as Error).message;
-      return { stdout: stdoutChunks.join('\n'), stderr: msg, compileOutput: '', status: msg === 'time_limit_exceeded' ? { id: 5, description: 'Time Limit Exceeded' } : { id: 7, description: 'Runtime Error' }, time: '0.000', memory: 0 };
-    }
-  }
-  return { stdout: '', stderr: `Local sandbox does not run "${language}". Configure JUDGE0_API_KEY to run real code.`, compileOutput: '', status: { id: 11, description: 'Sandbox Unavailable' }, time: '0.000', memory: 0 };
-};
-
 @Injectable()
 export class CodeExecutionService {
   constructor(
     @Inject(CODE_EXECUTION_REPOSITORY) private readonly executions: ICodeExecutionRepository,
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
+    private readonly quotas: DailyQuotaService,
   ) {}
 
   static resolveLanguageId(language?: string, languageId?: number) {
@@ -150,18 +90,6 @@ export class CodeExecutionService {
     if (sourceCode.length > 50000) throw new BadRequestError('sourceCode exceeds the 50000 character limit.');
     if (stdin.length > 10000) throw new BadRequestError('stdin exceeds the 10000 character limit.');
 
-    if (!payload.exerciseId) {
-      const since = new Date();
-      since.setHours(0, 0, 0, 0);
-      const usedToday = await this.executions.countFreeRunsToday(userId, since);
-      if (usedToday >= 20) {
-        throw new TooManyRequestsError(
-          'You have used your 20 daily code executions.',
-          'CODE_RUN_LIMIT',
-        );
-      }
-    }
-
     const languageId = CodeExecutionService.resolveLanguageId(payload.language, payload.languageId);
     const language = payload.language ?? String(languageId);
     let courseId = payload.courseId;
@@ -170,23 +98,54 @@ export class CodeExecutionService {
       courseId = courseId ?? lesson.courseId.toString();
     }
 
-    let result: ExecutionResult;
-    if (resolveJudge0Mode(env.JUDGE0_API_URL, env.JUDGE0_API_KEY) === 'remote') {
-      try {
-        result = await callJudge0(env.JUDGE0_API_URL, env.JUDGE0_API_KEY, { source_code: sourceCode, language_id: languageId, stdin });
-      } catch (err) {
-        logger.error('Judge0 remote call failed, falling back to local sandbox.', err);
-        result = await runLocalSandbox(language, sourceCode, stdin);
-      }
-    } else {
-      result = await runLocalSandbox(language, sourceCode, stdin);
+    let reservation: DailyQuotaReservation | null = null;
+    if (!payload.exerciseId && userRole !== 'ADMIN') {
+      reservation = await this.quotas.reserve(userId, 'code-execution', 20);
+      if (!reservation) throw new TooManyRequestsError('You have used your 20 daily code executions.', 'CODE_RUN_LIMIT');
     }
-    return this.persistExecution(userId, payload, language, languageId, courseId, result);
+
+    let result: ExecutionResult;
+    try {
+      if (!isJudge0Configured(env.JUDGE0_API_URL, env.JUDGE0_API_KEY)) {
+        throw new ServiceUnavailableError('Code execution is temporarily unavailable. Configure Judge0 before running code.', 'JUDGE0_NOT_CONFIGURED');
+      }
+      result = await callJudge0(env.JUDGE0_API_URL, env.JUDGE0_API_KEY, {
+        source_code: sourceCode,
+        language_id: languageId,
+        stdin,
+      });
+    } catch (error) {
+      // A failed infrastructure call is not a completed execution, so return
+      // the atomically reserved slot. Judge0 status failures are persisted.
+      if (reservation) await this.quotas.release(reservation);
+      if (error instanceof ServiceUnavailableError) throw error;
+      logger.error('Judge0 remote call failed.', error);
+      throw new ServiceUnavailableError('Code execution service is temporarily unavailable.', 'JUDGE0_UNAVAILABLE');
+    }
+
+    try {
+      return await this.persistExecution(userId, payload, language, languageId, courseId, result);
+    } catch (error) {
+      if (reservation) await this.quotas.release(reservation);
+      throw error;
+    }
   }
 
-  async listHistory(userId: string, lessonId?: string) {
-    const executions = await this.executions.listHistory(userId, lessonId);
-    return executions.map((execution) => this.presentExecution(execution));
+  async listHistory(userId: string, lessonId?: string, page = 1, limit = 20) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const result = await this.executions.listHistory(userId, { lessonId, page: safePage, limit: safeLimit });
+    const totalPages = Math.max(1, Math.ceil(result.total / safeLimit));
+    return {
+      items: result.items.map((execution) => this.presentExecution(execution)),
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total: result.total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
+    };
   }
 
   async getById(userId: string, id: string) {

@@ -16,6 +16,14 @@ export class MongoAIHistoryRepository implements IAIHistoryRepository {
     return AIHistory.find({ userId }).sort({ createdAt: -1 });
   }
 
+  async listByUserPage(userId: string, page: number, limit: number) {
+    const [items, total] = await Promise.all([
+      AIHistory.find({ userId }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      AIHistory.countDocuments({ userId }),
+    ]);
+    return { items, total };
+  }
+
   async findByUserAndId(userId: string, id: string): Promise<unknown | null> {
     return AIHistory.findOne({ _id: id, userId });
   }

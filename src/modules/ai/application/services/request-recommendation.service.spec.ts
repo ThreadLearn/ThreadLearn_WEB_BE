@@ -17,6 +17,7 @@ describe('RequestRecommendationService', () => {
   const buildRepo = (user: AIUserProfile | null, usedToday = 0): jest.Mocked<IAIHistoryRepository> => ({
     create: jest.fn(async (entity) => entity),
     listByUser: jest.fn(),
+    listByUserPage: jest.fn(),
     findByUserAndId: jest.fn(),
     updateFeedback: jest.fn(),
     countToday: jest.fn().mockResolvedValue(usedToday),
@@ -28,6 +29,19 @@ describe('RequestRecommendationService', () => {
   const buildHttp = (response: unknown) => ({
     post: jest.fn().mockReturnValue(of({ data: response } as AxiosResponse)),
   });
+
+  const buildService = (repo: jest.Mocked<IAIHistoryRepository>, http: unknown, usedToday = 0) =>
+    new RequestRecommendationService(
+      repo,
+      http as any,
+      {
+        reserve: jest.fn(async (_userId: string, _scope: string, limit: number) =>
+          usedToday >= limit ? null : { userId: 'user-1', scope: 'ai-recommendation', day: '2026-07-28', count: usedToday + 1 }),
+        release: jest.fn(),
+        status: jest.fn(async (_userId: string, _scope: string, limit: number) => ({ limit, used: usedToday + 1, remaining: Math.max(0, limit - usedToday - 1) })),
+      } as any,
+      { key: jest.fn().mockReturnValue('cache-key'), get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
+    );
 
   const payload: AIRecommendationPayload = {
     inputCode: 'for(var i=0;i<3;i++){setTimeout(()=>console.log(i));}',
@@ -51,7 +65,7 @@ describe('RequestRecommendationService', () => {
       docs_used: [{ id: 'doc-1', title: 'Closure Loop Variable', category: 'patterns', bm25_score: 12.5 }],
       cached: false,
     });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http);
 
     const result: any = await service.execute('user-1', payload);
 
@@ -86,7 +100,7 @@ describe('RequestRecommendationService', () => {
   it('produces an empty analysis summary when the AI service finds no issues', async () => {
     const repo = buildRepo(buildUser());
     const http = buildHttp({ user_id: 'user-1', language: 'javascript', issues: [], docs_used: [], cached: false });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http);
 
     const result: any = await service.execute('user-1', payload);
 
@@ -97,7 +111,7 @@ describe('RequestRecommendationService', () => {
   it('rejects when inputCode is missing', async () => {
     const repo = buildRepo(buildUser());
     const http = buildHttp({ issues: [] });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http);
 
     await expect(service.execute('user-1', { language: 'javascript' } as AIRecommendationPayload)).rejects.toThrow(
       'inputCode is required.',
@@ -108,7 +122,7 @@ describe('RequestRecommendationService', () => {
   it('rejects when the user profile does not exist', async () => {
     const repo = buildRepo(null);
     const http = buildHttp({ issues: [] });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http);
 
     await expect(service.execute('missing-user', payload)).rejects.toThrow('User profile not found.');
     expect(http.post).not.toHaveBeenCalled();
@@ -117,7 +131,7 @@ describe('RequestRecommendationService', () => {
   it('blocks the request once the free daily limit is reached', async () => {
     const repo = buildRepo(buildUser({ planType: 'FREE' }), 10);
     const http = buildHttp({ issues: [] });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http, 10);
 
     await expect(service.execute('user-1', payload)).rejects.toMatchObject({
       statusCode: 429,
@@ -129,7 +143,7 @@ describe('RequestRecommendationService', () => {
   it('allows premium users past the free daily limit', async () => {
     const repo = buildRepo(buildUser({ planType: 'PREMIUM' }), 10);
     const http = buildHttp({ issues: [] });
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http, 10);
 
     await expect(service.execute('user-1', payload)).resolves.toBeDefined();
     expect(http.post).toHaveBeenCalled();
@@ -138,7 +152,7 @@ describe('RequestRecommendationService', () => {
   it('propagates errors from the AI service call', async () => {
     const repo = buildRepo(buildUser());
     const http = { post: jest.fn().mockReturnValue(throwError(() => new Error('ECONNREFUSED'))) };
-    const service = new RequestRecommendationService(repo, http as any);
+    const service = buildService(repo, http);
 
     await expect(service.execute('user-1', payload)).rejects.toThrow('ECONNREFUSED');
     expect(repo.create).not.toHaveBeenCalled();

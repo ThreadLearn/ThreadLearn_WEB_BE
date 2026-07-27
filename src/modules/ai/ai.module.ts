@@ -6,6 +6,8 @@ import { GetHistoryLogsService } from './application/services/get-history-logs.s
 import { RequestRecommendationService } from './application/services/request-recommendation.service';
 import { StreamRecommendationService } from './application/services/stream-recommendation.service';
 import { UpdateFeedbackService } from './application/services/update-feedback.service';
+import { AIAnalysisCacheService } from './application/services/ai-analysis-cache.service';
+import { DailyQuotaService } from '../../shared/infrastructure/quota/daily-quota.service';
 import { AI_HISTORY_REPOSITORY } from './domain/interfaces/ai-history.repository';
 import { MongoAIHistoryRepository } from './infrastructure/persistence/mongo-ai-history.repository';
 import { AIController } from './presentation/controller/ai.controller';
@@ -22,6 +24,8 @@ import { AIController } from './presentation/controller/ai.controller';
     GetHistoryByIdService,
     UpdateFeedbackService,
     AIRetentionService,
+    AIAnalysisCacheService,
+    DailyQuotaService,
   ],
   exports: [AI_HISTORY_REPOSITORY],
 })

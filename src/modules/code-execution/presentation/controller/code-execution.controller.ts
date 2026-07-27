@@ -22,8 +22,13 @@ export class CodeExecutionController {
   }
 
   @Get('history')
-  async history(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const result = await this.codeExecution.listHistory(user.id, lessonId);
+  async history(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('lessonId') lessonId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const result = await this.codeExecution.listHistory(user.id, lessonId, Number(page) || 1, Number(limit) || 20);
     return ApiResponse.success({ message: 'Code execution history fetched.', data: result });
   }
 
