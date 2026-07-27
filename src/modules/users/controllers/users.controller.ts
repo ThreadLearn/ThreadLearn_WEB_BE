@@ -64,7 +64,7 @@ export class UsersController {
   async updateMyProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(updateProfileSchema))
-    body: { firstName?: string; lastName?: string; avatarUrl?: string }
+    body: { firstName?: string; lastName?: string }
   ) {
     if (!user) {
       throw new BadRequestError('User context not found.');
@@ -74,7 +74,6 @@ export class UsersController {
       userId: user.id,
       firstName: body.firstName,
       lastName: body.lastName,
-      avatarUrl: body.avatarUrl,
     });
     return ApiResponse.success({
       message: 'Profile updated successfully.',
