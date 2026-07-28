@@ -1,29 +1,36 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { ILeaderboardCachePort, LEADERBOARD_CACHE_PORT } from '../../domain/interfaces/leaderboard-cache.port';
 
 /**
  * Event handler: lắng nghe các event thay đổi XP để invalidate cache leaderboard.
- * Sử dụng @nestjs/event-emitter (EventEmitter2 singleton toàn app).
  */
 @Injectable()
-export class LeaderboardCacheEventHandler {
+export class LeaderboardCacheEventHandler implements OnModuleInit {
   constructor(
     @Inject(LEADERBOARD_CACHE_PORT)
     private readonly cachePort: ILeaderboardCachePort,
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
   ) {}
 
-  @OnEvent('quiz.passed')
+  onModuleInit(): void {
+    this.eventBus.subscribe('quiz.passed', this.onQuizPassed.bind(this));
+    this.eventBus.subscribe('lesson.completed', this.onLessonCompleted.bind(this));
+    this.eventBus.subscribe('course.completed', this.onCourseCompleted.bind(this));
+  }
+
   async onQuizPassed() {
     await this.cachePort.invalidate();
   }
 
-  @OnEvent('lesson.completed')
   async onLessonCompleted() {
     await this.cachePort.invalidate();
   }
 
-  @OnEvent('course.completed')
   async onCourseCompleted() {
     await this.cachePort.invalidate();
   }

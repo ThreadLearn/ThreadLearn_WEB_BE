@@ -51,6 +51,7 @@ import {
 
 // --- Application: side-effect handler (DEV1.4B — UserStats parity) ---
 import { UserRegisteredHandler } from './application/events';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * AuthModule.
@@ -66,6 +67,7 @@ import { UserRegisteredHandler } from './application/events';
  *   sau khi smoke HTTP đầy đủ (hiện app chưa boot do nợ kernel `LEARNING_ACCESS_DATA`).
  */
 @Module({
+  imports: [NotificationsModule],
   controllers: [AuthController],
   providers: [
     // Legacy (đang chạy thật — KHÔNG đổi)

@@ -36,6 +36,10 @@ export interface AdminDashboardSummary {
   averageQuizScore: number;
   quizPassRate: number;
   activeUsersThisMonth: number;
+  totalRevenue: number;
+  successfulPayments: number;
+  lockedUsers: number;
+  unreadNotifications: number;
 }
 
 export interface AdminDashboardCharts {
@@ -44,7 +48,19 @@ export interface AdminDashboardCharts {
   quizAttemptsByMonth: AdminMonthlyCount[];
   coursesCreatedByMonth: AdminMonthlyCount[];
   lessonsCreatedByMonth: AdminMonthlyCount[];
+  userGrowth: AdminChartCount[];
+  revenueTrend: AdminRevenueTrend[];
+  topPurchasedCourses: AdminPurchasedCourse[];
+  paymentStatusDistribution: AdminStatusCount[];
+  userStatusDistribution: AdminStatusCount[];
+  notificationsByType: AdminTypeCount[];
 }
+
+export interface AdminChartCount { label: string; count: number; }
+export interface AdminRevenueTrend { label: string; revenue: number; }
+export interface AdminPurchasedCourse { courseId: string; title: string; purchases: number; revenue: number; }
+export interface AdminStatusCount { status: string; count: number; }
+export interface AdminTypeCount { type: string; count: number; }
 
 export interface AdminDashboardStatisticsResult {
   summary: AdminDashboardSummary;

@@ -7,24 +7,29 @@ import {
   IPaymentGateway,
   PaymentRequestInput,
   PaymentRequestResult,
+  PaymentReconciliationResult,
   PaymentWebhookResult,
 } from '../../domain/interfaces/payment-gateway.port';
 import { IPlanRepository } from '../../domain/interfaces/plan.repository';
 import { IPurchaseRepository } from '../../domain/interfaces/purchase.repository';
 import { ISubscriptionRepository } from '../../domain/interfaces/subscription.repository';
+import { IUserPlanAccessRepository } from '../../domain/interfaces/user-plan-access.repository';
 import { PaymentSucceededHandler } from '../event-handlers/payment-succeeded.handler';
 import { CreatePlanService } from './create-plan.service';
 import { DeletePlanService } from './delete-plan.service';
 import { GetMySubscriptionService } from './get-my-subscription.service';
+import { GetMyPurchaseService } from './get-my-purchase.service';
 import { ListPlansService } from './list-plans.service';
 import { ProcessPaymentWebhookService } from './process-payment-webhook.service';
 import { PurchasePlanService } from './purchase-plan.service';
+import { ReconcilePaymentService } from './reconcile-payment.service';
 import { UpdatePlanService } from './update-plan.service';
 
 describe('Subscription UC51-52 service flow', () => {
   let planRepository: InMemoryPlanRepository;
   let purchaseRepository: InMemoryPurchaseRepository;
   let subscriptionRepository: InMemorySubscriptionRepository;
+  let userPlanAccessRepository: InMemoryUserPlanAccessRepository;
   let paymentGateway: FakePaymentGateway;
   let eventEmitter: CapturingEventEmitter;
   let createPlan: CreatePlanService;
@@ -33,18 +38,23 @@ describe('Subscription UC51-52 service flow', () => {
   let deletePlan: DeletePlanService;
   let purchasePlan: PurchasePlanService;
   let processWebhook: ProcessPaymentWebhookService;
+  let reconcilePayment: ReconcilePaymentService;
   let getMySubscription: GetMySubscriptionService;
+  let getMyPurchase: GetMyPurchaseService;
 
   beforeEach(() => {
     planRepository = new InMemoryPlanRepository();
     purchaseRepository = new InMemoryPurchaseRepository();
     subscriptionRepository = new InMemorySubscriptionRepository();
+    userPlanAccessRepository = new InMemoryUserPlanAccessRepository();
     paymentGateway = new FakePaymentGateway();
     eventEmitter = new CapturingEventEmitter();
 
     const paymentSucceededHandler = new PaymentSucceededHandler(
       planRepository,
       subscriptionRepository,
+      userPlanAccessRepository,
+      { subscribe: jest.fn() },
     );
     eventEmitter.handlePaymentSucceeded = (payload) => paymentSucceededHandler.handle(payload);
 
@@ -58,7 +68,13 @@ describe('Subscription UC51-52 service flow', () => {
       paymentGateway,
       eventEmitter as unknown as EventEmitter2,
     );
+    reconcilePayment = new ReconcilePaymentService(
+      purchaseRepository,
+      paymentGateway,
+      eventEmitter as unknown as EventEmitter2,
+    );
     getMySubscription = new GetMySubscriptionService(subscriptionRepository);
+    getMyPurchase = new GetMyPurchaseService(purchaseRepository);
   });
 
   it('covers admin plan CRUD including inactive filtering', async () => {
@@ -68,7 +84,7 @@ describe('Subscription UC51-52 service flow', () => {
       price: 99000,
       currency: 'vnd',
       durationDays: 30,
-      features: ['AI hints', 'Premium lessons'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     await expect(createPlan.execute({
@@ -83,14 +99,14 @@ describe('Subscription UC51-52 service flow', () => {
     const updated = await updatePlan.execute(monthly.id, {
       name: 'Premium Monthly Plus',
       price: 129000,
-      features: ['AI hints', 'Premium lessons', 'Certificates'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     expect(updated.toProps()).toMatchObject({
       name: 'Premium Monthly Plus',
       price: 129000,
       currency: 'VND',
-      features: ['AI hints', 'Premium lessons', 'Certificates'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
       isActive: true,
     });
 
@@ -108,7 +124,7 @@ describe('Subscription UC51-52 service flow', () => {
       price: 999000,
       currency: 'VND',
       durationDays: 365,
-      features: ['Everything'],
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
     });
 
     const purchase = await purchasePlan.execute('student-1', plan.id);
@@ -122,6 +138,11 @@ describe('Subscription UC51-52 service flow', () => {
       transactionId: purchase.id,
       paymentUrl: `/mock-payment/vnpay?purchaseId=${purchase.id}`,
     });
+    await expect(getMyPurchase.execute('another-student', purchase.id)).rejects.toMatchObject({
+      code: ErrorCode.SUBSCRIPTION_PURCHASE_NOT_FOUND,
+      statusCode: 404,
+    });
+    expect((await getMyPurchase.execute('student-1', purchase.id)).toProps().status).toBe('pending');
 
     const processed = await processWebhook.execute({
       purchaseId: purchase.id,
@@ -131,7 +152,7 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(processed.status).toBe('succeeded');
+    expect(processed?.status).toBe('succeeded');
     expect(eventEmitter.events).toEqual([
       {
         event: 'payment.succeeded',
@@ -150,6 +171,36 @@ describe('Subscription UC51-52 service flow', () => {
       status: 'active',
     });
     expect(subscription?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(userPlanAccessRepository.grants).toHaveLength(1);
+    expect(userPlanAccessRepository.grants[0]).toMatchObject({
+      userId: 'student-1',
+      features: ['AI_ADVANCED_ANALYSIS', 'PREMIUM_COURSES'],
+    });
+    expect(userPlanAccessRepository.grants[0].expiresAt.getTime()).toBe(
+      subscription?.expiresAt.getTime(),
+    );
+
+    const upgradedPlan = await createPlan.execute({
+      name: 'Premium Plus',
+      price: 1299000,
+      currency: 'VND',
+      durationDays: 30,
+      features: ['PREMIUM_COURSES'],
+    });
+    const upgradedPurchase = await purchasePlan.execute('student-1', upgradedPlan.id);
+    await processWebhook.execute({
+      purchaseId: upgradedPurchase.id,
+      transactionId: upgradedPurchase.id,
+      status: 'success',
+      amount: '1299000',
+    });
+    await eventEmitter.waitForLastEvent();
+
+    const upgradedSubscription = await getMySubscription.execute('student-1');
+    expect(upgradedSubscription?.toProps().planId).toBe(upgradedPlan.id);
+    expect(upgradedSubscription?.expiresAt.getTime()).toBeGreaterThan(subscription!.expiresAt.getTime());
+    expect(userPlanAccessRepository.grants).toHaveLength(2);
+    expect(userPlanAccessRepository.grants[1].features).toEqual(['PREMIUM_COURSES']);
 
     const secondWebhookResult = await processWebhook.execute({
       purchaseId: purchase.id,
@@ -159,8 +210,8 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(secondWebhookResult.status).toBe('succeeded');
-    expect(eventEmitter.events).toHaveLength(1);
+    expect(secondWebhookResult?.status).toBe('succeeded');
+    expect(eventEmitter.events).toHaveLength(2);
   });
 
   it('rejects unverified webhooks without changing purchase or subscription state', async () => {
@@ -168,6 +219,7 @@ describe('Subscription UC51-52 service flow', () => {
       name: 'Premium Weekly',
       price: 49000,
       durationDays: 7,
+      features: ['PREMIUM_COURSES'],
     });
     const purchase = await purchasePlan.execute('student-2', plan.id);
 
@@ -192,6 +244,7 @@ describe('Subscription UC51-52 service flow', () => {
       name: 'Premium Quarter',
       price: 299000,
       durationDays: 90,
+      features: ['AI_ADVANCED_ANALYSIS'],
     });
     const purchase = await purchasePlan.execute('student-3', plan.id);
 
@@ -203,9 +256,31 @@ describe('Subscription UC51-52 service flow', () => {
     });
     await eventEmitter.waitForLastEvent();
 
-    expect(processed.status).toBe('failed');
+    expect(processed?.status).toBe('failed');
     expect(await getMySubscription.execute('student-3')).toBeNull();
     expect(eventEmitter.events).toHaveLength(0);
+  });
+
+  it('reconciles a returned PayOS payment and activates the subscription', async () => {
+    const plan = await createPlan.execute({
+      name: 'Premium PayOS',
+      price: 99000,
+      durationDays: 30,
+      features: ['PREMIUM_COURSES'],
+    });
+    const purchase = await purchasePlan.execute('student-payos', plan.id);
+    paymentGateway.reconciliationResult = {
+      amount: 99000,
+      succeeded: true,
+      terminal: true,
+    };
+
+    const reconciled = await reconcilePayment.execute('student-payos', purchase.id);
+    await eventEmitter.waitForLastEvent();
+
+    expect(reconciled.status).toBe('succeeded');
+    expect((await getMySubscription.execute('student-payos'))?.toProps().status).toBe('active');
+    expect(userPlanAccessRepository.grants[0]?.features).toEqual(['PREMIUM_COURSES']);
   });
 });
 
@@ -336,7 +411,19 @@ class InMemorySubscriptionRepository implements ISubscriptionRepository {
   }
 }
 
+class InMemoryUserPlanAccessRepository implements IUserPlanAccessRepository {
+  grants: Array<{ userId: string; expiresAt: Date; features: string[] }> = [];
+
+  async grantPlanAccess(userId: string, expiresAt: Date, features: string[]): Promise<void> {
+    this.grants.push({ userId, expiresAt: new Date(expiresAt), features: [...features] });
+  }
+}
+
 class FakePaymentGateway implements IPaymentGateway {
+  reconciliationResult: PaymentReconciliationResult = {
+    succeeded: false,
+    terminal: false,
+  };
   async createPayment(input: PaymentRequestInput): Promise<PaymentRequestResult> {
     return {
       transactionId: input.purchaseId,
@@ -359,6 +446,10 @@ class FakePaymentGateway implements IPaymentGateway {
       succeeded: verified && (status === 'success' || responseCode === '00'),
       verified,
     };
+  }
+
+  async reconcilePayment(): Promise<PaymentReconciliationResult> {
+    return this.reconciliationResult;
   }
 }
 

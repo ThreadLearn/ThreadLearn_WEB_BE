@@ -5,7 +5,13 @@ import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { CodeSubmitPayload, runCodeSchema } from '../../application/dto/code-execution.dto';
+import {
+  CodeExecutionHistoryQuery,
+  RunCodePayload,
+  codeExecutionHistoryQuerySchema,
+  codeExecutionIdParamSchema,
+  runCodeSchema,
+} from '../../application/dto/code-execution.dto';
 import { CodeExecutionService } from '../../application/services/code-execution.service';
 
 @ApiTags('Code Execution')
@@ -16,19 +22,31 @@ export class CodeExecutionController {
   constructor(private readonly codeExecution: CodeExecutionService) {}
 
   @Post('run')
-  async run(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(runCodeSchema)) body: CodeSubmitPayload) {
+  async run(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(runCodeSchema)) body: RunCodePayload) {
     const result = await this.codeExecution.executeCode(user.id, body, user.role);
     return ApiResponse.success({ message: 'Code executed successfully.', data: result });
   }
 
   @Get('history')
-  async history(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const result = await this.codeExecution.listHistory(user.id, lessonId);
+  async history(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(codeExecutionHistoryQuerySchema))
+    query: CodeExecutionHistoryQuery,
+  ) {
+    const result = await this.codeExecution.listHistory(
+      user.id,
+      query.lessonId,
+      query.page,
+      query.limit,
+    );
     return ApiResponse.success({ message: 'Code execution history fetched.', data: result });
   }
 
   @Get(':id')
-  async detail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async detail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(codeExecutionIdParamSchema)) id: string,
+  ) {
     const result = await this.codeExecution.getById(user.id, id);
     return ApiResponse.success({ message: 'Code execution fetched.', data: result });
   }

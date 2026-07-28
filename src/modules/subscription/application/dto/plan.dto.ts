@@ -1,4 +1,5 @@
 import { z } from '../../../../common/zod/z';
+import { isSubscriptionFeatureKey } from '../../../../shared/domain/subscription-features';
 
 export const planIdParamSchema = z
   .string()
@@ -10,7 +11,7 @@ export const createPlanSchema = z.object({
   price: z.number().min(0, 'price cannot be negative.'),
   currency: z.string().min(1).max(10).optional(),
   durationDays: z.number().int().min(1, 'durationDays must be positive.'),
-  features: z.array(z.string().min(1)).optional(),
+  features: z.array(z.string().refine(isSubscriptionFeatureKey, 'Unknown subscription feature.')).min(1).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -29,6 +30,8 @@ export const listPlansQuerySchema = z.object({
 export const purchasePlanSchema = z.object({
   planId: planIdParamSchema,
 });
+
+export const purchaseIdParamSchema = planIdParamSchema;
 
 export const paymentWebhookSchema = z.record(z.unknown());
 

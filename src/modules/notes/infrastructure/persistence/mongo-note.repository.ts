@@ -8,17 +8,35 @@ import { NoteMapper } from '../mapper/note.mapper';
 
 @Injectable()
 export class MongoNoteRepository implements INoteRepository {
-  async findLatestByLesson(userId: string, lessonId: string): Promise<unknown | null> {
-    return Note.findOne({ userId, lessonId }).sort({ updatedAt: -1 });
+  async listByLesson(userId: string, lessonId: string): Promise<unknown[]> {
+    const notes = await Note.find({ userId, lessonId }).sort({ updatedAt: -1 }).lean();
+    return notes.map((note) => NoteMapper.formatView(note));
   }
 
-  async upsert(note: NoteEntity): Promise<unknown> {
-    const props = note.toProps();
-    return Note.findOneAndUpdate(
-      { userId: props.userId, lessonId: props.lessonId },
-      { $set: { noteText: props.noteText, codeSnippet: props.codeSnippet } },
-      { new: true, upsert: true, setDefaultsOnInsert: true, sort: { updatedAt: -1 } },
-    );
+  async listByUser(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const [notes, total] = await Promise.all([
+      Note.find({ userId })
+        .populate('lessonId', 'title courseId')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Note.countDocuments({ userId }),
+    ]);
+
+    return {
+      data: notes.map((note) => NoteMapper.formatView(note)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async create(note: NoteEntity): Promise<unknown> {
+    const saved = await Note.create(NoteMapper.toPersistence(note));
+    return NoteMapper.formatView(saved);
   }
 
   async findOwned(userId: string, noteId: string): Promise<NoteEntity | null> {
@@ -28,14 +46,30 @@ export class MongoNoteRepository implements INoteRepository {
   }
 
   async update(note: NoteEntity): Promise<unknown> {
-    const doc = await Note.findByIdAndUpdate(note.id, NoteMapper.toPersistence(note), { new: true });
+    const persistence = NoteMapper.toPersistence(note);
+    const props = note.toProps();
+    const $unset: Record<string, 1> = {};
+    if (props.anchorStart === undefined) $unset.anchorStart = 1;
+    if (props.anchorEnd === undefined) $unset.anchorEnd = 1;
+    const doc = await Note.findByIdAndUpdate(note.id, {
+      $set: persistence,
+      ...(Object.keys($unset).length ? { $unset } : {}),
+    }, {
+      new: true,
+      runValidators: true,
+    });
     if (!doc) throw new NotFoundError('Note not found.');
-    return doc;
+    return NoteMapper.formatView(doc);
   }
 
   async search(userId: string, query: string): Promise<unknown[]> {
     if (!query?.trim()) return [];
-    return Note.find({ userId, $text: { $search: query.trim() } }).sort({ updatedAt: -1 }).limit(50);
+    const notes = await Note.find({ userId, $text: { $search: query.trim() } })
+      .populate('lessonId', 'title courseId')
+      .sort({ updatedAt: -1 })
+      .limit(50)
+      .lean();
+    return notes.map((note) => NoteMapper.formatView(note));
   }
 
   async remove(userId: string, noteId: string): Promise<boolean> {

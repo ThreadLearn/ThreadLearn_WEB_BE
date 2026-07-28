@@ -4,7 +4,8 @@ import { ProfileSafeUser } from '../dto/profile-use-case.dto';
 /**
  * Presenter `UserEntity → ProfileSafeUser`. Mirror ĐÚNG `sanitizeUser`
  * (auth/utils/user-sanitizer): chỉ whitelist field an toàn, KHÔNG lộ
- * passwordHash/googleId/githubId/planType/lockedAt. Pure mapping — KHÔNG I/O,
+ * passwordHash/googleId/githubId/lockedAt. Entitlement is included because the
+ * authenticated client needs it to render and enforce the current paid plan.
  * KHÔNG import Mongoose/model/schema/infrastructure/`src/utils`.
  *
  * `firstName`/`lastName` fallback `''` (mirror style auth `GetSessionService.toSafeUser`):
@@ -22,6 +23,9 @@ export class ProfileUserPresenter {
       role: p.role,
       isVerified: p.isVerified,
       isActive: p.isActive,
+      planType: p.planType ?? 'FREE',
+      subscriptionExpiresAt: p.subscriptionExpiresAt,
+      subscriptionFeatures: p.subscriptionFeatures ?? [],
       lastLoginAt: p.lastLoginAt,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,

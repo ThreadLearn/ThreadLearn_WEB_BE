@@ -10,8 +10,10 @@ import { STUDENT_PROGRESS_PORT } from './domain/interfaces/student-progress.port
 import { GamificationRewardsEventHandler } from './application/event-handlers/gamification-rewards.event-handler';
 import { GAMIFICATION_REALTIME_PORT } from './domain/interfaces/gamification-realtime.port';
 import { SocketGamificationRealtimeAdapter } from './infrastructure/adapters/socket-gamification-realtime.adapter';
+import { SharedEventsModule } from '../../shared/infrastructure/events/shared-events.module';
 
 @Module({
+  imports: [SharedEventsModule],
   controllers: [GamificationController],
   providers: [
     AwardXpService,

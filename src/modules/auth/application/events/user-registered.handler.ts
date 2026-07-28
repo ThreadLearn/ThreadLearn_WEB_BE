@@ -4,6 +4,7 @@ import {
   USER_STATS_PROVISIONER,
 } from '../../domain/interfaces/user-stats-provisioner.port';
 import { UserRegisteredEvent } from '../../domain/events/user-registered.event';
+import { NotificationsService } from '../../../notifications/services/notifications.service';
 
 /**
  * Side-effect handler khi có user mới (register email/password HOẶC Google user mới).
@@ -27,6 +28,7 @@ export class UserRegisteredHandler {
   constructor(
     @Inject(USER_STATS_PROVISIONER)
     private readonly userStatsProvisioner: IUserStatsProvisioner,
+    private readonly notificationsService?: NotificationsService,
   ) {}
 
   /** Xử lý từ domain event (dùng khi đã có event bus). */
@@ -37,5 +39,6 @@ export class UserRegisteredHandler {
   /** Gọi trực tiếp từ use-case (chưa có event bus). Idempotent qua provisioner. */
   async onUserRegistered(userId: string): Promise<void> {
     await this.userStatsProvisioner.ensureForUser(userId);
+    await this.notificationsService?.notifyAdminUserRegistered(userId);
   }
 }

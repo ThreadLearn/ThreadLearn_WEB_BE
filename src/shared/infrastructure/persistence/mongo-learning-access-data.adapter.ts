@@ -4,6 +4,7 @@ import { User } from '../../../modules/auth/models/user.model';
 import { Course } from '../../../modules/courses/models/course.model';
 import { Enrollment } from '../../../modules/enrollments/models/enrollment.model';
 import { Lesson } from '../../../modules/lessons/models/lesson.model';
+import { hasActiveSubscriptionFeature } from '../../domain/subscription-features';
 import {
   CourseAccessSnapshot,
   ILearningAccessData,
@@ -15,7 +16,7 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
   async findLesson(lessonId: string): Promise<LessonAccessSnapshot | null> {
     if (!mongoose.isValidObjectId(lessonId)) return null;
     const lesson = (await Lesson.findById(lessonId)
-      .select('_id courseId status isPreview isLocked title')
+      .select('_id courseId status isPreview isLocked title attachmentUrl contentMarkdown content')
       .lean()) as any;
     if (!lesson || lesson.status === 'deleted') return null;
     return {
@@ -25,17 +26,21 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
       isPreview: !!lesson.isPreview,
       isLocked: !!lesson.isLocked,
       title: String(lesson.title ?? ''),
+      thumbnailUrl: lesson.attachmentUrl ?? undefined,
+      contentLength: String(lesson.contentMarkdown ?? lesson.content ?? '').length,
     };
   }
 
   async findCourse(courseId: string): Promise<CourseAccessSnapshot | null> {
     if (!mongoose.isValidObjectId(courseId)) return null;
-    const course = (await Course.findById(courseId).select('_id status isPremium').lean()) as any;
+    const course = (await Course.findById(courseId).select('_id status isPremium title thumbnailUrl coverImage').lean()) as any;
     if (!course || course.status === 'deleted') return null;
     return {
       id: String(course._id),
       status: course.status,
       isPremium: !!course.isPremium,
+      title: String(course.title ?? ''),
+      thumbnailUrl: course.thumbnailUrl ?? course.coverImage ?? undefined,
     };
   }
 
@@ -47,11 +52,15 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
 
   async hasActivePremium(userId: string): Promise<boolean> {
     if (!mongoose.isValidObjectId(userId)) return false;
-    const user = (await User.findById(userId).select('planType subscriptionExpiresAt').lean()) as any;
-    return (
-      user?.planType === 'PREMIUM' &&
-      (!user.subscriptionExpiresAt || user.subscriptionExpiresAt.getTime() > Date.now())
-    );
+    const user = (await User.findById(userId)
+      .select('planType subscriptionExpiresAt subscriptionFeatures')
+      .lean()) as any;
+    return hasActiveSubscriptionFeature({
+      planType: user?.planType,
+      subscriptionExpiresAt: user?.subscriptionExpiresAt,
+      subscriptionFeatures: user?.subscriptionFeatures,
+      feature: 'PREMIUM_COURSES',
+    });
   }
 
   async touchCursor(userId: string, courseId: string, lessonId: string): Promise<void> {

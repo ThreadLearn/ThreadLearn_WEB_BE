@@ -8,6 +8,7 @@ import { MongoCodeExecutionRepository } from './infrastructure/persistence/mongo
 import { MongoExerciseRepository } from './infrastructure/persistence/mongo-exercise.repository';
 import { CodeExecutionController } from './presentation/controller/code-execution.controller';
 import { ExercisesController } from './presentation/controller/exercises.controller';
+import { DailyQuotaService } from '../../shared/infrastructure/quota/daily-quota.service';
 
 @Module({
   imports: [LearningAccessModule],
@@ -19,6 +20,7 @@ import { ExercisesController } from './presentation/controller/exercises.control
     { provide: EXERCISE_REPOSITORY, useExisting: MongoExerciseRepository },
     CodeExecutionService,
     ExercisesService,
+    DailyQuotaService,
   ],
   exports: [CodeExecutionService, ExercisesService],
 })

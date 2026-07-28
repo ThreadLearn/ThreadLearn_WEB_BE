@@ -35,11 +35,16 @@ export class EnrollInCourseService {
       throw new NotFoundError('Course not found.');
     }
     if (courseProps.status !== 'published') {
-      throw new ForbiddenError('COURSE_ACCESS_DENIED');
+      throw new ForbiddenError('This course is not available for enrollment.', 'COURSE_ACCESS_DENIED');
     }
     if (courseProps.isPremium) {
       const isPremium = await this.accessData.hasActivePremium(userId);
-      if (!isPremium) throw new ForbiddenError('COURSE_PREMIUM_REQUIRED');
+      if (!isPremium) {
+        throw new ForbiddenError(
+          'An active Premium plan is required to enroll in this course.',
+          'COURSE_PREMIUM_REQUIRED',
+        );
+      }
     }
 
     const existing = await this.enrollments.findByUserAndCourse(userId, courseId);
@@ -55,7 +60,10 @@ export class EnrollInCourseService {
       }
     }
     if (missingPrerequisites.length) {
-      throw new ForbiddenError(`COURSE_PREREQUISITE_REQUIRED:${missingPrerequisites.join(',')}`);
+      throw new ForbiddenError(
+        'Complete the required prerequisite before enrolling in this course.',
+        'COURSE_PREREQUISITE_REQUIRED',
+      );
     }
 
     const totalLessons = await this.lessons.countCourseLessons(courseId);

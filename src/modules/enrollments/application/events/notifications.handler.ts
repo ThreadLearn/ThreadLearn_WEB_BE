@@ -1,20 +1,35 @@
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
-import { CourseCompletedEvent, LessonCompletedEvent } from './enrollment-completion.events';
+import {
+  CourseCompletedEvent,
+  ENROLLMENT_COMPLETION_EVENTS,
+  LessonCompletedEvent,
+} from './enrollment-completion.events';
 
-export class NotificationsHandler {
-  static async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
-    if (event.alreadyCompleted) return;
-    if (event.courseCompleted) {
-      await NotificationsService.sendNotification({
-        userId: event.userId,
-        title: 'Course completed 🏆',
-        message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
-        type: 'COURSE_COMPLETED',
-        metadata: { courseId: event.courseId },
-        link: `/courses/${event.courseId}`,
-      });
-      return;
-    }
+@Injectable()
+export class NotificationsHandler implements OnModuleInit {
+  constructor(
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
+  ) {}
+
+  onModuleInit(): void {
+    this.eventBus.subscribe<LessonCompletedEvent>(
+      ENROLLMENT_COMPLETION_EVENTS.lessonCompleted,
+      this.onLessonCompleted.bind(this),
+    );
+    this.eventBus.subscribe<CourseCompletedEvent>(
+      ENROLLMENT_COMPLETION_EVENTS.courseCompleted,
+      this.onCourseCompleted.bind(this),
+    );
+  }
+
+  async onLessonCompleted(event: LessonCompletedEvent): Promise<void> {
+    if (event.alreadyCompleted || event.courseCompleted) return;
 
     await NotificationsService.sendNotification({
       userId: event.userId,
@@ -26,14 +41,15 @@ export class NotificationsHandler {
     });
   }
 
-  static async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
+  async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
     await NotificationsService.sendNotification({
       userId: event.userId,
-      title: 'Course completed 🏆',
-      message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
+      title: 'Course completed',
+      message:
+        'Excellent work! You completed the course. View your learning credential in Certificates.',
       type: 'COURSE_COMPLETED',
       metadata: { courseId: event.courseId },
-      link: `/courses/${event.courseId}`,
+      link: '/certificates',
     });
   }
 }

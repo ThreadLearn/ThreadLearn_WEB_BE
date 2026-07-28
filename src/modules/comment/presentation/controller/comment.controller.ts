@@ -18,10 +18,12 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import {
   CreateCommentDto,
+  CreateReplyDto,
   ListCommentsQueryDto,
   UpdateCommentDto,
   commentIdParamSchema,
   createCommentSchema,
+  createReplySchema,
   listCommentsQuerySchema,
   updateCommentSchema,
 } from '../../application/dto/comment.dto';
@@ -45,9 +47,21 @@ export class CommentController {
   ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'UC29 - list comments by target.' })
-  async listComments(@Query(new ZodValidationPipe(listCommentsQuerySchema)) query: ListCommentsQueryDto) {
-    const result = await this.listCommentsSvc.execute(query.targetType, query.targetId, query.page, query.limit);
+  async listComments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(listCommentsQuerySchema)) query: ListCommentsQueryDto,
+  ) {
+    const result = await this.listCommentsSvc.execute(
+      user.id,
+      user.role,
+      query.targetType,
+      query.targetId,
+      query.page,
+      query.limit,
+    );
     return ApiResponse.success({
       message: 'Comments fetched.',
       data: result.data,
@@ -56,9 +70,14 @@ export class CommentController {
   }
 
   @Get(':commentId/replies')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'UC30 - list replies of a comment.' })
-  async listReplies(@Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
-    const replies = await this.listRepliesSvc.execute(commentId);
+  async listReplies(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+  ) {
+    const replies = await this.listRepliesSvc.execute(user.id, user.role, commentId);
     return ApiResponse.success({ message: 'Replies fetched.', data: replies });
   }
 
@@ -82,7 +101,7 @@ export class CommentController {
   async reply(
     @CurrentUser() user: AuthenticatedUser,
     @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
-    @Body(new ZodValidationPipe(updateCommentSchema)) body: UpdateCommentDto,
+    @Body(new ZodValidationPipe(createReplySchema)) body: CreateReplyDto,
   ) {
     if (!user) throw new BadRequestError('User context required.');
     const parent = await this.getCommentSvc.execute(commentId);
@@ -91,6 +110,7 @@ export class CommentController {
       targetId: parent.targetId,
       content: body.content,
       parentId: commentId,
+      isAnonymous: body.isAnonymous ?? false,
     });
     return ApiResponse.success({ message: 'Reply created.', data, statusCode: 201 });
   }
@@ -132,8 +152,22 @@ export class LessonCommentsController {
   ) {}
 
   @Get(':id/comments')
-  async lessonComments(@Param('id') id: string, @Query('page') page = '1', @Query('limit') limit = '10') {
-    const result = await this.listCommentsSvc.execute('LESSON', id, Number(page), Number(limit));
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async lessonComments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(commentIdParamSchema)) id: string,
+    @Query(new ZodValidationPipe(listCommentsQuerySchema.omit({ targetType: true, targetId: true })))
+    query: Pick<ListCommentsQueryDto, 'page' | 'limit'>,
+  ) {
+    const result = await this.listCommentsSvc.execute(
+      user.id,
+      user.role,
+      'LESSON',
+      id,
+      query.page,
+      query.limit,
+    );
     return ApiResponse.success({
       message: 'Comments fetched.',
       data: result.data,
@@ -146,14 +180,16 @@ export class LessonCommentsController {
   @ApiBearerAuth('BearerAuth')
   async createLessonComment(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: { content: string; parentId?: string },
+    @Param('id', new ZodValidationPipe(commentIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(createCommentSchema.omit({ targetType: true, targetId: true })))
+    body: Omit<CreateCommentDto, 'targetType' | 'targetId'>,
   ) {
     const comment = await this.createCommentSvc.execute(user.id, user.role, {
       targetType: 'LESSON',
       targetId: id,
       content: body.content,
       parentId: body.parentId,
+      isAnonymous: body.isAnonymous,
     });
     return ApiResponse.success({ message: 'Comment created.', data: comment, statusCode: 201 });
   }

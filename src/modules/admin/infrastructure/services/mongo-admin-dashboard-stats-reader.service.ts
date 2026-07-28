@@ -6,11 +6,13 @@ import { Enrollment } from '../../../enrollments/models/enrollment.model';
 import { Lesson } from '../../../lessons/models/lesson.model';
 import { Notification } from '../../../notifications/models/notification.model';
 import { QuizAttempt } from '../../../quiz-attempts/models/quiz-attempt.model';
+import { PurchaseModel } from '../../../subscription/infrastructure/persistence/schemas/purchase.schema';
 import {
   AdminBasicStats,
   AdminDashboardStatisticsQuery,
   AdminDashboardStatisticsResult,
   AdminMonthlyCount,
+  AdminStatusCount,
   IAdminDashboardStatsReader,
 } from '../../domain/interfaces/admin-dashboard-stats-reader.port';
 
@@ -62,6 +64,14 @@ export class MongoAdminDashboardStatsReaderService implements IAdminDashboardSta
       quizAttemptsByMonth,
       coursesCreatedByMonth,
       lessonsCreatedByMonth,
+      paymentSummary,
+      successfulPayments,
+      lockedUsers,
+      activeVerifiedUsers,
+      unreadNotifications,
+      revenueByMonth,
+      paymentStatusDistribution,
+      notificationsByType,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ role: 'STUDENT' }),
@@ -84,6 +94,14 @@ export class MongoAdminDashboardStatsReaderService implements IAdminDashboardSta
       this.aggregateMonthlyCounts(QuizAttempt, 'createdAt', range.start, range.end),
       this.aggregateMonthlyCounts(Course, 'createdAt', range.start, range.end),
       this.aggregateMonthlyCounts(Lesson, 'createdAt', range.start, range.end),
+      this.getPaymentSummary(),
+      PurchaseModel.countDocuments({ status: 'succeeded' }),
+      User.countDocuments({ isActive: false }),
+      User.countDocuments({ isActive: true, isVerified: true }),
+      Notification.countDocuments({ isRead: false }),
+      this.aggregateMonthlyRevenue(range.start, range.end),
+      this.aggregateStatusCounts(PurchaseModel),
+      this.aggregateNotificationTypes(),
     ]);
 
     return {
@@ -105,6 +123,10 @@ export class MongoAdminDashboardStatsReaderService implements IAdminDashboardSta
         averageQuizScore: quizStats.averageQuizScore,
         quizPassRate: quizStats.quizPassRate,
         activeUsersThisMonth,
+        totalRevenue: paymentSummary.totalRevenue,
+        successfulPayments,
+        lockedUsers,
+        unreadNotifications,
       },
       charts: {
         newUsersByMonth: this.fillMonthlyGaps(newUsersByMonth, range.start, range.end),
@@ -112,6 +134,17 @@ export class MongoAdminDashboardStatsReaderService implements IAdminDashboardSta
         quizAttemptsByMonth: this.fillMonthlyGaps(quizAttemptsByMonth, range.start, range.end),
         coursesCreatedByMonth: this.fillMonthlyGaps(coursesCreatedByMonth, range.start, range.end),
         lessonsCreatedByMonth: this.fillMonthlyGaps(lessonsCreatedByMonth, range.start, range.end),
+        userGrowth: this.toChartCounts(newUsersByMonth, range.start, range.end),
+        revenueTrend: this.fillMonthlyRevenueGaps(revenueByMonth, range.start, range.end),
+        // Purchases are subscriptions and reference plans, not courses.
+        topPurchasedCourses: [],
+        paymentStatusDistribution,
+        userStatusDistribution: [
+          { status: 'Active', count: activeVerifiedUsers },
+          { status: 'Locked', count: lockedUsers },
+          { status: 'Unverified', count: unverifiedUsers },
+        ],
+        notificationsByType,
       },
     };
   }
@@ -216,5 +249,63 @@ export class MongoAdminDashboardStatsReaderService implements IAdminDashboardSta
     }
 
     return result;
+  }
+
+  private toChartCounts(rows: AdminMonthlyCount[], start: Date, end: Date) {
+    return this.fillMonthlyGaps(rows, start, end).map(({ month, count }) => ({
+      label: this.formatMonth(month),
+      count,
+    }));
+  }
+
+  private async getPaymentSummary() {
+    const [summary] = await PurchaseModel.aggregate([
+      { $match: { status: 'succeeded' } },
+      { $group: { _id: null, totalRevenue: { $sum: '$amount' } } },
+    ]);
+    return { totalRevenue: summary?.totalRevenue ?? 0 };
+  }
+
+  private async aggregateMonthlyRevenue(start: Date, end: Date) {
+    return PurchaseModel.aggregate([
+      { $match: { status: 'succeeded', paidAt: { $gte: start, $lte: end } } },
+      { $group: { _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } }, revenue: { $sum: '$amount' } } },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $project: { _id: 0, month: { $concat: [{ $toString: '$_id.year' }, '-', { $cond: [{ $lt: ['$_id.month', 10] }, { $concat: ['0', { $toString: '$_id.month' }] }, { $toString: '$_id.month' }] }] }, revenue: 1 } },
+    ]) as Promise<Array<{ month: string; revenue: number }>>;
+  }
+
+  private async aggregateStatusCounts(model: { aggregate(pipeline: unknown[]): Promise<AdminStatusCount[]> }) {
+    return model.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, status: '$_id', count: 1 } },
+    ]);
+  }
+
+  private async aggregateNotificationTypes() {
+    return Notification.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, type: '$_id', count: 1 } },
+    ]) as Promise<Array<{ type: string; count: number }>>;
+  }
+
+  private fillMonthlyRevenueGaps(rows: Array<{ month: string; revenue: number }>, start: Date, end: Date) {
+    const revenueByMonth = new Map(rows.map((row) => [row.month, row.revenue]));
+    const result: Array<{ label: string; revenue: number }> = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const month = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+      result.push({ label: this.formatMonth(month), revenue: revenueByMonth.get(month) || 0 });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return result;
+  }
+
+  private formatMonth(month: string) {
+    const [year, monthNumber] = month.split('-').map(Number);
+    return new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, monthNumber - 1, 1)));
   }
 }

@@ -13,7 +13,7 @@ import { UserProfileStats } from '../../domain/interfaces/user-stats-reader.port
 /**
  * Whitelist field an toàn — mirror ĐÚNG `sanitizeUser` (auth/utils/user-sanitizer):
  * id, email, firstName, lastName, avatarUrl, role, isVerified, isActive,
- * lastLoginAt, createdAt, updatedAt. KHÔNG có passwordHash/googleId/githubId/planType/lockedAt.
+ * lastLoginAt, createdAt, updatedAt, entitlement. KHÔNG có passwordHash/googleId/githubId/lockedAt.
  */
 export type ProfileSafeUser = {
   id: string;
@@ -24,6 +24,9 @@ export type ProfileSafeUser = {
   role: 'STUDENT' | 'ADMIN';
   isVerified?: boolean;
   isActive?: boolean;
+  planType: 'FREE' | 'PREMIUM';
+  subscriptionExpiresAt?: Date;
+  subscriptionFeatures: string[];
   lastLoginAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -50,7 +53,6 @@ export interface UpdateMyProfileInput {
   userId: string;
   firstName?: string;
   lastName?: string;
-  avatarUrl?: string;
 }
 
 /**

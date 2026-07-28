@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  EVENT_PUBLISHER,
+  EventSubscriber,
+} from '../../../../shared/application/events/event-publisher.port';
 import { NotificationsService } from '../../services/notifications.service';
 
 interface QuizPassedEventPayload {
@@ -12,8 +15,19 @@ interface QuizPassedEventPayload {
 }
 
 @Injectable()
-export class QuizPassedNotificationEventHandler {
-  @OnEvent('quiz.passed')
+export class QuizPassedNotificationEventHandler implements OnModuleInit {
+  constructor(
+    @Inject(EVENT_PUBLISHER)
+    private readonly eventBus: EventSubscriber,
+  ) {}
+
+  onModuleInit(): void {
+    this.eventBus.subscribe<QuizPassedEventPayload>(
+      'quiz.passed',
+      this.onQuizPassed.bind(this),
+    );
+  }
+
   async onQuizPassed(event: QuizPassedEventPayload) {
     await NotificationsService.sendNotification({
       userId: event.userId,

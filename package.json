@@ -13,10 +13,13 @@
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest --passWithNoTests",
-    "db:seed": "ts-node src/database/seed.ts"
+    "db:seed": "ts-node src/database/seed.ts",
+    "db:migrate:notes-multiple": "ts-node src/database/migrations/migrate-note-multiple-per-lesson.ts",
+    "db:backfill:certificates": "ts-node src/database/migrations/backfill-missing-certificates.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",
+    "@digabi/noto-sans": "3.2.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^10.3.2",
     "@nestjs/config": "^3.1.1",
@@ -39,7 +42,7 @@
     "express": "^5.2.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.1.1",
+    "mongoose": "^8.24.1",
     "nodemailer": "^8.0.10",
     "pdfkit": "^0.18.0",
     "redis": "^4.6.12",

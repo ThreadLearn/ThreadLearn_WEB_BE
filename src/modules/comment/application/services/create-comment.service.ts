@@ -18,8 +18,17 @@ export class CreateCommentService {
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
   ) {}
 
-  async execute(userId: string, userRole: 'STUDENT' | 'ADMIN', input: CreateCommentDto) {
+  async execute(
+    userId: string,
+    userRole: 'STUDENT' | 'ADMIN',
+    input: Omit<CreateCommentDto, 'isAnonymous'> & { isAnonymous?: boolean },
+  ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
+    // The discussion model supports a root comment and one visible reply level.
+    // A reply-to-reply is attached to the same root instead of creating an
+    // unbounded tree, as required by UC30.
+    const parent = input.parentId ? await this.comments.findById(input.parentId) : null;
+    const parentId = parent?.parentId ?? parent?.id ?? input.parentId;
     const created = await this.comments.create(
       CommentEntity.createNew({
         userId,
@@ -27,20 +36,21 @@ export class CreateCommentService {
         targetId: input.targetId,
         courseId: access.courseId,
         content: input.content,
-        parentId: input.parentId,
+        parentId,
+        isAnonymous: input.isAnonymous ?? false,
         mentionUserIds: input.mentionUserIds?.filter(isObjectId),
       }),
     );
 
-    if (input.parentId) {
-      const targetUserId = await this.comments.findReplyNotificationTarget(input.parentId, userId);
+    if (parentId) {
+      const targetUserId = await this.comments.findReplyNotificationTarget(parentId, userId);
       if (targetUserId) {
         await NotificationsService.sendNotification({
           userId: targetUserId,
           title: 'New comment reply',
           message: 'Someone replied to your lesson comment.',
           type: 'COMMENT_REPLY',
-          metadata: { commentId: created.id, parentId: input.parentId },
+          metadata: { commentId: created.id, parentId },
         });
       }
     }

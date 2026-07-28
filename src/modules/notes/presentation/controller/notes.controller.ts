@@ -1,14 +1,37 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
+import {
+  CreateNoteDto,
+  CreateLessonNoteDto,
+  createLessonNoteSchema,
+  createNoteSchema,
+  ListNotesQueryDto,
+  listNotesQuerySchema,
+  UpdateNoteDto,
+  noteIdParamSchema,
+  updateNoteSchema,
+} from '../../application/dto/note.dto';
+import { CreateNoteService } from '../../application/services/create-note.service';
 import { ListByLessonService } from '../../application/services/list-by-lesson.service';
+import { ListMyNotesService } from '../../application/services/list-my-notes.service';
 import { RemoveNoteService } from '../../application/services/remove-note.service';
 import { SearchNotesService } from '../../application/services/search-notes.service';
 import { UpdateNoteService } from '../../application/services/update-note.service';
-import { UpsertNoteService } from '../../application/services/upsert-note.service';
 
 @ApiTags('Notes')
 @Controller('v1/notes')
@@ -17,16 +40,34 @@ import { UpsertNoteService } from '../../application/services/upsert-note.servic
 export class NotesController {
   constructor(
     private readonly listByLessonSvc: ListByLessonService,
+    private readonly listMyNotesSvc: ListMyNotesService,
     private readonly searchNotesSvc: SearchNotesService,
-    private readonly upsertNoteSvc: UpsertNoteService,
+    private readonly createNoteSvc: CreateNoteService,
     private readonly updateNoteSvc: UpdateNoteService,
-    private readonly removeNoteSvc: RemoveNoteService,
+    private readonly removeNoteSvc: RemoveNoteService
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedUser, @Query('lessonId') lessonId?: string) {
-    const notes = lessonId ? await this.listByLessonSvc.execute(user.id, lessonId) : [];
-    return ApiResponse.success({ message: 'Notes fetched.', data: notes });
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(listNotesQuerySchema)) query: ListNotesQueryDto
+  ) {
+    if (query.lessonId) {
+      const notes = await this.listByLessonSvc.execute(user.id, query.lessonId);
+      return ApiResponse.success({ message: 'Notes fetched.', data: notes });
+    }
+
+    const result = await this.listMyNotesSvc.execute(user.id, query.page, query.limit);
+    return ApiResponse.success({
+      message: 'Notes fetched.',
+      data: result.data,
+      meta: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
   }
 
   @Get('search')
@@ -36,23 +77,29 @@ export class NotesController {
   }
 
   @Post()
-  async upsert(@CurrentUser() user: AuthenticatedUser, @Body() body: { lessonId: string; noteText: string; codeSnippet?: string }) {
-    const note = await this.upsertNoteSvc.execute(user.id, body);
-    return ApiResponse.success({ message: 'Note saved.', data: note });
+  async create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createNoteSchema)) body: CreateNoteDto
+  ) {
+    const note = await this.createNoteSvc.execute(user.id, body);
+    return ApiResponse.success({ message: 'Note created.', data: note });
   }
 
   @Patch(':id')
   async update(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: { noteText?: string; content?: string; codeSnippet?: string },
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(updateNoteSchema)) body: UpdateNoteDto
   ) {
     const note = await this.updateNoteSvc.execute(user.id, id, body);
     return ApiResponse.success({ message: 'Note updated.', data: note });
   }
 
   @Delete(':id')
-  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const result = await this.removeNoteSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Note deleted.', data: result });
   }
@@ -65,26 +112,33 @@ export class NotesController {
 export class LessonNotesController {
   constructor(
     private readonly listByLessonSvc: ListByLessonService,
-    private readonly upsertNoteSvc: UpsertNoteService,
+    private readonly createNoteSvc: CreateNoteService
   ) {}
 
   @Get(':id/notes/me')
-  async myLessonNotes(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async myLessonNotes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const notes = await this.listByLessonSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
 
   @Post(':id/notes')
-  async upsertLessonNote(
+  async createLessonNote(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: { noteText?: string; content?: string; codeSnippet?: string },
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(createLessonNoteSchema))
+    body: CreateLessonNoteDto,
   ) {
-    const note = await this.upsertNoteSvc.execute(user.id, {
+    const note = await this.createNoteSvc.execute(user.id, {
       lessonId: id,
       noteText: body.noteText ?? body.content ?? '',
       codeSnippet: body.codeSnippet,
+      anchorText: body.anchorText,
+      anchorStart: body.anchorStart,
+      anchorEnd: body.anchorEnd,
     });
-    return ApiResponse.success({ message: 'Note saved.', data: note });
+    return ApiResponse.success({ message: 'Note created.', data: note });
   }
 }

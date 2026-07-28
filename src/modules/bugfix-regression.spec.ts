@@ -18,13 +18,10 @@ import { QuizAttemptRepository } from './quiz-attempts/infrastructure/persistenc
 import { Quiz } from './quiz/models/quiz.model';
 import { LearningAccessService } from '../shared/application/learning-access/learning-access.service';
 import { EnrollmentCompletionPublisher } from './enrollments/application/events/enrollment-completion.publisher';
-import { CertificatesService } from './certificates/services/certificates.service';
-import { NotificationsService } from './notifications/services/notifications.service';
 import { CourseEntity } from './course/domain/entities/course.entity';
 import { QuizMapper } from './quiz/infrastructure/mapper/quiz.mapper';
 import { IQuizRepository } from './quiz/domain/interfaces/quiz.repository';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DomainEventPublisher } from './quiz-attempts/application/events/domain-event.publisher';
 
 describe('reported bug regressions', () => {
   const createQuizAttemptUseCases = () => {
@@ -44,7 +41,7 @@ describe('reported bug regressions', () => {
         new SubmitAttemptService(
           attemptsRepo,
           quizRepo,
-          new DomainEventPublisher(new EventEmitter2()),
+          { publish: jest.fn() },
           new QuizGradingService(),
         ).execute(userId, quizId, answers, startTime),
       getAttemptById: (userId: string, attemptId: string) =>
@@ -66,6 +63,9 @@ describe('reported bug regressions', () => {
     await expect(
       new CodeExecutionService({ countFreeRunsToday: jest.fn().mockResolvedValue(0) } as any, {
         assertLessonViewAccess: accessSpy,
+      } as any, {
+        reserve: jest.fn().mockResolvedValue({ userId: 'student', scope: 'code-execution', day: '2026-07-28', count: 1 }),
+        release: jest.fn(),
       } as any).executeCode(
         '507f1f77bcf86cd799439011',
         {
@@ -128,7 +128,8 @@ describe('reported bug regressions', () => {
         '507f1f77bcf86cd799439012'
       )
     ).rejects.toMatchObject({
-      message: 'COURSE_PREMIUM_REQUIRED',
+      message: 'An active Premium plan is required to enroll in this course.',
+      code: 'COURSE_PREMIUM_REQUIRED',
       statusCode: 403,
     });
   });
@@ -208,30 +209,33 @@ describe('reported bug regressions', () => {
     ]);
   });
 
-  it('returns only the most recently updated note for a lesson', async () => {
-    const latest = { _id: 'latest-note', noteText: 'Current note' };
-    const sort = jest.fn().mockResolvedValue(latest);
-    jest.spyOn(Note, 'findOne').mockReturnValue({ sort } as never);
+  it('returns every note for a lesson, newest first', async () => {
+    const notes = [
+      { _id: 'newer-note', userId: 'user', lessonId: 'lesson', noteText: 'Newer note' },
+      { _id: 'older-note', userId: 'user', lessonId: 'lesson', noteText: 'Older note' },
+    ];
+    const lean = jest.fn().mockResolvedValue(notes);
+    const sort = jest.fn().mockReturnValue({ lean });
+    jest.spyOn(Note, 'find').mockReturnValue({ sort } as never);
 
     await expect(
-      new MongoNoteRepository().findLatestByLesson(
+      new MongoNoteRepository().listByLesson(
         '507f1f77bcf86cd799439011',
         '507f1f77bcf86cd799439012',
       )
-    ).resolves.toEqual(latest);
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ _id: 'newer-note', noteText: 'Newer note' }),
+      expect.objectContaining({ _id: 'older-note', noteText: 'Older note' }),
+    ]));
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
   });
 
-  it('handles course.completed with certificate and XP side effects', async () => {
-    const certificateSpy = jest
-      .spyOn(CertificatesService, 'issueCertificate')
-      .mockResolvedValue({ _id: 'certificate' } as never);
-    jest.spyOn(NotificationsService, 'sendNotification').mockResolvedValue({} as never);
+  it('publishes course.completed through EventEmitter2', async () => {
+    const events = new EventEmitter2();
+    const listener = jest.fn().mockResolvedValue({ xpRewarded: 500, stats: { xp: 600 } });
+    events.on('course.completed', listener);
 
-    // TODO DEV2: assert qua EventEmitter2 (GamificationRewardsService has been removed)
-    // TODO DEV4: LeaderboardService.invalidateCache removed — leaderboard uses @OnEvent now
-
-    await EnrollmentCompletionPublisher.publishCourseCompleted({
+    const effects = await new EnrollmentCompletionPublisher(events).publishCourseCompleted({
       userId: '507f1f77bcf86cd799439011',
       courseId: '507f1f77bcf86cd799439012',
       progressPercent: 100,
@@ -239,11 +243,11 @@ describe('reported bug regressions', () => {
       completedLessons: 1,
     });
 
-    expect(certificateSpy).toHaveBeenCalledWith(
-      '507f1f77bcf86cd799439011',
-      '507f1f77bcf86cd799439012',
-    );
-    // TODO DEV2: assert qua EventEmitter2
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      userId: '507f1f77bcf86cd799439011',
+      courseId: '507f1f77bcf86cd799439012',
+    }));
+    expect(effects).toEqual({ xpRewarded: 500, stats: { xp: 600 } });
   });
 
   it('grades quiz answers by question id', async () => {

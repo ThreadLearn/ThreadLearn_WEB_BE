@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundError } from '../../../../common/custom-error';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
+import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
+import { presentAnalysisForTier } from './ai-tier-policy';
 
 @Injectable()
 export class GetHistoryByIdService {
@@ -9,6 +11,13 @@ export class GetHistoryByIdService {
   async execute(userId: string, id: string) {
     const history = await this.histories.findByUserAndId(userId, id);
     if (!history) throw new NotFoundError('AI_HISTORY_NOT_FOUND');
-    return history;
+    const user = await this.histories.findUserProfile(userId);
+    const canViewOptimizedCode = Boolean(user && (user.role === 'ADMIN' || hasActiveSubscriptionFeature({
+      planType: user.planType,
+      subscriptionExpiresAt: user.subscriptionExpiresAt,
+      subscriptionFeatures: user.subscriptionFeatures,
+      feature: 'AI_ADVANCED_ANALYSIS',
+    })));
+    return presentAnalysisForTier(history, canViewOptimizedCode);
   }
 }

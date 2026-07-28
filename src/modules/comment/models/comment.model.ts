@@ -11,6 +11,7 @@ export interface IComment extends Document {
   userId:     Types.ObjectId;
   parentId?:  Types.ObjectId | null;
   content:    string;
+  isAnonymous: boolean;
   status:     CommentStatus;
   isEdited:   boolean;
   editedAt?:  Date;
@@ -30,6 +31,7 @@ const CommentSchema: Schema<IComment> = new Schema(
     userId:     { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     parentId:   { type: Schema.Types.ObjectId, ref: 'Comment', default: null },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
+    isAnonymous: { type: Boolean, default: false },
     status:     { type: String, enum: ['active', 'hidden', 'deleted'], default: 'active' },
     isEdited:   { type: Boolean, default: false },
     editedAt:   { type: Date },

@@ -68,9 +68,22 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   JUDGE0_API_URL: z.string().default('https://api.judge0.com'),
+  /** Preferred key name used by code-execution module */
   JUDGE0_API_KEY: z.string().optional(),
+  /** Alias some env templates use for RapidAPI Judge0 */
+  JUDGE0_RAPIDAPI_KEY: z.string().optional(),
+  JUDGE0_TIMEOUT_MS: z.coerce.number().int().positive().max(60_000).default(10_000),
   AI_API_URL: z.string().default('http://localhost:8001'),
   AI_API_TIMEOUT_MS: z.coerce.number().default(30000),
+  PAYMENT_GATEWAY_MODE: z.enum(['mock', 'vnpay', 'payos']).default('mock'),
+  PAYOS_CLIENT_ID: optionalNonEmptyString,
+  PAYOS_API_KEY: optionalNonEmptyString,
+  PAYOS_CHECKSUM_KEY: optionalNonEmptyString,
+  PAYOS_PARTNER_CODE: optionalNonEmptyString,
+  PAYOS_BASE_URL: z.string().url().optional(),
+  PAYOS_RETURN_URL: z.string().url().optional(),
+  PAYOS_CANCEL_URL: z.string().url().optional(),
+  PAYOS_WEBHOOK_URL: z.string().url().optional(),
   UPLOAD_DIR: z.string().default('./public/uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().default(10),
 });
@@ -79,6 +92,18 @@ const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   console.error('❌ Environment validation failed:', parsed.error.format());
+  throw new Error('Environment validation failed');
+}
+
+if (
+  parsed.data.NODE_ENV === 'production' &&
+  !parsed.data.FRONTEND_URL.some(
+    (origin) => !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/?$/i.test(origin),
+  )
+) {
+  console.error(
+    'Environment validation failed: FRONTEND_URL must include the deployed frontend origin in production',
+  );
   throw new Error('Environment validation failed');
 }
 
@@ -100,7 +125,11 @@ if (!databaseUrl) {
   throw new Error('Environment validation failed');
 }
 
+// Accept either JUDGE0_API_KEY or legacy JUDGE0_RAPIDAPI_KEY from .env templates
+const judge0ApiKey = parsed.data.JUDGE0_API_KEY || parsed.data.JUDGE0_RAPIDAPI_KEY;
+
 export const env = {
   ...parsed.data,
   DATABASE_URL: databaseUrl,
+  JUDGE0_API_KEY: judge0ApiKey,
 };

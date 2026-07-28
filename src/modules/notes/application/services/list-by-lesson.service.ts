@@ -9,12 +9,14 @@ import { INoteRepository, NOTE_REPOSITORY } from '../../domain/interfaces/note.r
 export class ListByLessonService {
   constructor(
     @Inject(NOTE_REPOSITORY) private readonly notes: INoteRepository,
-    @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
+    @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess
   ) {}
 
   async execute(userId: string, lessonId: string) {
-    await this.learningAccess.assertLessonInteractionAccess(lessonId, { id: userId, role: 'STUDENT' });
-    const latest = await this.notes.findLatestByLesson(userId, lessonId);
-    return latest ? [latest] : [];
+    await this.learningAccess.assertLessonInteractionAccess(lessonId, {
+      id: userId,
+      role: 'STUDENT',
+    });
+    return this.notes.listByLesson(userId, lessonId);
   }
 }

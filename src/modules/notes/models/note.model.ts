@@ -25,9 +25,8 @@ const NoteSchema = new Schema<INote>(
   { timestamps: true }
 );
 
-NoteSchema.index({ userId: 1, lessonId: 1 });
+NoteSchema.index({ userId: 1, lessonId: 1, updatedAt: -1 });
 NoteSchema.index({ userId: 1, noteText: 'text', codeSnippet: 'text' });
 
-export const Note: Model<INote> =
-  mongoose.models.Note || mongoose.model<INote>('Note', NoteSchema);
+export const Note: Model<INote> = mongoose.models.Note || mongoose.model<INote>('Note', NoteSchema);
 export default Note;

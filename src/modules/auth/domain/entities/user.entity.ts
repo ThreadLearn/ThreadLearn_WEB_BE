@@ -31,6 +31,9 @@ export interface UserProps {
   failedLoginAttempts?: number;
   /** Thời điểm hết khoá tạm thời do sai mật khẩu nhiều lần (KHÁC `lockedAt` admin-lock). */
   lockedUntil?: Date;
+  planType?: 'FREE' | 'PREMIUM';
+  subscriptionExpiresAt?: Date;
+  subscriptionFeatures?: string[];
   lastLoginAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -218,20 +221,17 @@ export class UserEntity {
 
   /**
    * Cập nhật profile cá nhân (UC09 — mirror `UsersService.updateProfile`).
-   * CHỈ cho phép đúng tập field legacy: `firstName`, `lastName`, `avatarUrl`.
+   * CHỈ cho phép đúng tập field UC09 PATCH: `firstName`, `lastName`.
    * Quy tắc: field `undefined` ⇒ KHÔNG đổi; string ⇒ trim (mirror zod `.trim()` hiện tại).
-   * KHÔNG validate unique/email, KHÔNG đụng email/role/planType… (legacy không cho update).
+   * KHÔNG validate unique/email, KHÔNG đụng email/role/planType/avatar….
    * KHÔNG dựng response — presenter/use-case lo. KHÔNG hardcode `/uploads` ở domain.
    */
-  updateProfile(input: { firstName?: string; lastName?: string; avatarUrl?: string }): void {
+  updateProfile(input: { firstName?: string; lastName?: string }): void {
     if (input.firstName !== undefined) {
       this.props.firstName = input.firstName.trim();
     }
     if (input.lastName !== undefined) {
       this.props.lastName = input.lastName.trim();
-    }
-    if (input.avatarUrl !== undefined) {
-      this.props.avatarUrl = input.avatarUrl.trim();
     }
   }
 

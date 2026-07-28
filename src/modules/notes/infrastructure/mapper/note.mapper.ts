@@ -41,4 +41,30 @@ export class NoteMapper {
       anchorEnd: props.anchorEnd,
     };
   }
+
+  static formatView(doc: INote | any) {
+    const props = this.toProps(doc);
+    const lesson = doc.lessonId;
+    const hasPopulatedLesson = lesson && typeof lesson === 'object' && lesson.title !== undefined;
+
+    return {
+      _id: props.id,
+      userId: props.userId,
+      lessonId: props.lessonId,
+      noteText: props.noteText,
+      codeSnippet: props.codeSnippet,
+      anchorText: props.anchorText,
+      anchorStart: props.anchorStart,
+      anchorEnd: props.anchorEnd,
+      createdAt: props.createdAt,
+      updatedAt: props.updatedAt,
+      lesson: hasPopulatedLesson
+        ? {
+            _id: String(lesson._id),
+            title: String(lesson.title),
+            courseId: String(idOf(lesson.courseId) ?? ''),
+          }
+        : undefined,
+    };
+  }
 }
