@@ -9,7 +9,7 @@ import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interf
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 
-const FREE_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 999;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
 
 interface AnalyzeIssue {
