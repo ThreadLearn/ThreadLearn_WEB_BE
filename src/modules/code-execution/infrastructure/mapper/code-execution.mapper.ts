@@ -25,6 +25,7 @@ export class CodeExecutionMapper {
       stdout: doc.stdout,
       stderr: doc.stderr,
       compileOutput: doc.compileOutput,
+      outputTruncated: doc.outputTruncated,
       runtime: doc.runtime,
       memory: doc.memory,
       judge0Token: doc.judge0Token,

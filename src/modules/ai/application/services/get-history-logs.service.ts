@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
+import { presentAnalysisForTier } from './ai-tier-policy';
 
 @Injectable()
 export class GetHistoryLogsService {
@@ -27,8 +28,6 @@ export class GetHistoryLogsService {
   }
 
   private present(history: any, canViewOptimizedCode: boolean) {
-    const value = typeof history?.toObject === 'function' ? history.toObject() : { ...history };
-    if (!canViewOptimizedCode) delete value.optimizedCode;
-    return value;
+    return presentAnalysisForTier(history, canViewOptimizedCode);
   }
 }

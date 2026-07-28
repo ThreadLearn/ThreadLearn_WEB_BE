@@ -18,13 +18,13 @@ export class UpdateNoteService {
       content?: string;
       codeSnippet?: string;
       anchorText?: string;
-      anchorStart?: number;
-      anchorEnd?: number;
+      anchorStart?: number | null;
+      anchorEnd?: number | null;
     }
   ) {
     const note = await this.notes.findOwned(userId, noteId);
     if (!note) throw new NotFoundError('Note not found.');
-    if (input.anchorEnd !== undefined) {
+    if (input.anchorEnd !== undefined && input.anchorEnd !== null) {
       const lesson = await this.learningAccess.assertLessonInteractionAccess(note.lessonId, { id: userId, role: 'STUDENT' });
       if (lesson.contentLength !== undefined && input.anchorEnd > lesson.contentLength) {
         throw new BadRequestError('anchorEnd exceeds lesson content length.');

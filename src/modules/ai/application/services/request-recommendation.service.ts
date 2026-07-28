@@ -13,6 +13,7 @@ import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
 import { AIAnalysisCacheService, CachedAnalysisResult } from './ai-analysis-cache.service';
+import { presentAnalysisForTier } from './ai-tier-policy';
 
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
@@ -79,7 +80,10 @@ export class RequestRecommendationService {
     // quota: no AI-provider work has been performed.
     if (cached) {
       const history = await this.persistHistory(userId, payload, cached, isPremiumTier, true);
-      return this.withQuota(history, await this.quotas.status(userId, 'ai-recommendation', limit));
+      return presentAnalysisForTier(
+        this.withQuota(history, await this.quotas.status(userId, 'ai-recommendation', limit)),
+        isPremiumTier,
+      );
     }
 
     const reservation = await this.reserveQuota(userId, limit);
@@ -95,7 +99,10 @@ export class RequestRecommendationService {
       );
       await this.cache.set(cacheKey, { issues: data.issues ?? [], docs_used: data.docs_used ?? [] });
       const history = await this.persistHistory(userId, payload, data, isPremiumTier, false);
-      return this.withQuota(history, await this.quotas.status(userId, 'ai-recommendation', limit));
+      return presentAnalysisForTier(
+        this.withQuota(history, await this.quotas.status(userId, 'ai-recommendation', limit)),
+        isPremiumTier,
+      );
     } catch (error) {
       await this.quotas.release(reservation);
       throw error;
@@ -121,7 +128,13 @@ export class RequestRecommendationService {
       prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
       raceConditions, optimizedCode: isPremiumTier ? optimizedCode : undefined, explanation,
       modelName: 'threadlearn-ai2-server', category: 'code-analysis',
-      issues: issues.map((issue) => ({ patternId: issue.pattern_id ?? 'unknown', lineRange: issue.line_range, severity: issue.severity, description: issue.description, fix: issue.fix })),
+      issues: issues.map((issue) => ({
+        patternId: issue.pattern_id ?? 'unknown',
+        lineRange: issue.line_range,
+        severity: issue.severity,
+        description: issue.description,
+        fix: isPremiumTier ? issue.fix : undefined,
+      })),
       docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
       cached,
     }));
