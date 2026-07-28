@@ -15,7 +15,7 @@ import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/inf
 import { AIAnalysisCacheService, CachedAnalysisResult } from './ai-analysis-cache.service';
 import { presentAnalysisForTier } from './ai-tier-policy';
 
-const FREE_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 999;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
 
 interface AnalyzeIssue {
