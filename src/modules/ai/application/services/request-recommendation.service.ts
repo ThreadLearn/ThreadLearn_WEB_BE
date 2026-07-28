@@ -126,14 +126,14 @@ export class RequestRecommendationService {
     return this.histories.create(AIHistoryEntity.createNew({
       userId, codeExecutionId: payload.codeExecutionId, inputCode: payload.inputCode, language: payload.language,
       prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
-      raceConditions, optimizedCode: isPremiumTier ? optimizedCode : undefined, explanation,
+      raceConditions, optimizedCode, explanation,
       modelName: 'threadlearn-ai2-server', category: 'code-analysis',
       issues: issues.map((issue) => ({
         patternId: issue.pattern_id ?? 'unknown',
         lineRange: issue.line_range,
         severity: issue.severity,
         description: issue.description,
-        fix: isPremiumTier ? issue.fix : undefined,
+        fix: issue.fix,
       })),
       docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
       cached,
