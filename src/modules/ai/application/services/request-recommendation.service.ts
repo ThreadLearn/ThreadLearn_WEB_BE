@@ -5,7 +5,10 @@ import { firstValueFrom } from 'rxjs';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
-import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
+import {
+  AI_HISTORY_REPOSITORY,
+  IAIHistoryRepository,
+} from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 
@@ -40,7 +43,7 @@ interface AnalyzeResponse {
 export class RequestRecommendationService {
   constructor(
     @Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository,
-    private readonly http: HttpService,
+    private readonly http: HttpService
   ) {}
 
   async execute(userId: string, payload: AIRecommendationPayload) {
@@ -56,8 +59,8 @@ export class RequestRecommendationService {
       this.http.post<AnalyzeResponse>(
         `${env.AI_API_URL}/api/v1/ai/analyze`,
         { code: payload.inputCode, language: payload.language, user_id: userId },
-        { timeout: env.AI_API_TIMEOUT_MS, headers: { Authorization: `Bearer ${aiToken}` } },
-      ),
+        { timeout: env.AI_API_TIMEOUT_MS, headers: { Authorization: `Bearer ${aiToken}` } }
+      )
     );
 
     const issues = data.issues ?? [];
@@ -68,7 +71,10 @@ export class RequestRecommendationService {
     const response = [
       '### AI Code Analysis',
       '',
-      ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`),
+      ...issues.map(
+        (issue, index) =>
+          `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`
+      ),
       '',
       explanation,
     ].join('\n');
@@ -102,7 +108,7 @@ export class RequestRecommendationService {
           score: doc.bm25_score,
         })),
         cached: data.cached ?? false,
-      }),
+      })
     );
   }
 
