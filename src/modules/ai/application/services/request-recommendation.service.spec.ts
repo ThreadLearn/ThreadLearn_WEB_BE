@@ -14,7 +14,10 @@ describe('RequestRecommendationService', () => {
     ...overrides,
   });
 
-  const buildRepo = (user: AIUserProfile | null, usedToday = 0): jest.Mocked<IAIHistoryRepository> => ({
+  const buildRepo = (
+    user: AIUserProfile | null,
+    usedToday = 0
+  ): jest.Mocked<IAIHistoryRepository> => ({
     create: jest.fn(async (entity) => entity),
     listByUser: jest.fn(),
     listByUserPage: jest.fn(),
@@ -30,18 +33,8 @@ describe('RequestRecommendationService', () => {
     post: jest.fn().mockReturnValue(of({ data: response } as AxiosResponse)),
   });
 
-  const buildService = (repo: jest.Mocked<IAIHistoryRepository>, http: unknown, usedToday = 0) =>
-    new RequestRecommendationService(
-      repo,
-      http as any,
-      {
-        reserve: jest.fn(async (_userId: string, _scope: string, limit: number) =>
-          usedToday >= limit ? null : { userId: 'user-1', scope: 'ai-recommendation', day: '2026-07-28', count: usedToday + 1 }),
-        release: jest.fn(),
-        status: jest.fn(async (_userId: string, _scope: string, limit: number) => ({ limit, used: usedToday + 1, remaining: Math.max(0, limit - usedToday - 1) })),
-      } as any,
-      { key: jest.fn().mockReturnValue('cache-key'), get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
-    );
+  const buildService = (repo: jest.Mocked<IAIHistoryRepository>, http: unknown, _usedToday = 0) =>
+    new RequestRecommendationService(repo, http as any);
 
   const payload: AIRecommendationPayload = {
     inputCode: 'for(var i=0;i<3;i++){setTimeout(()=>console.log(i));}',
@@ -62,7 +55,9 @@ describe('RequestRecommendationService', () => {
           pattern_id: 'closure_loop_var',
         },
       ],
-      docs_used: [{ id: 'doc-1', title: 'Closure Loop Variable', category: 'patterns', bm25_score: 12.5 }],
+      docs_used: [
+        { id: 'doc-1', title: 'Closure Loop Variable', category: 'patterns', bm25_score: 12.5 },
+      ],
       cached: false,
     });
     const service = buildService(repo, http);
@@ -72,11 +67,17 @@ describe('RequestRecommendationService', () => {
     expect(http.post).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/ai/analyze'),
       { code: payload.inputCode, language: payload.language, user_id: 'user-1' },
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
+      })
     );
     expect(repo.create).toHaveBeenCalled();
-    expect(result.props.suggestions).toEqual(['[high] Closure captures loop variable declared with var.']);
-    expect(result.props.raceConditions).toEqual(['1-3: Closure captures loop variable declared with var.']);
+    expect(result.props.suggestions).toEqual([
+      '[high] Closure captures loop variable declared with var.',
+    ]);
+    expect(result.props.raceConditions).toEqual([
+      '1-3: Closure captures loop variable declared with var.',
+    ]);
     expect(result.props.optimizedCode).toBeUndefined();
     expect(result.remainingQuota).toBe(9);
     expect(result.quotaLimit).toBe(10);
@@ -99,7 +100,13 @@ describe('RequestRecommendationService', () => {
 
   it('produces an empty analysis summary when the AI service finds no issues', async () => {
     const repo = buildRepo(buildUser());
-    const http = buildHttp({ user_id: 'user-1', language: 'javascript', issues: [], docs_used: [], cached: false });
+    const http = buildHttp({
+      user_id: 'user-1',
+      language: 'javascript',
+      issues: [],
+      docs_used: [],
+      cached: false,
+    });
     const service = buildService(repo, http);
 
     const result: any = await service.execute('user-1', payload);
@@ -113,9 +120,9 @@ describe('RequestRecommendationService', () => {
     const http = buildHttp({ issues: [] });
     const service = buildService(repo, http);
 
-    await expect(service.execute('user-1', { language: 'javascript' } as AIRecommendationPayload)).rejects.toThrow(
-      'inputCode is required.',
-    );
+    await expect(
+      service.execute('user-1', { language: 'javascript' } as AIRecommendationPayload)
+    ).rejects.toThrow('inputCode is required.');
     expect(http.post).not.toHaveBeenCalled();
   });
 
@@ -124,7 +131,9 @@ describe('RequestRecommendationService', () => {
     const http = buildHttp({ issues: [] });
     const service = buildService(repo, http);
 
-    await expect(service.execute('missing-user', payload)).rejects.toThrow('User profile not found.');
+    await expect(service.execute('missing-user', payload)).rejects.toThrow(
+      'User profile not found.'
+    );
     expect(http.post).not.toHaveBeenCalled();
   });
 
@@ -150,18 +159,22 @@ describe('RequestRecommendationService', () => {
   });
 
   it('keeps detailed fixes only for an actively entitled premium user', async () => {
-    const repo = buildRepo(buildUser({
-      planType: 'PREMIUM',
-      subscriptionExpiresAt: new Date(Date.now() + 60_000),
-      subscriptionFeatures: ['AI_ADVANCED_ANALYSIS'],
-    }));
+    const repo = buildRepo(
+      buildUser({
+        planType: 'PREMIUM',
+        subscriptionExpiresAt: new Date(Date.now() + 60_000),
+        subscriptionFeatures: ['AI_ADVANCED_ANALYSIS'],
+      })
+    );
     const http = buildHttp({
-      issues: [{
-        line_range: '1',
-        severity: 'high',
-        description: 'Unsafe shared state.',
-        fix: 'Use an immutable update.',
-      }],
+      issues: [
+        {
+          line_range: '1',
+          severity: 'high',
+          description: 'Unsafe shared state.',
+          fix: 'Use an immutable update.',
+        },
+      ],
       docs_used: [],
     });
     const service = buildService(repo, http);

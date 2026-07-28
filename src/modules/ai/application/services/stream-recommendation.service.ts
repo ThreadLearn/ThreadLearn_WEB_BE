@@ -2,24 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import type { Response } from 'express';
-import { BadRequestError, NotFoundError, TooManyRequestsError } from '../../../../common/custom-error';
+import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
-import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
-import mongoose from 'mongoose';
-import { CodeExecution } from '../../../code-execution/models/code-execution.model';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
-import {
-  AI_HISTORY_REPOSITORY,
-  IAIHistoryRepository,
-} from '../../domain/interfaces/ai-history.repository';
+import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
-import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
-import { AIAnalysisCacheService, CachedAnalysisResult } from './ai-analysis-cache.service';
-import { presentAnalysisForTier } from './ai-tier-policy';
 
 const FREE_DAILY_LIMIT = 999;
-const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
 
 interface AnalyzeIssue {
   line_range: string;
@@ -44,11 +34,6 @@ interface AnalyzeResultData {
   cached: boolean;
 }
 
-/**
- * Proxies the AI server's SSE pipeline (race_detector -> ast -> bm25 -> prompt -> llm)
- * straight through to the client so the FE can render step-by-step progress instead
- * of a blind spinner, then persists history once the "result" event arrives.
- */
 @Injectable()
 export class StreamRecommendationService {
   constructor(@Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository) {}
@@ -61,36 +46,7 @@ export class StreamRecommendationService {
     const user = await this.histories.findUserProfile(userId);
     if (!user) throw new NotFoundError('User profile not found.');
 
-    const isPremiumTier = user.role === 'ADMIN' || hasActiveSubscriptionFeature({
-      planType: user.planType,
-      subscriptionExpiresAt: user.subscriptionExpiresAt,
-      subscriptionFeatures: user.subscriptionFeatures,
-      feature: 'AI_ADVANCED_ANALYSIS',
-    });
-    if (payload.codeExecutionId) {
-      if (!mongoose.isValidObjectId(payload.codeExecutionId)) {
-        throw new NotFoundError('Code execution not found.');
-      }
-      const execution = await CodeExecution.exists({ _id: payload.codeExecutionId, userId });
-      if (!execution) throw new NotFoundError('Code execution not found.');
-    }
-
-    const limit = isPremiumTier ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-    const cacheKey = this.cache.key(payload.inputCode, payload.language);
-    const cached = await this.cache.get(cacheKey);
-    if (cached) {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('X-Accel-Buffering', 'no');
-      res.flushHeaders();
-      await this.persistHistory(userId, payload, cached, isPremiumTier, true, 0);
-      const presented = presentAnalysisForTier({ ...cached, cached: true }, isPremiumTier);
-      res.write(`event: result\ndata: ${JSON.stringify(presented)}\n\n`);
-      res.end();
-      return;
-    }
-
-    const reservation = await this.reserveQuota(userId, limit);
+    await this.assertDailyLimit(userId);
 
     const aiToken = jwt.sign({ sub: userId }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
     const startTime = Date.now();
@@ -102,7 +58,7 @@ export class StreamRecommendationService {
         timeout: env.AI_API_TIMEOUT_MS,
         headers: { Authorization: `Bearer ${aiToken}` },
         responseType: 'stream',
-      }
+      },
     );
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -112,8 +68,6 @@ export class StreamRecommendationService {
 
     let buffer = '';
 
-    let analysisCompleted = false;
-    let quotaReleased = false;
     let persistPromise: Promise<void> | null = null;
     const persist = async (resultData: AnalyzeResultData) => {
       const issues = resultData.issues ?? [];
@@ -124,10 +78,7 @@ export class StreamRecommendationService {
       const response = [
         '### AI Code Analysis',
         '',
-        ...issues.map(
-          (issue, index) =>
-            `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`
-        ),
+        ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`),
         '',
         explanation,
       ].join('\n');
@@ -163,13 +114,29 @@ export class StreamRecommendationService {
           })),
           cached: resultData.cached ?? false,
           analyzeTimeMs: Date.now() - startTime,
-        })
+        }),
       );
     };
 
-    // Client (browser) can abort mid-stream (tab close, reload) — that's normal,
-    // not a server error. Stop forwarding chunks and tear down the upstream request
-    // without throwing, so it never reaches GlobalExceptionFilter on a closed response.
+    const forwardEvent = (part: string) => {
+      const eventMatch = part.match(/^event:\s*(.+)$/m);
+      const dataMatch = part.match(/^data:\s*(.+)$/m);
+      if (!eventMatch?.[1] || !dataMatch?.[1]) {
+        res.write(`${part}\n\n`);
+        return;
+      }
+      const eventName = eventMatch[1].trim();
+      try {
+        const eventData = JSON.parse(dataMatch[1]) as Record<string, unknown>;
+        if (eventName === 'result' && !persistPromise) {
+          persistPromise = persist(eventData as unknown as AnalyzeResultData);
+        }
+        res.write(`event: ${eventName}\ndata: ${JSON.stringify(eventData)}\n\n`);
+      } catch {
+        res.write(`${part}\n\n`);
+      }
+    };
+
     let clientAborted = false;
     res.on('close', () => {
       if (!res.writableEnded) {
@@ -195,13 +162,7 @@ export class StreamRecommendationService {
           try {
             if (persistPromise) await persistPromise;
           } catch {
-            analysisCompleted = false;
-          }
-          if (!analysisCompleted) {
-            await releaseIfIncomplete();
-            if (!clientAborted && !res.writableEnded) {
-              res.write(`event: error\ndata: ${JSON.stringify({ message: 'AI analysis ended without a result.' })}\n\n`);
-            }
+            // persist failure logged at service level; stream continues
           }
           if (!clientAborted && !res.writableEnded) res.end();
           resolve();
@@ -210,60 +171,23 @@ export class StreamRecommendationService {
 
       upstream.data.on('error', (err: Error) => {
         if (clientAborted) {
-          void releaseIfIncomplete().finally(resolve);
+          resolve();
           return;
         }
-        // Headers/body may already be partially flushed to the client at this point
-        // (SSE stream mid-flight) — never reject here, since a reject propagates to
-        // GlobalExceptionFilter which would try res.status().json() on a response
-        // that has already started writing, crashing with ERR_HTTP_HEADERS_SENT.
-        // Instead, tell the client via a proper SSE error event and end cleanly.
         if (!res.writableEnded) {
-          res.write(
-            `event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`
-          );
+          res.write(`event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`);
           res.end();
         }
-        void releaseIfIncomplete().finally(resolve);
+        resolve();
       });
     });
   }
 
-  private async reserveQuota(userId: string, limit: number): Promise<DailyQuotaReservation> {
-    const reservation = await this.quotas.reserve(userId, 'ai-recommendation', limit);
-    if (!reservation) throw new TooManyRequestsError('Daily AI analysis quota exceeded.', 'AI_QUOTA_EXCEEDED');
-    return reservation;
-  }
-
-  private async persistHistory(
-    userId: string,
-    payload: AIRecommendationPayload,
-    resultData: AnalyzeResultData | CachedAnalysisResult,
-    isPremiumTier: boolean,
-    cached: boolean,
-    analyzeTimeMs: number,
-  ) {
-    const issues = (resultData.issues ?? []) as AnalyzeIssue[];
-    const docsUsed = (resultData.docs_used ?? []) as AnalyzeKnowledgeDoc[];
-    const suggestions = issues.map((issue) => `[${issue.severity}] ${issue.description}`);
-    const raceConditions = issues.map((issue) => `${issue.line_range}: ${issue.description}`);
-    const explanation = buildExplanation(issues.length, docsUsed.length);
-    const response = ['### AI Code Analysis', '', ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`), '', explanation].join('\n');
-    return this.histories.create(AIHistoryEntity.createNew({
-      userId, codeExecutionId: payload.codeExecutionId, inputCode: payload.inputCode, language: payload.language,
-      prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
-      raceConditions, optimizedCode: issues[0]?.fix, explanation,
-      modelName: 'threadlearn-ai2-server', category: 'code-analysis',
-      issues: issues.map((issue) => ({
-        patternId: issue.pattern_id ?? 'unknown',
-        lineRange: issue.line_range,
-        severity: issue.severity,
-        description: issue.description,
-        fix: issue.fix,
-        codeSnippet: issue.code_snippet,
-      })),
-      docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
-      cached, analyzeTimeMs,
-    }));
+  private async assertDailyLimit(userId: string) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    const usedToday = await this.histories.countToday(userId, since);
+    const limit = FREE_DAILY_LIMIT;
+    if (usedToday >= limit) throw new BadRequestError('AI_USAGE_LIMIT_EXCEEDED');
   }
 }
