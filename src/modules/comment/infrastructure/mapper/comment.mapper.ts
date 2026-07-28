@@ -60,6 +60,15 @@ export class CommentMapper {
 
   static formatView(comment: any) {
     if (!comment) return null;
+    if (comment.status === 'deleted') {
+      return {
+        ...comment,
+        userId: '',
+        user: undefined,
+        content: 'This comment has been deleted.',
+        isAnonymous: true,
+      };
+    }
     const user = comment.userId;
     const authorId = idOf(user) ?? '';
     const isAnonymous = !!comment.isAnonymous;
