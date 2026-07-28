@@ -10,6 +10,7 @@ export interface CommentListResult {
 
 export interface ICommentRepository {
   findById(id: string): Promise<CommentEntity | null>;
+  findTargetById(id: string): Promise<{ targetType: CommentTargetType; targetId: string } | null>;
   findViewById(id: string): Promise<unknown | null>;
   listByTarget(targetType: CommentTargetType, targetId: string, page: number, limit: number): Promise<CommentListResult>;
   listReplies(commentId: string): Promise<unknown[]>;

@@ -10,17 +10,56 @@ import { BookmarkMapper } from '../mapper/bookmark.mapper';
 export class MongoBookmarkRepository implements IBookmarkRepository {
   async toggle(bookmark: BookmarkEntity): Promise<{ bookmarked: boolean; bookmark?: unknown }> {
     const props = bookmark.toProps();
-    const existing = await Bookmark.findOneAndDelete({
-      userId: props.userId,
+    const filter = {
+      userId: new mongoose.Types.ObjectId(props.userId),
       targetType: props.targetType,
-      targetId: props.targetId,
-    });
-    if (existing) return { bookmarked: false };
+      targetId: new mongoose.Types.ObjectId(props.targetId),
+    };
+    const updatePipeline = [
+      {
+        $set: {
+          userId: filter.userId,
+          targetType: props.targetType,
+          targetId: filter.targetId,
+          title: props.title,
+          thumbnailUrl: props.thumbnailUrl ?? '$thumbnailUrl',
+          anchorText: props.anchorText ?? '$anchorText',
+          position: props.position ?? '$position',
+          note: props.note ?? '$note',
+          folder: props.folder ?? '$folder',
+          tags: props.tags,
+          status: {
+            $cond: [
+              { $eq: [{ $ifNull: ['$status', 'deleted'] }, 'active'] },
+              'deleted',
+              'active',
+            ],
+          },
+          createdAt: { $ifNull: ['$createdAt', '$$NOW'] },
+          updatedAt: '$$NOW',
+        },
+      },
+    ];
     try {
-      const doc = await Bookmark.create(BookmarkMapper.toPersistence(bookmark));
-      return { bookmarked: true, bookmark: doc };
+      const doc = await Bookmark.findOneAndUpdate(filter, updatePipeline, {
+        upsert: true,
+        new: true,
+      });
+      const bookmarked = doc.status === 'active';
+      return { bookmarked, bookmark: bookmarked ? doc : undefined };
     } catch (err: any) {
-      if (err?.code === 11000) return { bookmarked: true };
+      if (err?.code === 11000) {
+        // Two first-time toggles may both attempt an upsert. The unique
+        // compound index elects one winner; retrying without upsert applies
+        // the second logical toggle to that winner.
+        const doc = await Bookmark.findOneAndUpdate(filter, updatePipeline, {
+          upsert: false,
+          new: true,
+        });
+        if (!doc) throw err;
+        const bookmarked = doc.status === 'active';
+        return { bookmarked, bookmark: bookmarked ? doc : undefined };
+      }
       throw err;
     }
   }
@@ -38,7 +77,7 @@ export class MongoBookmarkRepository implements IBookmarkRepository {
 
   async exists(userId: string, targetType: BookmarkTargetType, targetId: string): Promise<boolean> {
     if (!mongoose.isValidObjectId(targetId)) return false;
-    return !!(await Bookmark.exists({ userId, targetType, targetId }));
+    return !!(await Bookmark.exists({ userId, targetType, targetId, status: 'active' }));
   }
 
   async findOwned(userId: string, bookmarkId: string): Promise<BookmarkEntity | null> {

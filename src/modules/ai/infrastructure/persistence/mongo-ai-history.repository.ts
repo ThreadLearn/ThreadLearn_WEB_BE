@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import mongoose from 'mongoose';
 import { User } from '../../../auth/models/user.model';
 import { Course } from '../../../courses/models/course.model';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
 import { AICourseProfile, AIUserProfile, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { AIHistory } from '../../models/ai-history.model';
 import { AIHistoryMapper } from '../mapper/ai-history.mapper';
+import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
 
 @Injectable()
 export class MongoAIHistoryRepository implements IAIHistoryRepository {
@@ -25,10 +27,12 @@ export class MongoAIHistoryRepository implements IAIHistoryRepository {
   }
 
   async findByUserAndId(userId: string, id: string): Promise<unknown | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     return AIHistory.findOne({ _id: id, userId });
   }
 
   async updateFeedback(userId: string, id: string, feedbackRating: number): Promise<unknown | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     return AIHistory.findOneAndUpdate({ _id: id, userId }, { feedbackRating }, { new: true });
   }
 
@@ -57,10 +61,17 @@ export class MongoAIHistoryRepository implements IAIHistoryRepository {
   }
 
   async purgeFreeHistory(cutoff: Date): Promise<number> {
-    const freeUsers = await User.find({
-      $or: [{ planType: { $ne: 'PREMIUM' } }, { planType: { $exists: false } }],
-    }).select('_id');
-    const freeIds = freeUsers.map((u) => u._id);
+    const users = await User.find({ role: { $ne: 'ADMIN' } })
+      .select('_id planType subscriptionExpiresAt subscriptionFeatures')
+      .lean();
+    const freeIds = users
+      .filter((user) => !hasActiveSubscriptionFeature({
+        planType: user.planType,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        subscriptionFeatures: user.subscriptionFeatures,
+        feature: 'AI_ADVANCED_ANALYSIS',
+      }))
+      .map((user) => user._id);
     if (!freeIds.length) return 0;
     const result = await AIHistory.deleteMany({ userId: { $in: freeIds }, createdAt: { $lt: cutoff } });
     return result.deletedCount ?? 0;

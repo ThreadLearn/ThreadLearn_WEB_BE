@@ -5,7 +5,7 @@ export interface IAIIssue {
   lineRange: string;
   severity: 'high' | 'medium' | 'low';
   description: string;
-  fix: string;
+  fix?: string;
   codeSnippet?: string;
 }
 
@@ -48,7 +48,7 @@ const AIIssueSchema = new Schema<IAIIssue>(
     lineRange: { type: String, required: true },
     severity: { type: String, enum: ['high', 'medium', 'low'], required: true },
     description: { type: String, required: true },
-    fix: { type: String, required: true },
+    fix: { type: String },
     codeSnippet: { type: String },
   },
   { _id: false }

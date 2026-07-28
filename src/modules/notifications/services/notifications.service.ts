@@ -4,6 +4,8 @@ import { getSocketServer } from '../../../socket';
 import { User } from '../../auth/models/user.model';
 import { PlanModel } from '../../subscription/infrastructure/persistence/schemas/plan.schema';
 import { Injectable } from '@nestjs/common';
+import mongoose from 'mongoose';
+import { BadRequestError } from '../../../common/custom-error';
 
 @Injectable()
 export class NotificationsService {
@@ -42,6 +44,7 @@ export class NotificationsService {
   }
 
   async markAsRead(notificationId: string, userId: string) {
+    if (!mongoose.isValidObjectId(notificationId)) throw new BadRequestError('Invalid notification id.');
     const notification = await Notification.findOneAndUpdate(
       { _id: notificationId, userId },
       { isRead: true, readAt: new Date() },
@@ -59,6 +62,7 @@ export class NotificationsService {
   }
 
   async markAdminAsRead(notificationId: string, userId: string) {
+    if (!mongoose.isValidObjectId(notificationId)) throw new BadRequestError('Invalid notification id.');
     const notification = await Notification.findOneAndUpdate(
       { _id: notificationId, ...this.adminNotificationScope(userId) },
       { isRead: true, readAt: new Date() },

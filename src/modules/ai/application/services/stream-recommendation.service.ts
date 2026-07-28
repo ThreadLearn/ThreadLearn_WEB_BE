@@ -13,6 +13,7 @@ import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
 import { AIAnalysisCacheService, CachedAnalysisResult } from './ai-analysis-cache.service';
+import { presentAnalysisForTier } from './ai-tier-policy';
 
 const FREE_DAILY_LIMIT = 10;
 const PREMIUM_DAILY_LIMIT = Number(process.env.AI_PREMIUM_DAILY_LIMIT || 40);
@@ -84,7 +85,8 @@ export class StreamRecommendationService {
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
       await this.persistHistory(userId, payload, cached, isPremiumTier, true, 0);
-      res.write(`event: result\ndata: ${JSON.stringify({ ...cached, cached: true })}\n\n`);
+      const presented = presentAnalysisForTier({ ...cached, cached: true }, isPremiumTier);
+      res.write(`event: result\ndata: ${JSON.stringify(presented)}\n\n`);
       res.end();
       return;
     }
@@ -113,10 +115,40 @@ export class StreamRecommendationService {
     let buffer = '';
 
     let analysisCompleted = false;
+    let quotaReleased = false;
+    let persistPromise: Promise<void> | null = null;
     const persist = async (resultData: AnalyzeResultData) => {
       await this.cache.set(cacheKey, { issues: resultData.issues ?? [], docs_used: resultData.docs_used ?? [] });
       await this.persistHistory(userId, payload, resultData, isPremiumTier, false, Date.now() - startTime);
       analysisCompleted = true;
+    };
+    const releaseIfIncomplete = async () => {
+      if (!analysisCompleted && !quotaReleased) {
+        quotaReleased = true;
+        await this.quotas.release(reservation);
+      }
+    };
+    const forwardEvent = (part: string) => {
+      const eventMatch = part.match(/^event:\s*(.+)$/m);
+      const dataMatch = part.match(/^data:\s*(.+)$/m);
+      if (!eventMatch?.[1] || !dataMatch?.[1]) {
+        if (isPremiumTier) res.write(`${part}\n\n`);
+        return;
+      }
+      const eventName = eventMatch[1].trim();
+      try {
+        const eventData = JSON.parse(dataMatch[1]) as Record<string, unknown>;
+        if (eventName === 'result' && !persistPromise) {
+          persistPromise = persist(eventData as unknown as AnalyzeResultData);
+        }
+        res.write(
+          `event: ${eventName}\ndata: ${JSON.stringify(
+            presentAnalysisForTier(eventData, isPremiumTier),
+          )}\n\n`,
+        );
+      } catch {
+        if (isPremiumTier) res.write(`${part}\n\n`);
+      }
     };
 
     // Client (browser) can abort mid-stream (tab close, reload) — that's normal,
@@ -135,33 +167,34 @@ export class StreamRecommendationService {
         if (clientAborted) return;
         const text = chunk.toString('utf-8');
         buffer += text;
-        res.write(text);
 
-        // Detect the "result" SSE event to persist history without waiting for stream end.
         const parts = buffer.split('\n\n');
         buffer = parts.pop() ?? '';
-        for (const part of parts) {
-          const eventMatch = part.match(/^event:\s*(.+)$/m);
-          const dataMatch = part.match(/^data:\s*(.+)$/m);
-          if (eventMatch?.[1]?.trim() === 'result' && dataMatch?.[1]) {
-            try {
-              const resultData = JSON.parse(dataMatch[1]) as AnalyzeResultData;
-              persist(resultData).catch(() => undefined);
-            } catch {
-              // Ignore malformed SSE payloads — stream continues regardless.
-            }
-          }
-        }
+        for (const part of parts) forwardEvent(part);
       });
 
       upstream.data.on('end', () => {
-        if (!clientAborted) res.end();
-        resolve();
+        void (async () => {
+          if (buffer.trim() && !clientAborted) forwardEvent(buffer);
+          try {
+            if (persistPromise) await persistPromise;
+          } catch {
+            analysisCompleted = false;
+          }
+          if (!analysisCompleted) {
+            await releaseIfIncomplete();
+            if (!clientAborted && !res.writableEnded) {
+              res.write(`event: error\ndata: ${JSON.stringify({ message: 'AI analysis ended without a result.' })}\n\n`);
+            }
+          }
+          if (!clientAborted && !res.writableEnded) res.end();
+          resolve();
+        })();
       });
 
       upstream.data.on('error', (err: Error) => {
         if (clientAborted) {
-          resolve();
+          void releaseIfIncomplete().finally(resolve);
           return;
         }
         // Headers/body may already be partially flushed to the client at this point
@@ -173,8 +206,7 @@ export class StreamRecommendationService {
           res.write(`event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`);
           res.end();
         }
-        if (!analysisCompleted) this.quotas.release(reservation).catch(() => undefined);
-        resolve();
+        void releaseIfIncomplete().finally(resolve);
       });
     });
   }
@@ -204,7 +236,14 @@ export class StreamRecommendationService {
       prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
       raceConditions, optimizedCode: isPremiumTier ? issues[0]?.fix : undefined, explanation,
       modelName: 'threadlearn-ai2-server', category: 'code-analysis',
-      issues: issues.map((issue) => ({ patternId: issue.pattern_id ?? 'unknown', lineRange: issue.line_range, severity: issue.severity, description: issue.description, fix: issue.fix, codeSnippet: issue.code_snippet })),
+      issues: issues.map((issue) => ({
+        patternId: issue.pattern_id ?? 'unknown',
+        lineRange: issue.line_range,
+        severity: issue.severity,
+        description: issue.description,
+        fix: isPremiumTier ? issue.fix : undefined,
+        codeSnippet: issue.code_snippet,
+      })),
       docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
       cached, analyzeTimeMs,
     }));

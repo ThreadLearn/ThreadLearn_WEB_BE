@@ -88,7 +88,7 @@ describe('RequestRecommendationService', () => {
         lineRange: '1-3',
         severity: 'high',
         description: 'Closure captures loop variable declared with var.',
-        fix: 'Use let instead of var.',
+        fix: undefined,
       },
     ]);
     expect(result.props.docsUsed).toEqual([
@@ -147,6 +147,29 @@ describe('RequestRecommendationService', () => {
 
     await expect(service.execute('user-1', payload)).resolves.toBeDefined();
     expect(http.post).toHaveBeenCalled();
+  });
+
+  it('keeps detailed fixes only for an actively entitled premium user', async () => {
+    const repo = buildRepo(buildUser({
+      planType: 'PREMIUM',
+      subscriptionExpiresAt: new Date(Date.now() + 60_000),
+      subscriptionFeatures: ['AI_ADVANCED_ANALYSIS'],
+    }));
+    const http = buildHttp({
+      issues: [{
+        line_range: '1',
+        severity: 'high',
+        description: 'Unsafe shared state.',
+        fix: 'Use an immutable update.',
+      }],
+      docs_used: [],
+    });
+    const service = buildService(repo, http);
+
+    const result: any = await service.execute('user-1', payload);
+
+    expect(result.props.optimizedCode).toBe('Use an immutable update.');
+    expect(result.props.issues[0].fix).toBe('Use an immutable update.');
   });
 
   it('propagates errors from the AI service call', async () => {
