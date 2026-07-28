@@ -8,7 +8,10 @@ import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscrip
 import mongoose from 'mongoose';
 import { CodeExecution } from '../../../code-execution/models/code-execution.model';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
-import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
+import {
+  AI_HISTORY_REPOSITORY,
+  IAIHistoryRepository,
+} from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
@@ -46,9 +49,7 @@ interface AnalyzeResponse {
 export class RequestRecommendationService {
   constructor(
     @Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository,
-    private readonly http: HttpService,
-    private readonly quotas: DailyQuotaService,
-    private readonly cache: AIAnalysisCacheService,
+    private readonly http: HttpService
   ) {}
 
   async execute(userId: string, payload: AIRecommendationPayload) {
@@ -109,11 +110,13 @@ export class RequestRecommendationService {
     }
   }
 
-  private async reserveQuota(userId: string, limit: number): Promise<DailyQuotaReservation> {
-    const reservation = await this.quotas.reserve(userId, 'ai-recommendation', limit);
-    if (!reservation) throw new TooManyRequestsError('Daily AI analysis quota exceeded.', 'AI_QUOTA_EXCEEDED');
-    return reservation;
-  }
+    const { data } = await firstValueFrom(
+      this.http.post<AnalyzeResponse>(
+        `${env.AI_API_URL}/api/v1/ai/analyze`,
+        { code: payload.inputCode, language: payload.language, user_id: userId },
+        { timeout: env.AI_API_TIMEOUT_MS, headers: { Authorization: `Bearer ${aiToken}` } }
+      )
+    );
 
   private async persistHistory(userId: string, payload: AIRecommendationPayload, data: AnalyzeResponse | CachedAnalysisResult, isPremiumTier: boolean, cached: boolean) {
     const issues = (data.issues ?? []) as AnalyzeIssue[];
@@ -126,14 +129,14 @@ export class RequestRecommendationService {
     return this.histories.create(AIHistoryEntity.createNew({
       userId, codeExecutionId: payload.codeExecutionId, inputCode: payload.inputCode, language: payload.language,
       prompt: `Analyze this ${payload.language} snippet for concurrent programming issues.`, response, suggestions,
-      raceConditions, optimizedCode, explanation,
+      raceConditions, optimizedCode: isPremiumTier ? optimizedCode : undefined, explanation,
       modelName: 'threadlearn-ai2-server', category: 'code-analysis',
       issues: issues.map((issue) => ({
         patternId: issue.pattern_id ?? 'unknown',
         lineRange: issue.line_range,
         severity: issue.severity,
         description: issue.description,
-        fix: issue.fix,
+        fix: isPremiumTier ? issue.fix : undefined,
       })),
       docsUsed: docsUsed.map((doc) => ({ id: doc.id, title: doc.title, category: doc.category, content: doc.content, score: doc.bm25_score })),
       cached,
