@@ -20,7 +20,11 @@ export class CreateNoteService {
       id: userId,
       role: 'STUDENT',
     });
-    if (input.anchorEnd !== undefined && lesson.contentLength !== undefined && input.anchorEnd > lesson.contentLength) {
+    if (
+      typeof input.anchorEnd === 'number'
+      && lesson.contentLength !== undefined
+      && input.anchorEnd > lesson.contentLength
+    ) {
       throw new BadRequestError('anchorEnd exceeds lesson content length.');
     }
     return this.notes.create(NoteEntity.createNew({ ...input, userId }));

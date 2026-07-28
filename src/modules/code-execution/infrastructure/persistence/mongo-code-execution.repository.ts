@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import mongoose from 'mongoose';
 import { CodeExecutionEntity } from '../../domain/entities/code-execution.entity';
 import { CodeExecutionHistoryOptions, ICodeExecutionRepository } from '../../domain/interfaces/code-execution.repository';
 import { CodeExecution } from '../../models/code-execution.model';
@@ -28,6 +29,7 @@ export class MongoCodeExecutionRepository implements ICodeExecutionRepository {
   }
 
   async findByUserAndId(userId: string, id: string): Promise<unknown | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     return CodeExecution.findOne({ _id: id, userId });
   }
 }

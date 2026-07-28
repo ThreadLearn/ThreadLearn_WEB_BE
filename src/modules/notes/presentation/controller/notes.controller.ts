@@ -17,10 +17,13 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import {
   CreateNoteDto,
+  CreateLessonNoteDto,
+  createLessonNoteSchema,
   createNoteSchema,
   ListNotesQueryDto,
   listNotesQuerySchema,
   UpdateNoteDto,
+  noteIdParamSchema,
   updateNoteSchema,
 } from '../../application/dto/note.dto';
 import { CreateNoteService } from '../../application/services/create-note.service';
@@ -85,7 +88,7 @@ export class NotesController {
   @Patch(':id')
   async update(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(updateNoteSchema)) body: UpdateNoteDto
   ) {
     const note = await this.updateNoteSvc.execute(user.id, id, body);
@@ -93,7 +96,10 @@ export class NotesController {
   }
 
   @Delete(':id')
-  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const result = await this.removeNoteSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Note deleted.', data: result });
   }
@@ -110,7 +116,10 @@ export class LessonNotesController {
   ) {}
 
   @Get(':id/notes/me')
-  async myLessonNotes(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async myLessonNotes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const notes = await this.listByLessonSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
@@ -118,16 +127,9 @@ export class LessonNotesController {
   @Post(':id/notes')
   async createLessonNote(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body()
-    body: {
-      noteText?: string;
-      content?: string;
-      codeSnippet?: string;
-      anchorText?: string;
-      anchorStart?: number;
-      anchorEnd?: number;
-    }
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(createLessonNoteSchema))
+    body: CreateLessonNoteDto,
   ) {
     const note = await this.createNoteSvc.execute(user.id, {
       lessonId: id,

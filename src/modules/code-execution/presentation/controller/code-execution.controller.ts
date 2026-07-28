@@ -5,7 +5,13 @@ import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
-import { RunCodePayload, runCodeSchema } from '../../application/dto/code-execution.dto';
+import {
+  CodeExecutionHistoryQuery,
+  RunCodePayload,
+  codeExecutionHistoryQuerySchema,
+  codeExecutionIdParamSchema,
+  runCodeSchema,
+} from '../../application/dto/code-execution.dto';
 import { CodeExecutionService } from '../../application/services/code-execution.service';
 
 @ApiTags('Code Execution')
@@ -24,16 +30,23 @@ export class CodeExecutionController {
   @Get('history')
   async history(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('lessonId') lessonId?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query(new ZodValidationPipe(codeExecutionHistoryQuerySchema))
+    query: CodeExecutionHistoryQuery,
   ) {
-    const result = await this.codeExecution.listHistory(user.id, lessonId, Number(page) || 1, Number(limit) || 20);
+    const result = await this.codeExecution.listHistory(
+      user.id,
+      query.lessonId,
+      query.page,
+      query.limit,
+    );
     return ApiResponse.success({ message: 'Code execution history fetched.', data: result });
   }
 
   @Get(':id')
-  async detail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async detail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(codeExecutionIdParamSchema)) id: string,
+  ) {
     const result = await this.codeExecution.getById(user.id, id);
     return ApiResponse.success({ message: 'Code execution fetched.', data: result });
   }

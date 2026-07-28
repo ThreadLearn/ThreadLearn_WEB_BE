@@ -46,8 +46,17 @@ export class MongoNoteRepository implements INoteRepository {
   }
 
   async update(note: NoteEntity): Promise<unknown> {
-    const doc = await Note.findByIdAndUpdate(note.id, NoteMapper.toPersistence(note), {
+    const persistence = NoteMapper.toPersistence(note);
+    const props = note.toProps();
+    const $unset: Record<string, 1> = {};
+    if (props.anchorStart === undefined) $unset.anchorStart = 1;
+    if (props.anchorEnd === undefined) $unset.anchorEnd = 1;
+    const doc = await Note.findByIdAndUpdate(note.id, {
+      $set: persistence,
+      ...(Object.keys($unset).length ? { $unset } : {}),
+    }, {
       new: true,
+      runValidators: true,
     });
     if (!doc) throw new NotFoundError('Note not found.');
     return NoteMapper.formatView(doc);
