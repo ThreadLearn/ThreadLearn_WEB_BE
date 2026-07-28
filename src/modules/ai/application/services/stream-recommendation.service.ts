@@ -5,7 +5,10 @@ import type { Response } from 'express';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { AIHistoryEntity } from '../../domain/entities/ai-history.entity';
-import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
+import {
+  AI_HISTORY_REPOSITORY,
+  IAIHistoryRepository,
+} from '../../domain/interfaces/ai-history.repository';
 import { AIRecommendationPayload } from '../dto/ai.dto';
 import { buildExplanation } from './build-explanation';
 
@@ -42,9 +45,7 @@ interface AnalyzeResultData {
  */
 @Injectable()
 export class StreamRecommendationService {
-  constructor(
-    @Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository,
-  ) {}
+  constructor(@Inject(AI_HISTORY_REPOSITORY) private readonly histories: IAIHistoryRepository) {}
 
   async execute(userId: string, payload: AIRecommendationPayload, res: Response) {
     if (!payload.inputCode) {
@@ -70,7 +71,7 @@ export class StreamRecommendationService {
         timeout: env.AI_API_TIMEOUT_MS,
         headers: { Authorization: `Bearer ${aiToken}` },
         responseType: 'stream',
-      },
+      }
     );
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -89,7 +90,10 @@ export class StreamRecommendationService {
       const response = [
         '### AI Code Analysis',
         '',
-        ...issues.map((issue, index) => `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`),
+        ...issues.map(
+          (issue, index) =>
+            `${index + 1}. [${issue.severity}] ${issue.line_range}: ${issue.description}`
+        ),
         '',
         explanation,
       ].join('\n');
@@ -125,7 +129,7 @@ export class StreamRecommendationService {
           })),
           cached: resultData.cached ?? false,
           analyzeTimeMs: Date.now() - startTime,
-        }),
+        })
       );
     };
 
@@ -180,7 +184,9 @@ export class StreamRecommendationService {
         // that has already started writing, crashing with ERR_HTTP_HEADERS_SENT.
         // Instead, tell the client via a proper SSE error event and end cleanly.
         if (!res.writableEnded) {
-          res.write(`event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`);
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ message: err.message || 'Upstream stream error' })}\n\n`
+          );
           res.end();
         }
         resolve();
