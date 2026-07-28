@@ -28,7 +28,9 @@ export class MongoCommentRepository implements ICommentRepository {
     limit: number,
   ): Promise<CommentListResult> {
     const skip = (page - 1) * limit;
-    const query = { targetType, targetId, parentId: null, status: { $ne: 'deleted' } };
+    // Deleted rows remain visible as tombstones so their reply thread keeps
+    // its context. Mutating a deleted comment is still blocked by findById.
+    const query = { targetType, targetId, parentId: null };
     const [comments, total] = await Promise.all([
       Comment.find(query)
         .populate('userId', 'firstName lastName avatarUrl')
@@ -51,7 +53,7 @@ export class MongoCommentRepository implements ICommentRepository {
     if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
     const parent = await Comment.findById(commentId);
     if (!parent) throw new NotFoundError('Comment not found.');
-    const replies = await Comment.find({ parentId: commentId, status: { $ne: 'deleted' } })
+    const replies = await Comment.find({ parentId: commentId })
       .populate('userId', 'firstName lastName avatarUrl')
       .sort({ createdAt: 1 })
       .lean();

@@ -16,7 +16,7 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
   async findLesson(lessonId: string): Promise<LessonAccessSnapshot | null> {
     if (!mongoose.isValidObjectId(lessonId)) return null;
     const lesson = (await Lesson.findById(lessonId)
-      .select('_id courseId status isPreview isLocked title attachmentUrl')
+      .select('_id courseId status isPreview isLocked title attachmentUrl contentMarkdown content')
       .lean()) as any;
     if (!lesson || lesson.status === 'deleted') return null;
     return {
@@ -27,6 +27,7 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
       isLocked: !!lesson.isLocked,
       title: String(lesson.title ?? ''),
       thumbnailUrl: lesson.attachmentUrl ?? undefined,
+      contentLength: String(lesson.contentMarkdown ?? lesson.content ?? '').length,
     };
   }
 

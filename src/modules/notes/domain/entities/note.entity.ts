@@ -48,6 +48,10 @@ export class NoteEntity {
     return this.props.id;
   }
 
+  get lessonId(): string {
+    return this.props.lessonId;
+  }
+
   applyPatch(input: {
     noteText?: string;
     content?: string;

@@ -6,6 +6,7 @@ import {
 import { NoteEntity } from '../../domain/entities/note.entity';
 import { INoteRepository, NOTE_REPOSITORY } from '../../domain/interfaces/note.repository';
 import { CreateNoteDto } from '../dto/note.dto';
+import { BadRequestError } from '../../../../common/custom-error';
 
 @Injectable()
 export class CreateNoteService {
@@ -15,10 +16,13 @@ export class CreateNoteService {
   ) {}
 
   async execute(userId: string, input: CreateNoteDto) {
-    await this.learningAccess.assertLessonInteractionAccess(input.lessonId, {
+    const lesson = await this.learningAccess.assertLessonInteractionAccess(input.lessonId, {
       id: userId,
       role: 'STUDENT',
     });
+    if (input.anchorEnd !== undefined && lesson.contentLength !== undefined && input.anchorEnd > lesson.contentLength) {
+      throw new BadRequestError('anchorEnd exceeds lesson content length.');
+    }
     return this.notes.create(NoteEntity.createNew({ ...input, userId }));
   }
 }
