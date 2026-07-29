@@ -21,6 +21,7 @@ import { EnrollmentsModule } from '../modules/enrollments/enrollments.module';
 import { GamificationModule } from '../modules/gamification/gamification.module';
 import { IDEModule } from '../modules/ide/ide.module';
 import { LeaderboardModule } from '../modules/leaderboard/leaderboard.module';
+import { LearningPlansModule } from '../modules/learning-plans/learning-plans.module';
 import { LessonsModule } from '../modules/lessons/lessons.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { NotesModule } from '../modules/notes/notes.module';
@@ -51,6 +52,7 @@ import { AppController } from './app.controller';
     GamificationModule,
     IDEModule,
     LeaderboardModule,
+    LearningPlansModule,
     LessonsModule,
     NotificationsModule,
     NotesModule,
