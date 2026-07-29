@@ -29,6 +29,7 @@ import { QuizModule } from '../modules/quiz/quiz.module';
 import { QuizAttemptsModule } from '../modules/quiz-attempts/quiz-attempts.module';
 import { SubscriptionModule } from '../modules/subscription/subscription.module';
 import { UsersModule } from '../modules/users/users.module';
+import { VideoBookmarksModule } from '../modules/video-bookmarks/video-bookmarks.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -60,6 +61,7 @@ import { AppController } from './app.controller';
     QuizAttemptsModule,
     SubscriptionModule,
     UsersModule,
+    VideoBookmarksModule,
   ],
   controllers: [AppController],
   providers: [SocketGateway],
