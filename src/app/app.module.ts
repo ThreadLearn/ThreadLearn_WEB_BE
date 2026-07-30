@@ -30,6 +30,7 @@ import { QuizAttemptsModule } from '../modules/quiz-attempts/quiz-attempts.modul
 import { SubscriptionModule } from '../modules/subscription/subscription.module';
 import { UsersModule } from '../modules/users/users.module';
 import { VideoBookmarksModule } from '../modules/video-bookmarks/video-bookmarks.module';
+import { VideoWatchProgressModule } from '../modules/video-watch-progress/video-watch-progress.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -62,6 +63,7 @@ import { AppController } from './app.controller';
     SubscriptionModule,
     UsersModule,
     VideoBookmarksModule,
+    VideoWatchProgressModule,
   ],
   controllers: [AppController],
   providers: [SocketGateway],
