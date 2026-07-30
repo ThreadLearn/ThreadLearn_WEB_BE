@@ -1,7 +1,7 @@
 import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 
 export type CodeShareTargetType = 'COURSE' | 'LESSON';
-export type CodeShareVisibility = 'COURSE' | 'CLASS';
+export type CodeShareVisibility = 'COURSE';
 
 export interface ICodeShare extends Document {
   authorId: Types.ObjectId;
@@ -42,7 +42,7 @@ const CodeShareSchema = new Schema<ICodeShare>(
     outputTruncated: { type: Boolean, default: false },
     runtime: { type: String },
     memory: { type: Number },
-    visibility: { type: String, enum: ['COURSE', 'CLASS'], default: 'COURSE' },
+    visibility: { type: String, enum: ['COURSE'], default: 'COURSE' },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

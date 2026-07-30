@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { BadRequestError, ConflictError, NotFoundError } from '../../../../common/custom-error';
 import { LEARNING_ACCESS, ILearningAccess } from '../../../../shared/domain/interfaces/learning-access.port';
 import { CodeExecution } from '../../../code-execution/models/code-execution.model';
+import { Lesson } from '../../../lessons/models/lesson.model';
 import { CodeShare } from '../../models/code-share.model';
 import { CreateCodeShareDto } from '../dto/code-share.dto';
 
@@ -22,11 +23,14 @@ export class CodeShareService {
     if (dto.targetType === 'LESSON' && executionLessonId !== dto.targetId) {
       throw new BadRequestError('Code execution does not belong to this lesson.');
     }
-    if (dto.targetType === 'COURSE' && executionCourseId !== dto.targetId) {
-      throw new BadRequestError('Code execution does not belong to this course.');
-    }
     if (dto.targetType === 'COURSE' && !executionLessonId) {
       throw new BadRequestError('Course discussions can only share code linked to a lesson.');
+    }
+    if (dto.targetType === 'COURSE') {
+      const lesson = await Lesson.findById(executionLessonId).select('courseId').lean();
+      if (!lesson || String(lesson.courseId) !== dto.targetId || executionCourseId !== dto.targetId) {
+        throw new BadRequestError('Code execution does not belong to this course.');
+      }
     }
 
     try {

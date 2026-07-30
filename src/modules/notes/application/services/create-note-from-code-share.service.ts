@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BadRequestError } from '../../../../common/custom-error';
 import { CodeShareService } from '../../../code-share/application/services/code-share.service';
 import { Note } from '../../models/note.model';
+import { NoteMapper } from '../../infrastructure/mapper/note.mapper';
 
 @Injectable()
 export class CreateNoteFromCodeShareService {
@@ -22,8 +23,8 @@ export class CreateNoteFromCodeShareService {
       sourceCodeShareId: share._id,
       sourceAuthorId: share.authorId,
       sourceAuthorName: share.author?.name,
-      sourceLink: `/lessons/${input.lessonId}`,
+      sourceLink: `/lessons/${input.lessonId}?codeShare=${share._id}`,
     });
-    return note;
+    return NoteMapper.formatView(note);
   }
 }

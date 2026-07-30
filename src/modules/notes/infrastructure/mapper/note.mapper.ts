@@ -24,6 +24,11 @@ export class NoteMapper {
       anchorText: doc.anchorText,
       anchorStart: doc.anchorStart,
       anchorEnd: doc.anchorEnd,
+      sourceType: doc.sourceType,
+      sourceCodeShareId: idOf(doc.sourceCodeShareId),
+      sourceAuthorId: idOf(doc.sourceAuthorId),
+      sourceAuthorName: doc.sourceAuthorName,
+      sourceLink: doc.sourceLink,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -39,6 +44,11 @@ export class NoteMapper {
       anchorText: props.anchorText,
       anchorStart: props.anchorStart,
       anchorEnd: props.anchorEnd,
+      sourceType: props.sourceType,
+      sourceCodeShareId: props.sourceCodeShareId,
+      sourceAuthorId: props.sourceAuthorId,
+      sourceAuthorName: props.sourceAuthorName,
+      sourceLink: props.sourceLink,
     };
   }
 
@@ -56,6 +66,11 @@ export class NoteMapper {
       anchorText: props.anchorText,
       anchorStart: props.anchorStart,
       anchorEnd: props.anchorEnd,
+      sourceType: props.sourceType,
+      sourceCodeShareId: props.sourceCodeShareId,
+      sourceAuthorId: props.sourceAuthorId,
+      sourceAuthorName: props.sourceAuthorName,
+      sourceLink: props.sourceLink,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
       lesson: hasPopulatedLesson

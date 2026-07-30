@@ -115,7 +115,10 @@ export class CodeExecutionService {
     let courseId = payload.courseId;
     if (payload.lessonId) {
       const lesson = await this.learningAccess.assertLessonViewAccess(payload.lessonId, { id: userId, role: userRole });
-      courseId = courseId ?? lesson.courseId.toString();
+      // A lesson is the authoritative context. Never persist a caller-provided
+      // course id that disagrees with it, otherwise a run could later be
+      // attached to an unrelated course discussion.
+      courseId = lesson.courseId.toString();
     }
 
     let reservation: DailyQuotaReservation | null = null;
@@ -151,10 +154,10 @@ export class CodeExecutionService {
     }
   }
 
-  async listHistory(userId: string, lessonId?: string, page = 1, limit = 20) {
+  async listHistory(userId: string, lessonId?: string, exerciseId?: string, page = 1, limit = 20) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
-    const result = await this.executions.listHistory(userId, { lessonId, page: safePage, limit: safeLimit });
+    const result = await this.executions.listHistory(userId, { lessonId, exerciseId, page: safePage, limit: safeLimit });
     const totalPages = Math.max(1, Math.ceil(result.total / safeLimit));
     return {
       items: result.items.map((execution) => this.presentExecution(execution)),

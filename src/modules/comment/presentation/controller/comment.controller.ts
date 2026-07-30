@@ -23,6 +23,7 @@ import {
   UpdateCommentDto,
   commentIdParamSchema,
   createCommentSchema,
+  createLessonCommentSchema,
   createReplySchema,
   listCommentsQuerySchema,
   updateCommentSchema,
@@ -217,7 +218,7 @@ export class LessonCommentsController {
   async createLessonComment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ZodValidationPipe(commentIdParamSchema)) id: string,
-    @Body(new ZodValidationPipe(createCommentSchema.omit({ targetType: true, targetId: true })))
+    @Body(new ZodValidationPipe(createLessonCommentSchema))
     body: Omit<CreateCommentDto, 'targetType' | 'targetId'>,
   ) {
     const comment = await this.createCommentSvc.execute(user.id, user.role, {

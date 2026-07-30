@@ -6,12 +6,13 @@ import {
   LEARNING_ACCESS,
 } from '../../../../shared/domain/interfaces/learning-access.port';
 import { CreateCommentDto } from '../dto/comment.dto';
-import { CommentEntity, CommentTargetType } from '../../domain/entities/comment.entity';
+import { CommentEntity, CommentPostType, CommentTargetType } from '../../domain/entities/comment.entity';
 import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/comment.repository';
 import { CodeShareService } from '../../../code-share/application/services/code-share.service';
 import { discussionRoom, getSocketServer } from '../../../../socket';
 
 const isObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
+type CreateCommentInput = Omit<CreateCommentDto, 'postType'> & { postType?: CommentPostType };
 
 @Injectable()
 export class CreateCommentService {
@@ -24,14 +25,30 @@ export class CreateCommentService {
   async execute(
     userId: string,
     userRole: 'STUDENT' | 'ADMIN',
-    input: Omit<CreateCommentDto, 'isAnonymous'> & { isAnonymous?: boolean },
+    input: Omit<CreateCommentInput, 'isAnonymous'> & { isAnonymous?: boolean },
   ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
     // The discussion model supports a root comment and one visible reply level.
     // A reply-to-reply is attached to the same root instead of creating an
     // unbounded tree, as required by UC30.
     const parent = input.parentId ? await this.comments.findById(input.parentId) : null;
+    if (input.parentId && !parent) throw new NotFoundError('Discussion not found.');
+    if (parent && (parent.targetType !== input.targetType || parent.targetId !== String(input.targetId))) {
+      throw new BadRequestError('Replies must stay in the same discussion room.');
+    }
     const parentId = parent?.parentId ?? parent?.id ?? input.parentId;
+    if (parentId && input.postType === 'CODE_SOLUTION' && !input.codeShareId) {
+      throw new BadRequestError('A code solution requires a verified code share.');
+    }
+    if (!parentId && input.postType === 'CODE_SOLUTION') {
+      throw new BadRequestError('Code solutions must be posted as replies.');
+    }
+    if (parentId && input.codeShareId && input.postType !== 'CODE_SOLUTION') {
+      throw new BadRequestError('Attach code as a code solution.');
+    }
+    if (input.isAnonymous && input.codeShareId) {
+      throw new BadRequestError('Code shares cannot be posted anonymously.');
+    }
     if (input.codeShareId) {
       if (!this.codeShares) throw new BadRequestError('Code sharing is unavailable.');
       await this.codeShares.assertAttachable(userId, userRole, input.codeShareId, input.targetType, String(input.targetId));
