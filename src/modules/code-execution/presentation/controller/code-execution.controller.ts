@@ -36,6 +36,7 @@ export class CodeExecutionController {
     const result = await this.codeExecution.listHistory(
       user.id,
       query.lessonId,
+      query.exerciseId,
       query.page,
       query.limit,
     );

@@ -11,6 +11,7 @@ export const runCodeSchema = z.object({
   stdin: z.string().max(10000).optional(),
   courseId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid course id.').optional(),
   lessonId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid lesson id.').optional(),
+  exerciseId: z.string().min(1).max(200).optional(),
 });
 
 export const codeExecutionIdParamSchema = z.string().regex(
@@ -20,6 +21,7 @@ export const codeExecutionIdParamSchema = z.string().regex(
 
 export const codeExecutionHistoryQuerySchema = z.object({
   lessonId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid lesson id.').optional(),
+  exerciseId: z.string().min(1).max(200).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });

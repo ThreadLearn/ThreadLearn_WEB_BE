@@ -68,20 +68,21 @@ export class CommentMapper {
 
   static formatView(comment: any) {
     if (!comment) return null;
-    if (comment.status === 'deleted') {
+    const raw = typeof comment.toObject === 'function' ? comment.toObject() : comment;
+    if (raw.status === 'deleted') {
       return {
-        ...comment,
+        ...raw,
         userId: '',
         user: undefined,
         content: 'This comment has been deleted.',
         isAnonymous: true,
       };
     }
-    const user = comment.userId;
+    const user = raw.userId;
     const authorId = idOf(user) ?? '';
-    const isAnonymous = !!comment.isAnonymous;
+    const isAnonymous = !!raw.isAnonymous;
     return {
-      ...comment,
+      ...raw,
       userId: authorId,
       isAnonymous,
       user:

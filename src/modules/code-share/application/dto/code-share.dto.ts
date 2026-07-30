@@ -6,7 +6,9 @@ export const createCodeShareSchema = z.object({
   sourceExecutionId: objectIdSchema,
   targetType: z.enum(['COURSE', 'LESSON']),
   targetId: objectIdSchema,
-  visibility: z.enum(['COURSE', 'CLASS']).optional().default('COURSE'),
+  // Class-scoped sharing needs a class identifier and membership ACL. Until
+  // that exists, only the verified course audience is a valid visibility.
+  visibility: z.literal('COURSE').optional().default('COURSE'),
 });
 
 export const codeShareIdParamSchema = objectIdSchema;

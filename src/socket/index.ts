@@ -1,5 +1,6 @@
 import {
   ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
@@ -65,6 +66,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('discussion:join')
   async joinDiscussion(
     @ConnectedSocket() socket: Socket,
+    @MessageBody()
     payload: { targetType?: 'COURSE' | 'LESSON'; targetId?: string },
   ) {
     const targetType = payload?.targetType;
@@ -85,7 +87,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('discussion:leave')
-  leaveDiscussion(@ConnectedSocket() socket: Socket, payload: { targetType?: 'COURSE' | 'LESSON'; targetId?: string }) {
+  leaveDiscussion(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() payload: { targetType?: 'COURSE' | 'LESSON'; targetId?: string },
+  ) {
     if (payload?.targetType && payload.targetId && mongoose.isValidObjectId(payload.targetId)) {
       socket.leave(discussionRoom(payload.targetType, payload.targetId));
     }

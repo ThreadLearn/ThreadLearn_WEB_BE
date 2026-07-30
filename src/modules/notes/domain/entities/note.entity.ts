@@ -9,6 +9,11 @@ export interface NoteProps {
   anchorText?: string;
   anchorStart?: number;
   anchorEnd?: number;
+  sourceType?: 'DISCUSSION_CODE_SHARE';
+  sourceCodeShareId?: string;
+  sourceAuthorId?: string;
+  sourceAuthorName?: string;
+  sourceLink?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

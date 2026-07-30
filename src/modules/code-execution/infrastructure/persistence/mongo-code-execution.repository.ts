@@ -19,8 +19,8 @@ export class MongoCodeExecutionRepository implements ICodeExecutionRepository {
     return CodeExecution.create(CodeExecutionMapper.toPersistence(execution));
   }
 
-  async listHistory(userId: string, { lessonId, page, limit }: CodeExecutionHistoryOptions) {
-    const filter = { userId, ...(lessonId ? { lessonId } : {}) };
+  async listHistory(userId: string, { lessonId, exerciseId, page, limit }: CodeExecutionHistoryOptions) {
+    const filter = { userId, ...(lessonId ? { lessonId } : {}), ...(exerciseId ? { exerciseId } : {}) };
     const [items, total] = await Promise.all([
       CodeExecution.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       CodeExecution.countDocuments(filter),

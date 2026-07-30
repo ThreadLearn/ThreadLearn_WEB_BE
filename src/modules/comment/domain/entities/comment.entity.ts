@@ -49,6 +49,8 @@ export class CommentEntity {
     codeShareId?: string;
   }): CommentEntity {
     if (!input.content?.trim()) throw new BadRequestError('content is required.');
+    const postType = input.postType ?? 'GENERAL';
+    const isDiscussionQuestion = ['QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST'].includes(postType);
     return new CommentEntity({
       id: '',
       targetType: input.targetType,
@@ -62,8 +64,8 @@ export class CommentEntity {
       status: 'active',
       isEdited: false,
       mentionUserIds: input.mentionUserIds ?? [],
-      postType: input.postType ?? 'GENERAL',
-      questionStatus: input.parentId ? undefined : 'OPEN',
+      postType,
+      questionStatus: input.parentId || !isDiscussionQuestion ? undefined : 'OPEN',
       codeShareId: input.codeShareId,
     });
   }
