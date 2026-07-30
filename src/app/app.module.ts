@@ -15,6 +15,7 @@ import { BookmarkModule } from '../modules/bookmark/bookmark.module';
 import { CertificatesModule } from '../modules/certificates/certificates.module';
 import { CommentModule } from '../modules/comment/comment.module';
 import { CodeExecutionModule } from '../modules/code-execution/code-execution.module';
+import { CodeShareModule } from '../modules/code-share/code-share.module';
 import { CourseModule } from '../modules/course/course.module';
 import { CoursesModule } from '../modules/courses/courses.module';
 import { EnrollmentsModule } from '../modules/enrollments/enrollments.module';
@@ -47,6 +48,7 @@ import { AppController } from './app.controller';
     BookmarkModule,
     CertificatesModule,
     CodeExecutionModule,
+    CodeShareModule,
     CommentModule,
     CourseModule,
     CoursesModule,

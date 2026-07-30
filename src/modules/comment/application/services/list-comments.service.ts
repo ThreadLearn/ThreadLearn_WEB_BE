@@ -21,6 +21,7 @@ export class ListCommentsService {
     targetId: string,
     page = 1,
     limit = 10,
+    filters?: { postType?: import('../../domain/entities/comment.entity').CommentPostType; questionStatus?: import('../../domain/entities/comment.entity').CommentQuestionStatus },
   ) {
     if (!targetType || !['COURSE', 'LESSON'].includes(targetType)) {
       throw new BadRequestError('targetType must be COURSE or LESSON.');
@@ -31,6 +32,6 @@ export class ListCommentsService {
     } else {
       await this.learningAccess.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
     }
-    return this.comments.listByTarget(targetType, targetId, page, limit);
+    return this.comments.listByTarget(targetType, targetId, page, limit, filters);
   }
 }

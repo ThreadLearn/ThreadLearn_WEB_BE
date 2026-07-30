@@ -33,6 +33,10 @@ import { GetCommentService } from '../../application/services/get-comment.servic
 import { ListCommentsService } from '../../application/services/list-comments.service';
 import { ListRepliesService } from '../../application/services/list-replies.service';
 import { UpdateCommentService } from '../../application/services/update-comment.service';
+import { ManageDiscussionService } from '../../application/services/manage-discussion.service';
+import { z } from '../../../../common/zod/z';
+
+const acceptDiscussionSchema = z.object({ replyId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid reply id.') });
 
 @ApiTags('Comments')
 @Controller('v1/comments')
@@ -44,6 +48,7 @@ export class CommentController {
     private readonly createCommentSvc: CreateCommentService,
     private readonly updateCommentSvc: UpdateCommentService,
     private readonly deleteCommentSvc: DeleteCommentService,
+    private readonly manageDiscussionSvc: ManageDiscussionService,
   ) {}
 
   @Get()
@@ -61,6 +66,7 @@ export class CommentController {
       query.targetId,
       query.page,
       query.limit,
+      { postType: query.postType, questionStatus: query.questionStatus },
     );
     return ApiResponse.success({
       message: 'Comments fetched.',
@@ -111,6 +117,8 @@ export class CommentController {
       content: body.content,
       parentId: commentId,
       isAnonymous: body.isAnonymous ?? false,
+      postType: body.postType === 'CODE_SOLUTION' ? 'CODE_SOLUTION' : 'GENERAL',
+      codeShareId: body.codeShareId,
     });
     return ApiResponse.success({ message: 'Reply created.', data, statusCode: 201 });
   }
@@ -140,6 +148,34 @@ export class CommentController {
     if (!user) throw new BadRequestError('User context required.');
     await this.deleteCommentSvc.execute(user.id, user.role, commentId);
     return ApiResponse.success({ message: 'Comment deleted.' });
+  }
+
+  @Patch(':commentId/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async acceptSolution(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+    @Body(new ZodValidationPipe(acceptDiscussionSchema)) body: z.infer<typeof acceptDiscussionSchema>,
+  ) {
+    const data = await this.manageDiscussionSvc.accept(user.id, user.role, commentId, body.replyId);
+    return ApiResponse.success({ message: 'Solution accepted.', data });
+  }
+
+  @Patch(':commentId/close')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async closeDiscussion(@CurrentUser() user: AuthenticatedUser, @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
+    const data = await this.manageDiscussionSvc.setStatus(user.id, user.role, commentId, 'CLOSED');
+    return ApiResponse.success({ message: 'Discussion closed.', data });
+  }
+
+  @Patch(':commentId/reopen')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async reopenDiscussion(@CurrentUser() user: AuthenticatedUser, @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
+    const data = await this.manageDiscussionSvc.setStatus(user.id, user.role, commentId, 'OPEN');
+    return ApiResponse.success({ message: 'Discussion reopened.', data });
   }
 }
 
@@ -190,6 +226,8 @@ export class LessonCommentsController {
       content: body.content,
       parentId: body.parentId,
       isAnonymous: body.isAnonymous,
+      postType: body.postType,
+      codeShareId: body.codeShareId,
     });
     return ApiResponse.success({ message: 'Comment created.', data: comment, statusCode: 201 });
   }

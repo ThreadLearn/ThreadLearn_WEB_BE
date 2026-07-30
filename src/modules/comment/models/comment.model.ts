@@ -2,6 +2,8 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 
 export type CommentTargetType = 'COURSE' | 'LESSON';
 export type CommentStatus     = 'active' | 'hidden' | 'deleted';
+export type CommentPostType = 'GENERAL' | 'QUESTION' | 'CODE_HELP' | 'CODE_REVIEW' | 'EXPLANATION_REQUEST' | 'CODE_SOLUTION';
+export type CommentQuestionStatus = 'OPEN' | 'SOLVED' | 'CLOSED';
 
 export interface IComment extends Document {
   targetType: CommentTargetType;
@@ -20,6 +22,10 @@ export interface IComment extends Document {
   deletedAt?: Date;
   reactionCount?: number;
   mentionUserIds?: Types.ObjectId[];
+  postType?: CommentPostType;
+  questionStatus?: CommentQuestionStatus;
+  codeShareId?: Types.ObjectId;
+  acceptedReplyId?: Types.ObjectId;
 }
 
 const CommentSchema: Schema<IComment> = new Schema(
@@ -38,11 +44,20 @@ const CommentSchema: Schema<IComment> = new Schema(
     deletedAt:  { type: Date },
     reactionCount: { type: Number, default: 0, min: 0 },
     mentionUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    postType: {
+      type: String,
+      enum: ['GENERAL', 'QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST', 'CODE_SOLUTION'],
+      default: 'GENERAL',
+    },
+    questionStatus: { type: String, enum: ['OPEN', 'SOLVED', 'CLOSED'], default: 'OPEN' },
+    codeShareId: { type: Schema.Types.ObjectId, ref: 'CodeShare', index: true },
+    acceptedReplyId: { type: Schema.Types.ObjectId, ref: 'Comment' },
   },
   { timestamps: true },
 );
 
 CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, createdAt: -1 });
+CommentSchema.index({ targetType: 1, targetId: 1, questionStatus: 1, createdAt: -1 });
 
 export const Comment: Model<IComment> =
   mongoose.models.Comment || mongoose.model<IComment>('Comment', CommentSchema);

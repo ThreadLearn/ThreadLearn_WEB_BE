@@ -35,6 +35,10 @@ export class CommentMapper {
       deletedAt: dateOf(doc.deletedAt),
       reactionCount: doc.reactionCount,
       mentionUserIds: (doc.mentionUserIds ?? []).map((id: any) => String(idOf(id) ?? id)),
+      postType: doc.postType ?? 'GENERAL',
+      questionStatus: doc.questionStatus,
+      codeShareId: idOf(doc.codeShareId),
+      acceptedReplyId: idOf(doc.acceptedReplyId),
     };
   }
 
@@ -55,6 +59,10 @@ export class CommentMapper {
       deletedAt: props.deletedAt,
       reactionCount: props.reactionCount,
       mentionUserIds: props.mentionUserIds,
+      postType: props.postType,
+      questionStatus: props.questionStatus,
+      codeShareId: props.codeShareId,
+      acceptedReplyId: props.acceptedReplyId,
     };
   }
 

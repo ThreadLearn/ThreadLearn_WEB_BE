@@ -2,6 +2,8 @@ import { BadRequestError, ForbiddenError } from '../../../../common/custom-error
 
 export type CommentTargetType = 'COURSE' | 'LESSON';
 export type CommentStatus = 'active' | 'hidden' | 'deleted';
+export type CommentPostType = 'GENERAL' | 'QUESTION' | 'CODE_HELP' | 'CODE_REVIEW' | 'EXPLANATION_REQUEST' | 'CODE_SOLUTION';
+export type CommentQuestionStatus = 'OPEN' | 'SOLVED' | 'CLOSED';
 
 export interface CommentProps {
   id: string;
@@ -21,13 +23,17 @@ export interface CommentProps {
   deletedAt?: Date;
   reactionCount?: number;
   mentionUserIds: string[];
+  postType?: CommentPostType;
+  questionStatus?: CommentQuestionStatus;
+  codeShareId?: string;
+  acceptedReplyId?: string;
 }
 
 export class CommentEntity {
   private constructor(private readonly props: CommentProps) {}
 
   static fromPersistence(props: CommentProps): CommentEntity {
-    return new CommentEntity({ ...props, mentionUserIds: [...props.mentionUserIds] });
+    return new CommentEntity({ ...props, postType: props.postType ?? 'GENERAL', mentionUserIds: [...props.mentionUserIds] });
   }
 
   static createNew(input: {
@@ -39,6 +45,8 @@ export class CommentEntity {
     courseId?: string;
     parentId?: string | null;
     mentionUserIds?: string[];
+    postType?: CommentPostType;
+    codeShareId?: string;
   }): CommentEntity {
     if (!input.content?.trim()) throw new BadRequestError('content is required.');
     return new CommentEntity({
@@ -54,6 +62,9 @@ export class CommentEntity {
       status: 'active',
       isEdited: false,
       mentionUserIds: input.mentionUserIds ?? [],
+      postType: input.postType ?? 'GENERAL',
+      questionStatus: input.parentId ? undefined : 'OPEN',
+      codeShareId: input.codeShareId,
     });
   }
 
@@ -75,6 +86,18 @@ export class CommentEntity {
 
   get parentId(): string | null | undefined {
     return this.props.parentId;
+  }
+
+  get postType(): CommentPostType {
+    return this.props.postType ?? 'GENERAL';
+  }
+
+  get codeShareId(): string | undefined {
+    return this.props.codeShareId;
+  }
+
+  get questionStatus(): CommentQuestionStatus | undefined {
+    return this.props.questionStatus;
   }
 
   ensureCanModify(userId: string, userRole: 'STUDENT' | 'ADMIN'): void {
