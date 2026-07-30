@@ -19,6 +19,9 @@ export class LessonMapper {
       contentMarkdown: doc.contentMarkdown ?? doc.content ?? '',
       lessonType: (doc.lessonType ?? 'article') as LessonType,
       videoUrl: doc.videoUrl,
+      transcript: doc.transcript,
+      transcriptLanguage: doc.transcriptLanguage,
+      subtitleTracks: doc.subtitleTracks ?? [],
       attachments: doc.attachments ?? [],
       codeSnippets: (doc.codeSnippets ?? []).map((s) => ({
         language: s.language,
@@ -44,13 +47,18 @@ export class LessonMapper {
     return {
       courseId: Types.ObjectId.isValid(p.courseId) ? new Types.ObjectId(p.courseId) : p.courseId,
       sectionId:
-        p.sectionId && Types.ObjectId.isValid(p.sectionId) ? new Types.ObjectId(p.sectionId) : undefined,
+        p.sectionId && Types.ObjectId.isValid(p.sectionId)
+          ? new Types.ObjectId(p.sectionId)
+          : undefined,
       title: p.title,
       slug: p.slug,
       description: p.description,
       contentMarkdown: p.contentMarkdown,
       lessonType: p.lessonType,
       videoUrl: p.videoUrl,
+      transcript: p.transcript,
+      transcriptLanguage: p.transcriptLanguage,
+      subtitleTracks: p.subtitleTracks,
       attachments,
       codeSnippets: p.codeSnippets,
       orderIndex: p.orderIndex,

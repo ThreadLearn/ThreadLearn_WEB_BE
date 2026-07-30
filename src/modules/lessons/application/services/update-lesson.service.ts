@@ -14,13 +14,13 @@ import { UpdateLessonDto } from '../dto/lesson.dto';
 export class UpdateLessonService {
   constructor(
     @Inject(LESSON_REPOSITORY) private readonly repo: ILessonRepository,
-    @Inject(LESSON_VERSION_REPOSITORY) private readonly versions: ILessonVersionRepository,
+    @Inject(LESSON_VERSION_REPOSITORY) private readonly versions: ILessonVersionRepository
   ) {}
 
   async execute(
     lessonId: string,
     input: UpdateLessonDto,
-    actor?: { id?: string },
+    actor?: { id?: string }
   ): Promise<LessonEntity> {
     const lesson = await this.repo.findById(lessonId);
     if (!lesson || lesson.isDeleted) {
@@ -32,6 +32,9 @@ export class UpdateLessonService {
       description: input.description,
       lessonType: input.lessonType,
       videoUrl: input.videoUrl,
+      transcript: input.transcript,
+      transcriptLanguage: input.transcriptLanguage,
+      subtitleTracks: input.subtitleTracks,
       attachments: input.attachments,
       codeSnippets: input.codeSnippets,
       estimatedTime: input.estimatedTime,
@@ -55,7 +58,7 @@ export class UpdateLessonService {
           version: latest + 1,
           contentMarkdown: saved.contentMarkdown,
           createdBy: actor?.id,
-        }),
+        })
       );
       saved.setCurrentVersion(version.id);
       saved = await this.repo.update(saved);

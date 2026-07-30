@@ -1,10 +1,20 @@
 import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
-import { LessonStatus, LessonType, VERSION_THRESHOLD_CHARS } from '../value-objects/lesson-status.vo';
+import {
+  LessonStatus,
+  LessonType,
+  VERSION_THRESHOLD_CHARS,
+} from '../value-objects/lesson-status.vo';
 
 export interface LessonCodeSnippet {
   language: string;
   code: string;
   description?: string;
+}
+
+export interface LessonSubtitleTrack {
+  language: string;
+  label?: string;
+  url: string;
 }
 
 /** Toàn bộ trạng thái của 1 Lesson (đã tách khỏi Mongoose — domain thuần). */
@@ -18,6 +28,9 @@ export interface LessonProps {
   contentMarkdown: string;
   lessonType: LessonType;
   videoUrl?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  subtitleTracks: LessonSubtitleTrack[];
   attachments: string[];
   codeSnippets: LessonCodeSnippet[];
   orderIndex: number;
@@ -39,6 +52,9 @@ export interface CreateLessonEntityInput {
   contentMarkdown?: string;
   lessonType?: LessonType;
   videoUrl?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  subtitleTracks?: LessonSubtitleTrack[];
   attachments?: string[];
   codeSnippets?: LessonCodeSnippet[];
   orderIndex: number;
@@ -53,6 +69,9 @@ export interface LessonEditableProps {
   description?: string;
   lessonType?: LessonType;
   videoUrl?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  subtitleTracks?: LessonSubtitleTrack[];
   attachments?: string[];
   codeSnippets?: LessonCodeSnippet[];
   estimatedTime?: number;
@@ -90,6 +109,9 @@ export class LessonEntity {
       contentMarkdown: input.contentMarkdown ?? '',
       lessonType: input.lessonType ?? 'article',
       videoUrl: input.videoUrl,
+      transcript: input.transcript,
+      transcriptLanguage: input.transcriptLanguage,
+      subtitleTracks: input.subtitleTracks ?? [],
       attachments: input.attachments ?? [],
       codeSnippets: input.codeSnippets ?? [],
       orderIndex: input.orderIndex,
@@ -100,14 +122,30 @@ export class LessonEntity {
     });
   }
 
-  get id(): string { return this.props.id; }
-  get courseId(): string { return this.props.courseId; }
-  get title(): string { return this.props.title; }
-  get status(): LessonStatus { return this.props.status; }
-  get lessonType(): LessonType { return this.props.lessonType; }
-  get isLocked(): boolean { return this.props.isLocked; }
-  get contentMarkdown(): string { return this.props.contentMarkdown; }
-  get isDeleted(): boolean { return this.props.status === 'deleted'; }
+  get id(): string {
+    return this.props.id;
+  }
+  get courseId(): string {
+    return this.props.courseId;
+  }
+  get title(): string {
+    return this.props.title;
+  }
+  get status(): LessonStatus {
+    return this.props.status;
+  }
+  get lessonType(): LessonType {
+    return this.props.lessonType;
+  }
+  get isLocked(): boolean {
+    return this.props.isLocked;
+  }
+  get contentMarkdown(): string {
+    return this.props.contentMarkdown;
+  }
+  get isDeleted(): boolean {
+    return this.props.status === 'deleted';
+  }
 
   ensureNotDeleted(): void {
     if (this.props.status === 'deleted') {
@@ -126,6 +164,9 @@ export class LessonEntity {
     if (patch.description !== undefined) p.description = patch.description;
     if (patch.lessonType !== undefined) p.lessonType = patch.lessonType;
     if (patch.videoUrl !== undefined) p.videoUrl = patch.videoUrl;
+    if (patch.transcript !== undefined) p.transcript = patch.transcript;
+    if (patch.transcriptLanguage !== undefined) p.transcriptLanguage = patch.transcriptLanguage;
+    if (patch.subtitleTracks !== undefined) p.subtitleTracks = patch.subtitleTracks;
     if (patch.attachments !== undefined) p.attachments = patch.attachments;
     if (patch.codeSnippets !== undefined) p.codeSnippets = patch.codeSnippets;
     if (patch.estimatedTime !== undefined) p.estimatedTime = patch.estimatedTime;
