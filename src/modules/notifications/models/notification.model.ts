@@ -17,6 +17,11 @@ export type NotificationType =
   | 'NEW_USER_REGISTERED'
   | 'STUDENT_COMMENT_REPORT'
   | 'COMMENT_REPLY'
+  | 'DISCUSSION_REPLY'
+  | 'DISCUSSION_MENTION'
+  | 'CODE_SOLUTION_SUBMITTED'
+  | 'CODE_SOLUTION_ACCEPTED'
+  | 'DISCUSSION_REOPENED'
   | 'AI_FEEDBACK'
   | 'SYSTEM_ERROR';
 
@@ -61,6 +66,11 @@ const NotificationSchema: Schema<INotification> = new Schema(
         'NEW_USER_REGISTERED',
         'STUDENT_COMMENT_REPORT',
         'COMMENT_REPLY',
+        'DISCUSSION_REPLY',
+        'DISCUSSION_MENTION',
+        'CODE_SOLUTION_SUBMITTED',
+        'CODE_SOLUTION_ACCEPTED',
+        'DISCUSSION_REOPENED',
         'AI_FEEDBACK',
         'SYSTEM_ERROR',
       ],

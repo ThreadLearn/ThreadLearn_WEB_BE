@@ -32,6 +32,14 @@ import { ListMyNotesService } from '../../application/services/list-my-notes.ser
 import { RemoveNoteService } from '../../application/services/remove-note.service';
 import { SearchNotesService } from '../../application/services/search-notes.service';
 import { UpdateNoteService } from '../../application/services/update-note.service';
+import { CreateNoteFromCodeShareService } from '../../application/services/create-note-from-code-share.service';
+import { z } from '../../../../common/zod/z';
+
+const createFromCodeShareSchema = z.object({
+  codeShareId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid code share id.'),
+  lessonId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid lesson id.'),
+  noteText: z.string().max(10000).optional(),
+});
 
 @ApiTags('Notes')
 @Controller('v1/notes')
@@ -44,7 +52,8 @@ export class NotesController {
     private readonly searchNotesSvc: SearchNotesService,
     private readonly createNoteSvc: CreateNoteService,
     private readonly updateNoteSvc: UpdateNoteService,
-    private readonly removeNoteSvc: RemoveNoteService
+    private readonly removeNoteSvc: RemoveNoteService,
+    private readonly createFromCodeShareSvc: CreateNoteFromCodeShareService,
   ) {}
 
   @Get()
@@ -83,6 +92,15 @@ export class NotesController {
   ) {
     const note = await this.createNoteSvc.execute(user.id, body);
     return ApiResponse.success({ message: 'Note created.', data: note });
+  }
+
+  @Post('from-code-share')
+  async createFromCodeShare(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createFromCodeShareSchema)) body: z.infer<typeof createFromCodeShareSchema>,
+  ) {
+    const note = await this.createFromCodeShareSvc.execute(user.id, user.role, body);
+    return ApiResponse.success({ message: 'Community solution saved to notes.', data: note, statusCode: 201 });
   }
 
   @Patch(':id')

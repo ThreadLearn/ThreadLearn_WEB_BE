@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { NotFoundError } from '../../../../common/custom-error';
+import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
 import {
   ILearningAccess,
@@ -8,6 +8,8 @@ import {
 import { CreateCommentDto } from '../dto/comment.dto';
 import { CommentEntity, CommentTargetType } from '../../domain/entities/comment.entity';
 import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/comment.repository';
+import { CodeShareService } from '../../../code-share/application/services/code-share.service';
+import { discussionRoom, getSocketServer } from '../../../../socket';
 
 const isObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
 
@@ -16,6 +18,7 @@ export class CreateCommentService {
   constructor(
     @Inject(COMMENT_REPOSITORY) private readonly comments: ICommentRepository,
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
+    private readonly codeShares?: CodeShareService,
   ) {}
 
   async execute(
@@ -29,6 +32,10 @@ export class CreateCommentService {
     // unbounded tree, as required by UC30.
     const parent = input.parentId ? await this.comments.findById(input.parentId) : null;
     const parentId = parent?.parentId ?? parent?.id ?? input.parentId;
+    if (input.codeShareId) {
+      if (!this.codeShares) throw new BadRequestError('Code sharing is unavailable.');
+      await this.codeShares.assertAttachable(userId, userRole, input.codeShareId, input.targetType, String(input.targetId));
+    }
     const created = await this.comments.create(
       CommentEntity.createNew({
         userId,
@@ -39,6 +46,8 @@ export class CreateCommentService {
         parentId,
         isAnonymous: input.isAnonymous ?? false,
         mentionUserIds: input.mentionUserIds?.filter(isObjectId),
+        postType: input.postType,
+        codeShareId: input.codeShareId,
       }),
     );
 
@@ -47,15 +56,22 @@ export class CreateCommentService {
       if (targetUserId) {
         await NotificationsService.sendNotification({
           userId: targetUserId,
-          title: 'New comment reply',
-          message: 'Someone replied to your lesson comment.',
-          type: 'COMMENT_REPLY',
+          title: input.postType === 'CODE_SOLUTION' ? 'New code solution' : 'New discussion reply',
+          message: input.postType === 'CODE_SOLUTION' ? 'Someone submitted a verified code solution.' : 'Someone replied to your discussion.',
+          type: input.postType === 'CODE_SOLUTION' ? 'CODE_SOLUTION_SUBMITTED' : 'DISCUSSION_REPLY',
           metadata: { commentId: created.id, parentId },
         });
       }
     }
 
-    return this.comments.findViewById(created.id);
+    const view = await this.comments.findViewById(created.id);
+    getSocketServer()?.to(discussionRoom(input.targetType, String(input.targetId))).emit('discussion:update', {
+      targetType: input.targetType,
+      targetId: String(input.targetId),
+      action: parentId ? 'reply-created' : 'thread-created',
+      discussionId: parentId ?? created.id,
+    });
+    return view;
   }
 
   private async checkTargetAccess(

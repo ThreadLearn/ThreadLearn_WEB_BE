@@ -34,11 +34,12 @@ export class MongoCommentRepository implements ICommentRepository {
     targetId: string,
     page: number,
     limit: number,
+    filters?: { postType?: import('../../domain/entities/comment.entity').CommentPostType; questionStatus?: import('../../domain/entities/comment.entity').CommentQuestionStatus },
   ): Promise<CommentListResult> {
     const skip = (page - 1) * limit;
     // Deleted rows remain visible as tombstones so their reply thread keeps
     // its context. Mutating a deleted comment is still blocked by findById.
-    const query = { targetType, targetId, parentId: null };
+    const query = { targetType, targetId, parentId: null, ...(filters?.postType ? { postType: filters.postType } : {}), ...(filters?.questionStatus ? { questionStatus: filters.questionStatus } : {}) };
     const [comments, total] = await Promise.all([
       Comment.find(query)
         .populate('userId', 'firstName lastName avatarUrl')
