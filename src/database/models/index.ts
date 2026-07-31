@@ -17,6 +17,9 @@ import { Exercise } from '../../modules/code-execution/models/exercise.model';
 import { Certificate } from '../../modules/certificates/models/certificate.model';
 import { Quiz } from '../../modules/quiz/models/quiz.model';
 import { QuizAttempt } from '../../modules/quiz-attempts/models/quiz-attempt.model';
+import { QuizSession } from '../../modules/quiz-attempts/infrastructure/persistence/schemas/quiz-session.schema';
+import { QuizBankImport } from '../../modules/quiz/infrastructure/persistence/schemas/quiz-bank-import.schema';
+import { QuizBankQuestion, QuizQuestionBank } from '../../modules/quiz/infrastructure/persistence/schemas/quiz-question-bank.schema';
 import { AIHistory } from '../../modules/ai/models/ai-history.model';
 import { UserStats } from '../../modules/gamification/infrastructure/persistence/schemas/user-stats.schema';
 import { XpAwardLog } from '../../modules/gamification/infrastructure/persistence/schemas/xp-award-log.schema';
@@ -45,6 +48,10 @@ export {
   Certificate,
   Quiz,
   QuizAttempt,
+  QuizSession,
+  QuizQuestionBank,
+  QuizBankQuestion,
+  QuizBankImport,
   AIHistory,
   UserStats,
   XpAwardLog,

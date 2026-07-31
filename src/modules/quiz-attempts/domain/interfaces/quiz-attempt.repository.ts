@@ -19,6 +19,7 @@ export interface QuizAttemptPageResult {
 export interface IQuizAttemptRepository {
   create(entity: QuizAttempt): Promise<QuizAttempt>;
   findByIdAndUser(attemptId: string, userId: string): Promise<QuizAttempt | null>;
+  findBySessionIdAndUser(sessionId: string, userId: string): Promise<QuizAttempt | null>;
   findByUser(userId: string): Promise<QuizAttempt[]>;
   findByUserPaginated(userId: string, options: QuizAttemptPageOptions): Promise<QuizAttemptPageResult>;
   deleteById(attemptId: string): Promise<void>;

@@ -16,6 +16,10 @@ export interface IQuiz extends Document {
   timeLimitSeconds?: number;
   timeLimit: number;
   xpReward: number;
+  /** Khi bật, câu hỏi được phát từ question bank thay vì mảng questions legacy. */
+  useQuestionBank: boolean;
+  /** Số câu phát cho một attempt. Giới hạn nghiệp vụ 5–10. */
+  randomQuestionCount?: number;
   questions: IQuestion[];
   isDeleted: boolean;
   deletedAt?: Date | null;
@@ -35,6 +39,8 @@ export const QuizSchema: Schema<IQuiz> = new Schema(
     passingScorePercent: { type: Number, default: 80 },
     timeLimitSeconds: { type: Number },
     xpReward: { type: Number, default: 100 },
+    useQuestionBank: { type: Boolean, default: false },
+    randomQuestionCount: { type: Number, min: 5, max: 10 },
     timeLimit: { type: Number, default: 1800, min: 0 },
     passingScore: { type: Number, default: 80, min: 0, max: 100 },
     isDeleted: { type: Boolean, default: false, index: true },

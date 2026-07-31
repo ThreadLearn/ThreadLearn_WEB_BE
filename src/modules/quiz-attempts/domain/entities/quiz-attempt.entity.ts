@@ -10,6 +10,7 @@ export interface QuizAttemptProps {
   passingScorePercent?: number;
   xpRewarded?: number;
   isTimeout?: boolean;
+  sessionId?: string;
   startedAt?: Date;
   completedAt?: Date;
 }
@@ -77,6 +78,7 @@ export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
       passingScorePercent: this.props.passingScorePercent,
       xpRewarded: this.props.xpRewarded,
       isTimeout: this.props.isTimeout,
+      sessionId: this.props.sessionId,
       startedAt: this.props.startedAt,
       completedAt: this.props.completedAt,
     };

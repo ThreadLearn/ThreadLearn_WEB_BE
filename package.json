@@ -14,7 +14,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest --passWithNoTests",
     "db:seed": "ts-node src/database/seed.ts",
-    "db:migrate:notes-multiple": "ts-node src/database/migrations/migrate-note-multiple-per-lesson.ts"
+    "db:migrate:notes-multiple": "ts-node src/database/migrations/migrate-note-multiple-per-lesson.ts",
+    "db:migrate:quiz-question-bank": "ts-node src/database/migrations/migrate-quiz-question-bank.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",
@@ -40,6 +41,7 @@
     "express": "^5.2.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.12.0",
     "mongoose": "^8.1.1",
     "nodemailer": "^8.0.10",
     "pdfkit": "^0.18.0",
@@ -50,6 +52,7 @@
     "socket.io-client": "^4.7.4",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
