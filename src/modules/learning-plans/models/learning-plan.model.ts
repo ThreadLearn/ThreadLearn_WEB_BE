@@ -6,6 +6,7 @@ export interface ILearningPlan extends Document {
   preferredDays: number[];
   targetDate?: Date;
   reminderEnabled: boolean;
+  emailReminderEnabled: boolean;
   reminderTime: string;
   timezone: string;
   createdAt: Date;
@@ -19,6 +20,7 @@ const LearningPlanSchema = new Schema<ILearningPlan>(
     preferredDays: { type: [Number], required: true, default: [1, 3, 5] },
     targetDate: { type: Date },
     reminderEnabled: { type: Boolean, default: true },
+    emailReminderEnabled: { type: Boolean, default: false },
     reminderTime: { type: String, required: true, default: '19:00' },
     timezone: { type: String, required: true, default: 'Asia/Ho_Chi_Minh' },
   },

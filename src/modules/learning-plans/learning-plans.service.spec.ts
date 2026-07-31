@@ -21,6 +21,7 @@ describe('LearningPlansService', () => {
       preferredDays: [1, 3, 5],
       targetDate: null,
       reminderEnabled: true,
+      emailReminderEnabled: false,
       reminderTime: '19:00',
       timezone: 'Asia/Ho_Chi_Minh',
       isConfigured: false,
@@ -34,6 +35,7 @@ describe('LearningPlansService', () => {
       preferredDays: [1, 3, 5],
       targetDate: new Date('2026-08-30T23:59:59.999Z'),
       reminderEnabled: true,
+      emailReminderEnabled: true,
       reminderTime: '20:30',
       timezone: 'Asia/Bangkok',
     };
@@ -44,6 +46,7 @@ describe('LearningPlansService', () => {
       preferredDays: [5, 1, 3],
       targetDate: '2026-08-30',
       reminderEnabled: true,
+      emailReminderEnabled: true,
       reminderTime: '20:30',
       timezone: 'Asia/Bangkok',
     });
@@ -56,6 +59,7 @@ describe('LearningPlansService', () => {
       expect.objectContaining({ upsert: true }),
     );
     expect(result.suggestedSessionMinutes).toBe(80);
+    expect(result.emailReminderEnabled).toBe(true);
     expect(result.isConfigured).toBe(true);
   });
 });

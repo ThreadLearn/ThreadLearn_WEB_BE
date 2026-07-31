@@ -12,6 +12,7 @@ export const updateLearningPlanSchema = z.object({
     .refine((days) => new Set(days).size === days.length, 'Preferred days must be unique.'),
   targetDate: z.string().regex(dateOnly, 'Target date must use YYYY-MM-DD.').nullable().optional(),
   reminderEnabled: z.boolean(),
+  emailReminderEnabled: z.boolean().optional(),
   reminderTime: z.string().regex(timeOfDay, 'Reminder time must use HH:mm.').optional(),
   timezone: z.string().min(1).max(100).optional(),
 });
