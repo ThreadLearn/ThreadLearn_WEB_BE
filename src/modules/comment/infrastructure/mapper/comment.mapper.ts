@@ -34,11 +34,16 @@ export class CommentMapper {
       updatedAt: dateOf(doc.updatedAt),
       deletedAt: dateOf(doc.deletedAt),
       reactionCount: doc.reactionCount,
+      helpfulCount: doc.helpfulCount,
+      replyCount: doc.replyCount,
       mentionUserIds: (doc.mentionUserIds ?? []).map((id: any) => String(idOf(id) ?? id)),
       postType: doc.postType ?? 'GENERAL',
       questionStatus: doc.questionStatus,
       codeShareId: idOf(doc.codeShareId),
       acceptedReplyId: idOf(doc.acceptedReplyId),
+      learningContext: doc.learningContext,
+      instructorVerifiedAt: dateOf(doc.instructorVerifiedAt),
+      instructorVerifiedBy: idOf(doc.instructorVerifiedBy),
     };
   }
 
@@ -58,11 +63,16 @@ export class CommentMapper {
       editedAt: props.editedAt,
       deletedAt: props.deletedAt,
       reactionCount: props.reactionCount,
+      helpfulCount: props.helpfulCount,
+      replyCount: props.replyCount,
       mentionUserIds: props.mentionUserIds,
       postType: props.postType,
       questionStatus: props.questionStatus,
       codeShareId: props.codeShareId,
       acceptedReplyId: props.acceptedReplyId,
+      learningContext: props.learningContext,
+      instructorVerifiedAt: props.instructorVerifiedAt,
+      instructorVerifiedBy: props.instructorVerifiedBy,
     };
   }
 

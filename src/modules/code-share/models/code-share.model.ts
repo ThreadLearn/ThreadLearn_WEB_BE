@@ -10,6 +10,8 @@ export interface ICodeShare extends Document {
   courseId?: Types.ObjectId;
   lessonId?: Types.ObjectId;
   exerciseId?: string;
+  lessonVersionId?: Types.ObjectId;
+  lessonUpdatedAt?: Date;
   sourceExecutionId: Types.ObjectId;
   language: string;
   sourceCode: string;
@@ -32,6 +34,8 @@ const CodeShareSchema = new Schema<ICodeShare>(
     courseId: { type: Schema.Types.ObjectId, ref: 'Course', index: true },
     lessonId: { type: Schema.Types.ObjectId, ref: 'Lesson', index: true },
     exerciseId: { type: String, trim: true },
+    lessonVersionId: { type: Schema.Types.ObjectId, ref: 'LessonVersion' },
+    lessonUpdatedAt: { type: Date },
     sourceExecutionId: { type: Schema.Types.ObjectId, ref: 'CodeExecution', required: true, unique: true },
     language: { type: String, required: true, trim: true },
     sourceCode: { type: String, required: true, maxlength: 50000 },

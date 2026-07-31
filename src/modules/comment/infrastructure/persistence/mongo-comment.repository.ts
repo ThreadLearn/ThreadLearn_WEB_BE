@@ -11,7 +11,7 @@ export class MongoCommentRepository implements ICommentRepository {
   async findById(id: string): Promise<CommentEntity | null> {
     if (!mongoose.isValidObjectId(id)) return null;
     const doc = await Comment.findById(id);
-    if (!doc || doc.status === 'deleted') return null;
+    if (!doc || doc.status !== 'active') return null;
     return CommentMapper.toEntity(doc);
   }
 
@@ -39,7 +39,7 @@ export class MongoCommentRepository implements ICommentRepository {
     const skip = (page - 1) * limit;
     // Deleted rows remain visible as tombstones so their reply thread keeps
     // its context. Mutating a deleted comment is still blocked by findById.
-    const query = { targetType, targetId, parentId: null, ...(filters?.postType ? { postType: filters.postType } : {}), ...(filters?.questionStatus ? { questionStatus: filters.questionStatus } : {}) };
+    const query = { targetType, targetId, parentId: null, status: { $ne: 'hidden' }, ...(filters?.postType ? { postType: filters.postType } : {}), ...(filters?.questionStatus ? { questionStatus: filters.questionStatus } : {}) };
     const [comments, total] = await Promise.all([
       Comment.find(query)
         .populate('userId', 'firstName lastName avatarUrl')
@@ -62,7 +62,7 @@ export class MongoCommentRepository implements ICommentRepository {
     if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
     const parent = await Comment.findById(commentId);
     if (!parent) throw new NotFoundError('Comment not found.');
-    const replies = await Comment.find({ parentId: commentId })
+    const replies = await Comment.find({ parentId: commentId, status: { $ne: 'hidden' } })
       .populate('userId', 'firstName lastName avatarUrl')
       .sort({ createdAt: 1 })
       .lean();

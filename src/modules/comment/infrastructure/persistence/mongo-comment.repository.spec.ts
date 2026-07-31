@@ -42,6 +42,7 @@ describe('MongoCommentRepository', () => {
       targetType: 'LESSON',
       targetId: '507f1f77bcf86cd799439012',
       parentId: null,
+      status: { $ne: 'hidden' },
     });
     expect(result.data).toEqual([
       expect.objectContaining({

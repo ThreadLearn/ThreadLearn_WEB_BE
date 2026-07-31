@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -25,6 +26,8 @@ import {
   createCommentSchema,
   createLessonCommentSchema,
   createReplySchema,
+  moderationSchema,
+  reportDiscussionSchema,
   listCommentsQuerySchema,
   updateCommentSchema,
 } from '../../application/dto/comment.dto';
@@ -35,6 +38,7 @@ import { ListCommentsService } from '../../application/services/list-comments.se
 import { ListRepliesService } from '../../application/services/list-replies.service';
 import { UpdateCommentService } from '../../application/services/update-comment.service';
 import { ManageDiscussionService } from '../../application/services/manage-discussion.service';
+import { DiscussionEngagementService } from '../../application/services/discussion-engagement.service';
 import { z } from '../../../../common/zod/z';
 
 const acceptDiscussionSchema = z.object({ replyId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid reply id.') });
@@ -50,6 +54,7 @@ export class CommentController {
     private readonly updateCommentSvc: UpdateCommentService,
     private readonly deleteCommentSvc: DeleteCommentService,
     private readonly manageDiscussionSvc: ManageDiscussionService,
+    private readonly discussionEngagementSvc: DiscussionEngagementService,
   ) {}
 
   @Get()
@@ -177,6 +182,46 @@ export class CommentController {
   async reopenDiscussion(@CurrentUser() user: AuthenticatedUser, @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
     const data = await this.manageDiscussionSvc.setStatus(user.id, user.role, commentId, 'OPEN');
     return ApiResponse.success({ message: 'Discussion reopened.', data });
+  }
+
+  @Put(':commentId/helpful')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async toggleHelpful(@CurrentUser() user: AuthenticatedUser, @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
+    const data = await this.discussionEngagementSvc.toggleHelpful(user.id, user.role, commentId);
+    return ApiResponse.success({ message: data.helpful ? 'Marked as helpful.' : 'Helpful mark removed.', data });
+  }
+
+  @Post(':commentId/reports')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async reportDiscussion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+    @Body(new ZodValidationPipe(reportDiscussionSchema)) body: z.infer<typeof reportDiscussionSchema>,
+  ) {
+    const data = await this.discussionEngagementSvc.report(user.id, user.role, commentId, body);
+    return ApiResponse.success({ message: 'Discussion report submitted.', data, statusCode: 201 });
+  }
+
+  @Patch(':commentId/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async verifyDiscussion(@CurrentUser() user: AuthenticatedUser, @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string) {
+    const data = await this.discussionEngagementSvc.verify(user.id, user.role, commentId);
+    return ApiResponse.success({ message: 'Discussion contribution verified.', data });
+  }
+
+  @Patch(':commentId/moderation')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async moderateDiscussion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commentId', new ZodValidationPipe(commentIdParamSchema)) commentId: string,
+    @Body(new ZodValidationPipe(moderationSchema)) body: z.infer<typeof moderationSchema>,
+  ) {
+    const data = await this.discussionEngagementSvc.moderate(user.id, user.role, commentId, body);
+    return ApiResponse.success({ message: 'Discussion moderation updated.', data });
   }
 }
 

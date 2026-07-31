@@ -22,11 +22,16 @@ export interface CommentProps {
   updatedAt?: Date;
   deletedAt?: Date;
   reactionCount?: number;
+  helpfulCount?: number;
+  replyCount?: number;
   mentionUserIds: string[];
   postType?: CommentPostType;
   questionStatus?: CommentQuestionStatus;
   codeShareId?: string;
   acceptedReplyId?: string;
+  learningContext?: { expectedResult?: string; actualResult?: string; tried?: string };
+  instructorVerifiedAt?: Date;
+  instructorVerifiedBy?: string;
 }
 
 export class CommentEntity {
@@ -47,6 +52,7 @@ export class CommentEntity {
     mentionUserIds?: string[];
     postType?: CommentPostType;
     codeShareId?: string;
+    learningContext?: { expectedResult?: string; actualResult?: string; tried?: string };
   }): CommentEntity {
     if (!input.content?.trim()) throw new BadRequestError('content is required.');
     const postType = input.postType ?? 'GENERAL';
@@ -67,6 +73,7 @@ export class CommentEntity {
       postType,
       questionStatus: input.parentId || !isDiscussionQuestion ? undefined : 'OPEN',
       codeShareId: input.codeShareId,
+      learningContext: input.learningContext,
     });
   }
 

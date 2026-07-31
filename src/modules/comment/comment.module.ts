@@ -8,6 +8,7 @@ import { ListCommentsService } from './application/services/list-comments.servic
 import { ListRepliesService } from './application/services/list-replies.service';
 import { UpdateCommentService } from './application/services/update-comment.service';
 import { ManageDiscussionService } from './application/services/manage-discussion.service';
+import { DiscussionEngagementService } from './application/services/discussion-engagement.service';
 import { COMMENT_REPOSITORY } from './domain/interfaces/comment.repository';
 import { MongoCommentRepository } from './infrastructure/persistence/mongo-comment.repository';
 import { CommentController, LessonCommentsController } from './presentation/controller/comment.controller';
@@ -25,6 +26,7 @@ import { CommentController, LessonCommentsController } from './presentation/cont
     UpdateCommentService,
     DeleteCommentService,
     ManageDiscussionService,
+    DiscussionEngagementService,
   ],
 })
 export class CommentModule {}
