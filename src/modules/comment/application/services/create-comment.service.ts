@@ -10,6 +10,7 @@ import { CommentEntity, CommentPostType, CommentTargetType } from '../../domain/
 import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/comment.repository';
 import { CodeShareService } from '../../../code-share/application/services/code-share.service';
 import { discussionRoom, getSocketServer } from '../../../../socket';
+import { Comment } from '../../models/comment.model';
 
 const isObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
 type CreateCommentInput = Omit<CreateCommentDto, 'postType'> & { postType?: CommentPostType };
@@ -28,6 +29,7 @@ export class CreateCommentService {
     input: Omit<CreateCommentInput, 'isAnonymous'> & { isAnonymous?: boolean },
   ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
+    await this.assertRateLimit(userId, Boolean(input.parentId));
     // The discussion model supports a root comment and one visible reply level.
     // A reply-to-reply is attached to the same root instead of creating an
     // unbounded tree, as required by UC30.
@@ -65,10 +67,12 @@ export class CreateCommentService {
         mentionUserIds: input.mentionUserIds?.filter(isObjectId),
         postType: input.postType,
         codeShareId: input.codeShareId,
+        learningContext: input.learningContext,
       }),
     );
 
     if (parentId) {
+      await Comment.updateOne({ _id: parentId }, { $inc: { replyCount: 1 } });
       const targetUserId = await this.comments.findReplyNotificationTarget(parentId, userId);
       if (targetUserId) {
         await NotificationsService.sendNotification({
@@ -106,5 +110,14 @@ export class CreateCommentService {
     }
     const lesson = await this.learningAccess.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
     return { courseId: lesson.courseId.toString() };
+  }
+
+  private async assertRateLimit(userId: string, isReply: boolean) {
+    const windowStart = new Date(Date.now() - 5 * 60 * 1000);
+    const limit = isReply ? 16 : 8;
+    const count = await Comment.countDocuments({ userId, createdAt: { $gte: windowStart } });
+    if (count >= limit) {
+      throw new BadRequestError('You are posting too quickly. Please wait a few minutes before trying again.');
+    }
   }
 }

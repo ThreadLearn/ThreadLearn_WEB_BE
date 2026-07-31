@@ -20,6 +20,9 @@ export class CodeShareService {
     const context = await this.assertTargetAccess(userId, role, dto.targetType, dto.targetId);
     const executionLessonId = execution.lessonId ? String(execution.lessonId) : undefined;
     const executionCourseId = execution.courseId ? String(execution.courseId) : undefined;
+    const executionLesson = executionLessonId
+      ? await Lesson.findById(executionLessonId).select('courseId title currentVersionId updatedAt').lean()
+      : null;
     if (dto.targetType === 'LESSON' && executionLessonId !== dto.targetId) {
       throw new BadRequestError('Code execution does not belong to this lesson.');
     }
@@ -27,8 +30,7 @@ export class CodeShareService {
       throw new BadRequestError('Course discussions can only share code linked to a lesson.');
     }
     if (dto.targetType === 'COURSE') {
-      const lesson = await Lesson.findById(executionLessonId).select('courseId').lean();
-      if (!lesson || String(lesson.courseId) !== dto.targetId || executionCourseId !== dto.targetId) {
+      if (!executionLesson || String(executionLesson.courseId) !== dto.targetId || executionCourseId !== dto.targetId) {
         throw new BadRequestError('Code execution does not belong to this course.');
       }
     }
@@ -41,6 +43,8 @@ export class CodeShareService {
         courseId: executionCourseId ?? context.courseId,
         lessonId: executionLessonId,
         exerciseId: execution.exerciseId,
+        lessonVersionId: executionLesson?.currentVersionId,
+        lessonUpdatedAt: executionLesson?.updatedAt,
         sourceExecutionId: execution._id,
         language: execution.language,
         sourceCode: execution.sourceCode,
@@ -66,10 +70,19 @@ export class CodeShareService {
 
   async getVisible(userId: string, role: UserRole, id: string) {
     if (!mongoose.isValidObjectId(id)) throw new BadRequestError('Invalid code share id.');
-    const share = await CodeShare.findById(id).populate('authorId', 'firstName lastName avatarUrl').lean();
+    const share = await CodeShare.findById(id)
+      .populate('authorId', 'firstName lastName avatarUrl')
+      .populate('lessonId', 'title courseId currentVersionId updatedAt')
+      .lean();
     if (!share) throw new NotFoundError('Code share not found.');
     await this.assertTargetAccess(userId, role, share.targetType, String(share.targetId));
-    return this.present(share);
+    const authorId = typeof share.authorId === 'object' ? String(share.authorId._id) : String(share.authorId);
+    const hasAttempt = authorId === userId || !share.lessonId || await CodeExecution.exists({
+      userId,
+      lessonId: typeof share.lessonId === 'object' ? share.lessonId._id : share.lessonId,
+      ...(share.exerciseId ? { exerciseId: share.exerciseId } : {}),
+    });
+    return this.present(share, { revealCode: Boolean(hasAttempt) });
   }
 
   async assertAttachable(userId: string, role: UserRole, id: string, targetType: 'COURSE' | 'LESSON', targetId: string) {
@@ -90,8 +103,11 @@ export class CodeShareService {
     return { courseId: String(lesson.courseId) };
   }
 
-  private present(share: any) {
+  private present(share: any, options: { revealCode?: boolean } = {}) {
     const author = share.authorId;
+    const lesson = share.lessonId;
+    const hasLessonDetails = lesson && typeof lesson === 'object' && lesson.title !== undefined;
+    const revealCode = options.revealCode ?? true;
     return {
       _id: String(share._id),
       authorId: typeof author === 'object' ? String(author._id) : String(author),
@@ -101,14 +117,21 @@ export class CodeShareService {
       targetType: share.targetType,
       targetId: String(share.targetId),
       courseId: share.courseId ? String(share.courseId) : undefined,
-      lessonId: share.lessonId ? String(share.lessonId) : undefined,
+      lessonId: share.lessonId ? String(typeof lesson === 'object' ? lesson._id : lesson) : undefined,
       exerciseId: share.exerciseId,
+      lesson: hasLessonDetails ? {
+        _id: String(lesson._id),
+        title: String(lesson.title),
+        courseId: String(lesson.courseId),
+      } : undefined,
+      isOutdated: Boolean(hasLessonDetails && share.lessonVersionId && String(lesson.currentVersionId ?? '') !== String(share.lessonVersionId)),
+      isCodeLocked: !revealCode,
       language: share.language,
-      sourceCode: share.sourceCode,
+      sourceCode: revealCode ? share.sourceCode : undefined,
       status: share.status,
-      stdout: share.stdout ?? '',
-      stderr: share.stderr ?? '',
-      compileOutput: share.compileOutput ?? '',
+      stdout: revealCode ? share.stdout ?? '' : '',
+      stderr: revealCode ? share.stderr ?? '' : '',
+      compileOutput: revealCode ? share.compileOutput ?? '' : '',
       outputTruncated: Boolean(share.outputTruncated),
       runtime: share.runtime ?? '0.000',
       memory: share.memory ?? 0,

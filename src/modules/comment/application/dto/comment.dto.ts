@@ -1,6 +1,11 @@
 import { z } from '../../../../common/zod/z';
 
 const objectIdSchema = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid id format.');
+const learningContextSchema = z.object({
+  expectedResult: z.string().min(1).max(1000),
+  actualResult: z.string().min(1).max(1000),
+  tried: z.string().min(1).max(1000),
+});
 
 export const commentIdParamSchema = objectIdSchema;
 
@@ -22,9 +27,10 @@ const createCommentBaseSchema = z.object({
   mentionUserIds: z.array(objectIdSchema).optional(),
   postType: z.enum(['GENERAL', 'QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST']).optional(),
   codeShareId: objectIdSchema.optional(),
+  learningContext: learningContextSchema.optional(),
 });
 
-const validateNoAnonymousCodeShare = (value: { isAnonymous?: boolean; codeShareId?: string }, context: z.RefinementCtx) => {
+const validateNoAnonymousCodeShare = (value: { isAnonymous?: boolean; codeShareId?: string; postType?: string; learningContext?: unknown }, context: z.RefinementCtx) => {
   if (value.isAnonymous && value.codeShareId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['isAnonymous'], message: 'Code shares cannot be posted anonymously.' });
   }
@@ -54,6 +60,16 @@ export const createReplySchema = z.object({
 
 export const updateCommentSchema = z.object({
   content: z.string().min(1).max(2000),
+});
+
+export const reportDiscussionSchema = z.object({
+  reason: z.enum(['SPAM', 'ABUSE', 'INCORRECT', 'SPOILER', 'UNSAFE_CODE', 'OTHER']),
+  details: z.string().max(1000).optional(),
+});
+
+export const moderationSchema = z.object({
+  action: z.enum(['HIDE', 'RESTORE']),
+  reason: z.string().min(3).max(500),
 });
 
 export type CreateCommentDto = z.infer<typeof createCommentSchema>;

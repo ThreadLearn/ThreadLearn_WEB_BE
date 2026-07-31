@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BadRequestError } from '../../../../common/custom-error';
+import { BadRequestError, ForbiddenError } from '../../../../common/custom-error';
 import { CodeShareService } from '../../../code-share/application/services/code-share.service';
 import { Note } from '../../models/note.model';
 import { NoteMapper } from '../../infrastructure/mapper/note.mapper';
@@ -10,6 +10,9 @@ export class CreateNoteFromCodeShareService {
 
   async execute(userId: string, role: 'STUDENT' | 'ADMIN', input: { codeShareId: string; lessonId: string; noteText?: string }) {
     const share = await this.codeShares.getVisible(userId, role, input.codeShareId);
+    if (share.isCodeLocked || !share.sourceCode) {
+      throw new ForbiddenError('Run this exercise yourself before saving a community code solution.');
+    }
     if (!share.lessonId || share.lessonId !== input.lessonId) {
       throw new BadRequestError('Choose the lesson linked to this shared code.');
     }
