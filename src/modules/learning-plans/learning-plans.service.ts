@@ -6,6 +6,7 @@ const DEFAULT_PLAN = {
   weeklyHours: 3,
   preferredDays: [1, 3, 5],
   reminderEnabled: true,
+  emailReminderEnabled: false,
   reminderTime: '19:00',
   timezone: 'Asia/Ho_Chi_Minh',
 };
@@ -41,6 +42,7 @@ export class LearningPlansService {
       preferredDays: source.preferredDays,
       targetDate: plan?.targetDate?.toISOString() ?? null,
       reminderEnabled: source.reminderEnabled,
+      emailReminderEnabled: source.emailReminderEnabled ?? false,
       reminderTime: source.reminderTime,
       timezone: source.timezone,
       isConfigured: Boolean(plan),
