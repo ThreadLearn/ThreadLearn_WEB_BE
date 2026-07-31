@@ -71,6 +71,7 @@ const CommentSchema: Schema<IComment> = new Schema(
 );
 
 CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, createdAt: -1 });
+CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, status: 1, createdAt: -1 });
 CommentSchema.index({ targetType: 1, targetId: 1, questionStatus: 1, createdAt: -1 });
 CommentSchema.index({ targetType: 1, targetId: 1, helpfulCount: -1, createdAt: -1 });
 
