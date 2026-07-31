@@ -7,6 +7,8 @@ export interface IImportedQuestion {
   correctAnswer?: string;
   explanation?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
+  /** Giá trị difficulty gốc để hiển thị lỗi import thay vì âm thầm đổi về medium. */
+  difficultyInput?: string;
   tags?: string[];
   errors: string[];
 }
@@ -36,6 +38,7 @@ const ImportedQuestionSchema = new Schema<IImportedQuestion>(
     correctAnswer: String,
     explanation: String,
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
+    difficultyInput: String,
     tags: [String],
     errors: { type: [String], default: [] },
   },

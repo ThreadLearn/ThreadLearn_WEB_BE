@@ -70,7 +70,10 @@ export class QuizSessionService {
     const session = await this.getOwnedSession(sessionId, user.id);
     await this.learningAccess.assertLessonInteractionAccess(String(session.lessonId), user);
     await this.assertActive(session);
-    this.assertAnswers(session, answers);
+    // A manual submission must be complete. At/after the server deadline we
+    // accept the partial autosaved snapshot so the timeout can be graded.
+    const isTimedOut = Boolean(session.expiresAt && session.expiresAt.getTime() <= Date.now());
+    this.assertAnswers(session, answers, !isTimedOut);
     session.answers = answers;
     await session.save();
     return { attemptSessionId: String(session._id), answers: session.answers, savedAt: session.updatedAt };
@@ -160,7 +163,7 @@ export class QuizSessionService {
     }
   }
 
-  private assertAnswers(session: any, answers: Record<string, number>) {
+  private assertAnswers(session: any, answers: Record<string, number>, requireAllAnswers = false) {
     if (!answers || typeof answers !== 'object') throw new BadRequestError('answers must be an object.');
     const questions = new Map<string, any>(session.questions.map((question: any) => [String(question.sourceQuestionId), question]));
     for (const [questionId, selectedOption] of Object.entries(answers)) {
@@ -169,6 +172,9 @@ export class QuizSessionService {
       if (!Number.isInteger(selectedOption) || selectedOption < 0 || selectedOption >= question.options.length) {
         throw new BadRequestError('answers contains an invalid option index.');
       }
+    }
+    if (requireAllAnswers && questions.size !== Object.keys(answers).length) {
+      throw new BadRequestError('All quiz questions must be answered before submitting.');
     }
   }
 

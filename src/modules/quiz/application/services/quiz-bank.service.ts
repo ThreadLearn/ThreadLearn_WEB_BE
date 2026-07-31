@@ -58,10 +58,10 @@ export class QuizBankService {
     const rawItems = extension === 'xlsx'
       ? this.parseXlsx(input.file.buffer)
       : await this.parseDocx(input.file.buffer);
-    const items = rawItems.slice(0, 1000).map((item) => this.validateItem(item));
     if (rawItems.length > 1000) {
       throw new BadRequestError('A quiz library can contain at most 1,000 questions per import.');
     }
+    const items = await this.validateAndAnnotateItems(String(quiz._id), rawItems);
 
     const validCount = items.filter((item) => item.errors.length === 0).length;
     const importJob = await QuizBankImport.create({
@@ -74,7 +74,7 @@ export class QuizBankService {
       questionCount: input.questionCount ?? 5,
       validCount,
       invalidCount: items.length - validCount,
-      duplicateCount: 0,
+      duplicateCount: this.countDuplicateItems(items),
       items,
     });
     return {
@@ -188,19 +188,20 @@ export class QuizBankService {
     const itemIndex = importJob.items.findIndex((item) => item.row === row);
     if (itemIndex < 0) throw new NotFoundError('Import row not found.');
     const current = importJob.items[itemIndex];
-    const candidate = this.validateItem({
+    const candidate = {
       row: current.row,
       questionText: input.questionText ?? current.questionText,
       options: input.options ?? current.options,
       correctAnswer: input.correctAnswer ?? current.correctAnswer,
       explanation: input.explanation ?? current.explanation,
       difficulty: input.difficulty ?? current.difficulty,
+      difficultyInput: input.difficultyInput ?? current.difficultyInput,
       tags: input.tags ?? current.tags,
-    });
+    } as RawQuestion;
     importJob.items[itemIndex] = candidate as any;
-    this.refreshImportCounts(importJob);
+    await this.refreshImportCounts(importJob);
     await importJob.save();
-    return this.toImportResponse(importJob, [candidate]);
+    return this.toImportResponse(importJob, [importJob.items[itemIndex]]);
   }
 
   async removeImportItem(importId: string, row: number, actor: QuizBankActor) {
@@ -208,7 +209,7 @@ export class QuizBankService {
     const countBefore = importJob.items.length;
     importJob.items = importJob.items.filter((item) => item.row !== row) as any;
     if (importJob.items.length === countBefore) throw new NotFoundError('Import row not found.');
-    this.refreshImportCounts(importJob);
+    await this.refreshImportCounts(importJob);
     await importJob.save();
     return this.toImportResponse(importJob, []);
   }
@@ -375,9 +376,11 @@ export class QuizBankService {
     }
   }
 
-  private refreshImportCounts(importJob: { items: IImportedQuestion[]; validCount: number; invalidCount: number }) {
+  private async refreshImportCounts(importJob: { quizId: unknown; items: IImportedQuestion[]; validCount: number; invalidCount: number; duplicateCount: number }) {
+    importJob.items = await this.validateAndAnnotateItems(String(importJob.quizId), importJob.items as RawQuestion[]);
     importJob.validCount = importJob.items.filter((item) => item.errors.length === 0).length;
     importJob.invalidCount = importJob.items.length - importJob.validCount;
+    importJob.duplicateCount = this.countDuplicateItems(importJob.items);
   }
 
   private async getBankOrThrow(quizId: string) {
@@ -509,7 +512,8 @@ export class QuizBankService {
       .filter(Boolean);
     const answerRaw = values.correctanswer || values.answer || values.dapan || values.correct || '';
     const answer = answerRaw.trim().toUpperCase().replace(/^OPTION\s*/, '');
-    const difficulty = ['easy', 'medium', 'hard'].includes(values.difficulty) ? values.difficulty as QuestionDifficulty : undefined;
+    const difficultyInput = values.difficulty.trim().toLowerCase();
+    const difficulty = ['easy', 'medium', 'hard'].includes(difficultyInput) ? difficultyInput as QuestionDifficulty : undefined;
     return {
       row: rowNumber,
       questionText,
@@ -517,19 +521,30 @@ export class QuizBankService {
       correctAnswer: answer,
       explanation: values.explanation || values.giaithich || undefined,
       difficulty,
+      difficultyInput: difficultyInput || undefined,
       tags: (values.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
     };
   }
 
   private validateItem(item: RawQuestion): IImportedQuestion {
+    const difficultyInput = item.difficultyInput?.trim().toLocaleLowerCase()
+      ?? (typeof item.difficulty === 'string' ? item.difficulty.trim().toLocaleLowerCase() : undefined);
+    const difficulty = difficultyInput && ['easy', 'medium', 'hard'].includes(difficultyInput)
+      ? difficultyInput as QuestionDifficulty
+      : undefined;
     const normalized: IImportedQuestion = {
       ...item,
       questionText: item.questionText?.trim(),
       options: item.options?.map((option) => option.trim()).filter(Boolean),
       correctAnswer: item.correctAnswer?.trim().toUpperCase(),
+      difficulty,
+      difficultyInput,
       errors: [],
     };
     if (!normalized.questionText) normalized.errors.push('Question text is required.');
+    if (normalized.questionText && normalized.questionText.length > 5_000) {
+      normalized.errors.push('Question text must not exceed 5,000 characters.');
+    }
     if (!normalized.options || normalized.options.length < 2 || normalized.options.length > 6) {
       normalized.errors.push('Each question must contain between 2 and 6 options.');
     }
@@ -537,7 +552,44 @@ export class QuizBankService {
     if (answerIndex < 0 || !normalized.options || answerIndex >= normalized.options.length) {
       normalized.errors.push('correct_answer must be a valid option letter (A–F).');
     }
+    if (normalized.options?.some((option) => option.length > 2_000)) {
+      normalized.errors.push('Each option must not exceed 2,000 characters.');
+    }
+    if (normalized.options) {
+      const optionTexts = normalized.options.map((option) => option.replace(/\s+/g, ' ').toLocaleLowerCase());
+      if (new Set(optionTexts).size !== optionTexts.length) {
+        normalized.errors.push('Option text must not be duplicated.');
+      }
+    }
+    if (difficultyInput && !['easy', 'medium', 'hard'].includes(difficultyInput)) {
+      normalized.errors.push('difficulty must be easy, medium, or hard.');
+    }
+    if (normalized.explanation && normalized.explanation.length > 5_000) {
+      normalized.errors.push('Explanation must not exceed 5,000 characters.');
+    }
     return normalized;
+  }
+
+  private async validateAndAnnotateItems(quizId: string, rawItems: RawQuestion[]): Promise<IImportedQuestion[]> {
+    const items = rawItems.map((item) => this.validateItem(item));
+    const candidates = items.filter((item) => item.errors.length === 0 && item.questionText && item.options);
+    const hashes = candidates.map((item) => this.contentHash(item.questionText!, item.options!));
+    const existingHashes = new Set(
+      (await QuizBankQuestion.find({ quizId, contentHash: { $in: hashes } }).select('contentHash').lean().exec())
+        .map((question) => question.contentHash),
+    );
+    const seen = new Set<string>();
+    for (const item of candidates) {
+      const hash = this.contentHash(item.questionText!, item.options!);
+      if (seen.has(hash)) item.errors.push('Duplicate question in this import.');
+      else seen.add(hash);
+      if (existingHashes.has(hash)) item.errors.push('An equivalent question already exists in this library.');
+    }
+    return items;
+  }
+
+  private countDuplicateItems(items: IImportedQuestion[]) {
+    return items.filter((item) => item.errors.some((error) => error.startsWith('Duplicate question') || error.startsWith('An equivalent question'))).length;
   }
 
   private normalizeHeader(header: string) {

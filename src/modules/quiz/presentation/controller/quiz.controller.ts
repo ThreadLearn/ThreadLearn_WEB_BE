@@ -7,6 +7,7 @@ import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
 import { BadRequestError } from '../../../../common/custom-error';
+import { env } from '../../../../configs/env';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
@@ -66,7 +67,9 @@ export class QuizController {
   @Post('imports')
   @HttpCode(201)
   @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: env.MAX_FILE_SIZE_MB * 1024 * 1024, files: 1 },
+  }))
   @ApiConsumes('multipart/form-data')
   async uploadQuestionBank(
     @CurrentUser() user: AuthenticatedUser,
