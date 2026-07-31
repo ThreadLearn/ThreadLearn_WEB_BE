@@ -45,11 +45,11 @@ type GoogleUserInfo = {
  */
 export class AuthService {
   static generateTokens(payload: { id: string; email: string; role: string }) {
-    const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
+    const accessToken = jwt.sign({ ...payload, tokenType: 'access' }, env.JWT_ACCESS_SECRET, {
       expiresIn: env.JWT_ACCESS_EXPIRES_IN as any,
     });
 
-    const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+    const refreshToken = jwt.sign({ ...payload, tokenType: 'refresh' }, env.JWT_REFRESH_SECRET, {
       expiresIn: env.JWT_REFRESH_EXPIRES_IN as any,
     });
 

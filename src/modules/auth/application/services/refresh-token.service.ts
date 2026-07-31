@@ -15,7 +15,7 @@ import { RefreshTokenInput, RefreshTokenResult } from '../dto/auth-use-case.dto'
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Payload tối thiểu giải mã từ refresh token (tương thích `JWTPayload`/`TokenPayload`). */
-type DecodedRefresh = { id: string; email: string; role: string };
+type DecodedRefresh = { id: string; email: string; role: string; tokenVersion?: number };
 
 /**
  * Refresh token rotation. Mirror luồng `AuthService.refresh` hiện tại:
@@ -80,11 +80,16 @@ export class RefreshTokenService {
     }
 
     this.assertCanAuthenticate(user);
+    const userTokenVersion = user.toProps().tokenVersion ?? 0;
+    if ((decoded.tokenVersion ?? 0) !== userTokenVersion) {
+      await this.refreshTokenRepo.deleteByToken(rawToken);
+      throw new UnauthorizedError('Refresh token has been revoked.');
+    }
 
     // Rotation: xoá token cũ trước, tạo token mới sau (mirror legacy).
     await this.refreshTokenRepo.deleteByToken(rawToken);
 
-    const payload = { id: decoded.id, email: decoded.email, role: decoded.role };
+    const payload = { id: decoded.id, email: decoded.email, role: decoded.role, tokenVersion: userTokenVersion };
     const accessToken = this.tokenService.signAccessToken(payload);
     const refreshToken = this.tokenService.signRefreshToken(payload);
 

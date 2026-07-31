@@ -72,6 +72,17 @@ export const moderationSchema = z.object({
   reason: z.string().min(3).max(500),
 });
 
+export const moderationQueueSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  status: z.enum(['OPEN', 'RESOLVED']).optional(),
+  reason: z.enum(['SPAM', 'ABUSE', 'INCORRECT', 'SPOILER', 'UNSAFE_CODE', 'OTHER']).optional(),
+  courseId: objectIdSchema.optional(),
+  lessonId: objectIdSchema.optional(),
+  createdFrom: z.coerce.date().optional(),
+  createdTo: z.coerce.date().optional(),
+});
+
 export type CreateCommentDto = z.infer<typeof createCommentSchema>;
 export type ListCommentsQueryDto = z.infer<typeof listCommentsQuerySchema>;
 export type UpdateCommentDto = z.infer<typeof updateCommentSchema>;

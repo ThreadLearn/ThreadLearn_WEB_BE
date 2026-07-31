@@ -31,6 +31,8 @@ export interface UserProps {
   failedLoginAttempts?: number;
   /** Thời điểm hết khoá tạm thời do sai mật khẩu nhiều lần (KHÁC `lockedAt` admin-lock). */
   lockedUntil?: Date;
+  /** Tăng để thu hồi mọi access/refresh token đã phát hành trước đó. */
+  tokenVersion?: number;
   planType?: 'FREE' | 'PREMIUM';
   subscriptionExpiresAt?: Date;
   subscriptionFeatures?: string[];
@@ -78,6 +80,7 @@ export class UserEntity {
       role: input.role ?? 'STUDENT',
       isVerified: input.isVerified ?? false,
       isActive: true,
+      tokenVersion: 0,
     });
   }
 
@@ -309,6 +312,10 @@ export class UserEntity {
     this.props.failedLoginAttempts = 0;
     this.props.lockedUntil = undefined;
     this.props.lastLoginAt = now;
+  }
+
+  revokeTokens(): void {
+    this.props.tokenVersion = (this.props.tokenVersion ?? 0) + 1;
   }
 
   /** Snapshot bất biến cho mapper/presenter (không lộ tham chiếu nội bộ). */

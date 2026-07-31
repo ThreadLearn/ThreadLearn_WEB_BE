@@ -23,6 +23,7 @@ const DiscussionReportSchema = new Schema<IDiscussionReport>(
 );
 
 DiscussionReportSchema.index({ commentId: 1, reporterId: 1 }, { unique: true });
+DiscussionReportSchema.index({ status: 1, reason: 1, createdAt: -1 });
 
 export const DiscussionReport: Model<IDiscussionReport> =
   mongoose.models.DiscussionReport || mongoose.model<IDiscussionReport>('DiscussionReport', DiscussionReportSchema);

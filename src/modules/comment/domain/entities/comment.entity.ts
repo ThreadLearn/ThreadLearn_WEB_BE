@@ -11,6 +11,8 @@ export interface CommentProps {
   targetId: string;
   lessonId?: string;
   courseId?: string;
+  exerciseId?: string;
+  lessonVersionId?: string;
   userId: string;
   parentId?: string | null;
   content: string;
@@ -48,6 +50,9 @@ export class CommentEntity {
     content: string;
     isAnonymous?: boolean;
     courseId?: string;
+    lessonId?: string;
+    exerciseId?: string;
+    lessonVersionId?: string;
     parentId?: string | null;
     mentionUserIds?: string[];
     postType?: CommentPostType;
@@ -61,8 +66,10 @@ export class CommentEntity {
       id: '',
       targetType: input.targetType,
       targetId: input.targetId,
-      lessonId: input.targetType === 'LESSON' ? input.targetId : undefined,
+      lessonId: input.lessonId ?? (input.targetType === 'LESSON' ? input.targetId : undefined),
       courseId: input.courseId,
+      exerciseId: input.exerciseId,
+      lessonVersionId: input.lessonVersionId,
       userId: input.userId,
       parentId: input.parentId ?? null,
       content: input.content.trim(),
@@ -95,6 +102,22 @@ export class CommentEntity {
 
   get parentId(): string | null | undefined {
     return this.props.parentId;
+  }
+
+  get lessonId(): string | undefined {
+    return this.props.lessonId;
+  }
+
+  get courseId(): string | undefined {
+    return this.props.courseId;
+  }
+
+  get exerciseId(): string | undefined {
+    return this.props.exerciseId;
+  }
+
+  get lessonVersionId(): string | undefined {
+    return this.props.lessonVersionId;
   }
 
   get postType(): CommentPostType {

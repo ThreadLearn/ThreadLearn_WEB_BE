@@ -2,6 +2,7 @@ import type { CourseAccessSnapshot, LessonAccessSnapshot } from './learning-acce
 
 export type LearningAccessReason =
   | 'ADMIN'
+  | 'INSTRUCTOR'
   | 'PREVIEW'
   | 'ENROLLED'
   | 'NOT_ENROLLED'

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { BadRequestError, ConflictError, NotFoundError } from '../../../../common/custom-error';
 import { CommentEntity, CommentTargetType } from '../../domain/entities/comment.entity';
-import { CommentListResult, ICommentRepository } from '../../domain/interfaces/comment.repository';
+import { CommentListResult, CommentViewerContext, ICommentRepository } from '../../domain/interfaces/comment.repository';
 import { Comment } from '../../models/comment.model';
 import { CommentMapper } from '../mapper/comment.mapper';
 
@@ -15,10 +15,10 @@ export class MongoCommentRepository implements ICommentRepository {
     return CommentMapper.toEntity(doc);
   }
 
-  async findViewById(id: string): Promise<unknown | null> {
+  async findViewById(id: string, viewer?: string | CommentViewerContext): Promise<unknown | null> {
     if (!mongoose.isValidObjectId(id)) return null;
     const doc = await Comment.findById(id).populate('userId', 'firstName lastName avatarUrl').lean();
-    return CommentMapper.formatView(doc);
+    return CommentMapper.formatView(doc, viewer);
   }
 
   async findTargetById(id: string): Promise<{ targetType: CommentTargetType; targetId: string } | null> {
@@ -35,6 +35,7 @@ export class MongoCommentRepository implements ICommentRepository {
     page: number,
     limit: number,
     filters?: { postType?: import('../../domain/entities/comment.entity').CommentPostType; questionStatus?: import('../../domain/entities/comment.entity').CommentQuestionStatus },
+    viewer?: string | CommentViewerContext,
   ): Promise<CommentListResult> {
     const skip = (page - 1) * limit;
     // Deleted rows remain visible as tombstones so their reply thread keeps
@@ -50,7 +51,7 @@ export class MongoCommentRepository implements ICommentRepository {
       Comment.countDocuments(query),
     ]);
     return {
-      data: comments.map((comment) => CommentMapper.formatView(comment)),
+      data: comments.map((comment) => CommentMapper.formatView(comment, viewer)),
       total,
       page,
       limit,
@@ -58,7 +59,7 @@ export class MongoCommentRepository implements ICommentRepository {
     };
   }
 
-  async listReplies(commentId: string): Promise<unknown[]> {
+  async listReplies(commentId: string, viewer?: string | CommentViewerContext): Promise<unknown[]> {
     if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
     const parent = await Comment.findById(commentId);
     if (!parent) throw new NotFoundError('Comment not found.');
@@ -66,7 +67,7 @@ export class MongoCommentRepository implements ICommentRepository {
       .populate('userId', 'firstName lastName avatarUrl')
       .sort({ createdAt: 1 })
       .lean();
-    return replies.map((reply) => CommentMapper.formatView(reply));
+    return replies.map((reply) => CommentMapper.formatView(reply, viewer));
   }
 
   async create(comment: CommentEntity): Promise<CommentEntity> {

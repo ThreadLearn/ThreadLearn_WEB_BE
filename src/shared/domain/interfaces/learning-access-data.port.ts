@@ -15,6 +15,8 @@ export interface CourseAccessSnapshot {
   isPremium: boolean;
   title: string;
   thumbnailUrl?: string;
+  instructorId?: string;
+  createdBy?: string;
 }
 
 export interface ILearningAccessData {

@@ -23,6 +23,7 @@ export interface IUser extends Document {
   lockedReason?: string;
   failedLoginAttempts?: number;
   lockedUntil?: Date;
+  tokenVersion: number;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -52,6 +53,7 @@ const UserSchema: Schema<IUser> = new Schema(
     lockedReason: { type: String, trim: true },
     failedLoginAttempts: { type: Number, default: 0, min: 0 },
     lockedUntil: { type: Date },
+    tokenVersion: { type: Number, default: 0, min: 0 },
     lastLoginAt: { type: Date },
   },
   { timestamps: true }

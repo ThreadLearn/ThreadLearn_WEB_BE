@@ -32,6 +32,14 @@ export class LearningAccessService implements ILearningAccess {
     }
     if (viewer?.role === 'ADMIN') return { canView: true, reason: 'ADMIN' };
 
+    const assignedCourse = viewer?.id ? await this.data.findCourse(lesson.courseId) : null;
+    if (
+      viewer?.id &&
+      (assignedCourse?.instructorId === viewer.id || assignedCourse?.createdBy === viewer.id)
+    ) {
+      return { canView: true, reason: 'INSTRUCTOR' };
+    }
+
     if (lesson.status === 'locked' || lesson.isLocked) {
       if (lesson.isPreview) return { canView: true, reason: 'PREVIEW' };
       return { canView: false, reason: 'LESSON_LOCKED' };
@@ -42,7 +50,7 @@ export class LearningAccessService implements ILearningAccess {
       return { canView: false, reason: 'NOT_ENROLLED' };
     }
 
-    const course = await this.data.findCourse(lesson.courseId);
+    const course = assignedCourse ?? await this.data.findCourse(lesson.courseId);
     if (!course) {
       return { canView: false, reason: 'LESSON_NOT_FOUND' };
     }
@@ -102,6 +110,7 @@ export class LearningAccessService implements ILearningAccess {
     const course = await this.data.findCourse(courseId);
     if (!course) throw new NotFoundError('Course not found.');
     if (viewer.role === 'ADMIN') return course;
+    if (viewer.id && (course.instructorId === viewer.id || course.createdBy === viewer.id)) return course;
 
     if (course.status !== 'published') {
       throw new ForbiddenError('Comments are disabled on this course.');

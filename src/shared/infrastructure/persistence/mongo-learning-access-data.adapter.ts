@@ -33,7 +33,7 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
 
   async findCourse(courseId: string): Promise<CourseAccessSnapshot | null> {
     if (!mongoose.isValidObjectId(courseId)) return null;
-    const course = (await Course.findById(courseId).select('_id status isPremium title thumbnailUrl coverImage').lean()) as any;
+    const course = (await Course.findById(courseId).select('_id status isPremium title thumbnailUrl coverImage instructorId createdBy').lean()) as any;
     if (!course || course.status === 'deleted') return null;
     return {
       id: String(course._id),
@@ -41,6 +41,8 @@ export class MongoLearningAccessDataAdapter implements ILearningAccessData {
       isPremium: !!course.isPremium,
       title: String(course.title ?? ''),
       thumbnailUrl: course.thumbnailUrl ?? course.coverImage ?? undefined,
+      instructorId: course.instructorId ? String(course.instructorId) : undefined,
+      createdBy: course.createdBy ? String(course.createdBy) : undefined,
     };
   }
 

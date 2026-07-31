@@ -14,6 +14,8 @@ export interface NoteProps {
   sourceAuthorId?: string;
   sourceAuthorName?: string;
   sourceLink?: string;
+  sourceDiscussionId?: string;
+  sourceCommentId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
