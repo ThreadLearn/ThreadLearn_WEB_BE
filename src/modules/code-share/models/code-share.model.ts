@@ -36,7 +36,7 @@ const CodeShareSchema = new Schema<ICodeShare>(
     exerciseId: { type: String, trim: true },
     lessonVersionId: { type: Schema.Types.ObjectId, ref: 'LessonVersion' },
     lessonUpdatedAt: { type: Date },
-    sourceExecutionId: { type: Schema.Types.ObjectId, ref: 'CodeExecution', required: true, unique: true },
+    sourceExecutionId: { type: Schema.Types.ObjectId, ref: 'CodeExecution', required: true },
     language: { type: String, required: true, trim: true },
     sourceCode: { type: String, required: true, maxlength: 50000 },
     status: { type: String, required: true },
@@ -54,6 +54,10 @@ const CodeShareSchema = new Schema<ICodeShare>(
 CodeShareSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });
 CodeShareSchema.index({ targetType: 1, targetId: 1, lessonId: 1, createdAt: -1 });
 CodeShareSchema.index({ authorId: 1, createdAt: -1 });
+CodeShareSchema.index(
+  { sourceExecutionId: 1, targetType: 1, targetId: 1 },
+  { unique: true, name: 'codeshare_execution_room_unique' },
+);
 
 export const CodeShare: Model<ICodeShare> =
   mongoose.models.CodeShare || mongoose.model<ICodeShare>('CodeShare', CodeShareSchema);

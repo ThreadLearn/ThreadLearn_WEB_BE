@@ -48,10 +48,13 @@ describe('MongoCommentRepository', () => {
       expect.objectContaining({
         status: 'deleted',
         content: 'This comment has been deleted.',
-        userId: '',
-        user: undefined,
+        isAnonymous: true,
+        isOwner: false,
       }),
     ]);
+    expect(result.data[0]).not.toHaveProperty('userId');
+    expect(result.data[0]).not.toHaveProperty('user');
+    expect(result.data[0]).not.toHaveProperty('codeShareId');
     expect(result.total).toBe(1);
   });
 

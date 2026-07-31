@@ -21,14 +21,14 @@ export async function comparePasswords(password: string, hash: string): Promise<
  * Generates a signed JWT access token.
  */
 export function signAccessToken(payload: JWTPayload): string {
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRES_IN as any });
+  return jwt.sign({ ...payload, tokenType: 'access' }, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRES_IN as any });
 }
 
 /**
  * Generates a signed JWT refresh token.
  */
 export function signRefreshToken(payload: JWTPayload): string {
-  return jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN as any });
+  return jwt.sign({ ...payload, tokenType: 'refresh' }, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN as any });
 }
 
 /**

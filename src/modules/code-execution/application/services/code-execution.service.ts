@@ -218,7 +218,6 @@ export class CodeExecutionService {
         outputTruncated,
         runtime: result.time,
         memory: result.memory,
-        judge0Token: result.token,
         exitCode: result.status?.id,
         errorMessage: result.stderr || result.compileOutput || undefined,
       }),

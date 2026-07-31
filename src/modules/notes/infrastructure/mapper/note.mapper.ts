@@ -29,6 +29,8 @@ export class NoteMapper {
       sourceAuthorId: idOf(doc.sourceAuthorId),
       sourceAuthorName: doc.sourceAuthorName,
       sourceLink: doc.sourceLink,
+      sourceDiscussionId: idOf(doc.sourceDiscussionId),
+      sourceCommentId: idOf(doc.sourceCommentId),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -49,6 +51,8 @@ export class NoteMapper {
       sourceAuthorId: props.sourceAuthorId,
       sourceAuthorName: props.sourceAuthorName,
       sourceLink: props.sourceLink,
+      sourceDiscussionId: props.sourceDiscussionId,
+      sourceCommentId: props.sourceCommentId,
     };
   }
 
@@ -71,6 +75,8 @@ export class NoteMapper {
       sourceAuthorId: props.sourceAuthorId,
       sourceAuthorName: props.sourceAuthorName,
       sourceLink: props.sourceLink,
+      sourceDiscussionId: props.sourceDiscussionId,
+      sourceCommentId: props.sourceCommentId,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
       lesson: hasPopulatedLesson

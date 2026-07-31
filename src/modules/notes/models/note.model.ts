@@ -13,6 +13,8 @@ export interface INote extends Document {
   sourceAuthorId?: mongoose.Types.ObjectId;
   sourceAuthorName?: string;
   sourceLink?: string;
+  sourceDiscussionId?: mongoose.Types.ObjectId;
+  sourceCommentId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,12 +33,22 @@ const NoteSchema = new Schema<INote>(
     sourceAuthorId: { type: Schema.Types.ObjectId, ref: 'User' },
     sourceAuthorName: { type: String, maxlength: 200 },
     sourceLink: { type: String, maxlength: 500 },
+    sourceDiscussionId: { type: Schema.Types.ObjectId, ref: 'Comment' },
+    sourceCommentId: { type: Schema.Types.ObjectId, ref: 'Comment' },
   },
   { timestamps: true }
 );
 
 NoteSchema.index({ userId: 1, lessonId: 1, updatedAt: -1 });
 NoteSchema.index({ userId: 1, noteText: 'text', codeSnippet: 'text' });
+NoteSchema.index(
+  { userId: 1, sourceCodeShareId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { sourceCodeShareId: { $type: 'objectId' } },
+    name: 'note_user_codeshare_unique',
+  },
+);
 
 export const Note: Model<INote> = mongoose.models.Note || mongoose.model<INote>('Note', NoteSchema);
 export default Note;

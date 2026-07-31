@@ -40,7 +40,7 @@ export interface ICourse extends Document {
 
 const CourseSchema: Schema<ICourse> = new Schema(
   {
-    title: { type: String, required: true, trim: true, index: 'text' },
+    title: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     shortDescription: { type: String, trim: true, maxlength: 500 },
     description: { type: String, required: true, trim: true },
@@ -75,6 +75,12 @@ const CourseSchema: Schema<ICourse> = new Schema(
 );
 
 CourseSchema.index({ status: 1, isPremium: 1, level: 1 });
+// `language` is a course programming-language field. MongoDB otherwise treats
+// it as the text index language override and rejects values such as "python".
+CourseSchema.index(
+  { title: 'text' },
+  { name: 'course_title_text', language_override: 'textSearchLanguage' },
+);
 
 export const Course: Model<ICourse> =
   mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);

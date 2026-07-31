@@ -98,7 +98,7 @@ export class LoginUserService {
     await this.userRepo.updateLoginSecurityState(user);
 
     const props = user.toProps();
-    const payload = { id: props.id, email: props.email, role: props.role };
+    const payload = { id: props.id, email: props.email, role: props.role, tokenVersion: props.tokenVersion ?? 0 };
     const accessToken = this.tokenService.signAccessToken(payload);
     const refreshToken = this.tokenService.signRefreshToken(payload);
 

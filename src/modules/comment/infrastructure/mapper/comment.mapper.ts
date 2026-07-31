@@ -23,6 +23,8 @@ export class CommentMapper {
       targetId: String(idOf(doc.targetId) ?? ''),
       lessonId: idOf(doc.lessonId),
       courseId: idOf(doc.courseId),
+      exerciseId: doc.exerciseId ? String(doc.exerciseId) : undefined,
+      lessonVersionId: idOf(doc.lessonVersionId),
       userId: String(idOf(doc.userId) ?? ''),
       parentId: idOf(doc.parentId) ?? null,
       content: String(doc.content ?? ''),
@@ -54,6 +56,8 @@ export class CommentMapper {
       targetId: props.targetId,
       lessonId: props.lessonId,
       courseId: props.courseId,
+      exerciseId: props.exerciseId,
+      lessonVersionId: props.lessonVersionId,
       userId: props.userId,
       parentId: props.parentId,
       content: props.content,
@@ -76,33 +80,98 @@ export class CommentMapper {
     };
   }
 
-  static formatView(comment: any) {
+  static formatView(
+    comment: any,
+    viewer?: string | { id: string; isAdmin?: boolean; canModerate?: boolean },
+  ) {
     if (!comment) return null;
     const raw = typeof comment.toObject === 'function' ? comment.toObject() : comment;
+    const id = String(raw._id ?? raw.id ?? '');
+    const targetId = String(idOf(raw.targetId) ?? '');
+    const lessonId = idOf(raw.lessonId);
+    const courseId = idOf(raw.courseId);
+    const exerciseId = raw.exerciseId ? String(raw.exerciseId) : undefined;
+    const lessonVersionId = idOf(raw.lessonVersionId);
+    const parentId = idOf(raw.parentId) ?? null;
+    const authorId = idOf(raw.userId) ?? '';
+    const viewerId = typeof viewer === 'string' ? viewer : viewer?.id;
+    const isAdmin = typeof viewer === 'object' && Boolean(viewer?.isAdmin);
+    const canModerate = typeof viewer === 'object' && Boolean(viewer?.canModerate || viewer?.isAdmin);
+    const isOwner = Boolean(viewerId && authorId === viewerId);
+
     if (raw.status === 'deleted') {
       return {
-        ...raw,
-        userId: '',
-        user: undefined,
+        id,
+        targetType: raw.targetType,
+        targetId,
+        lessonId,
+        courseId,
+        exerciseId,
+        lessonVersionId,
+        parentId,
+        status: 'deleted' as const,
         content: 'This comment has been deleted.',
         isAnonymous: true,
+        isOwner: false,
+        postType: raw.postType ?? 'GENERAL',
+        questionStatus: raw.questionStatus,
+        acceptedReplyId: undefined,
+        replyCount: Number(raw.replyCount ?? 0),
+        createdAt: dateOf(raw.createdAt),
+        updatedAt: dateOf(raw.updatedAt),
+        deletedAt: dateOf(raw.deletedAt),
       };
     }
+
     const user = raw.userId;
-    const authorId = idOf(user) ?? '';
     const isAnonymous = !!raw.isAnonymous;
-    return {
-      ...raw,
-      userId: authorId,
+    const view: Record<string, unknown> = {
+      id,
+      targetType: raw.targetType,
+      targetId,
+      lessonId,
+      courseId,
+      exerciseId,
+      lessonVersionId,
+      parentId,
+      content: String(raw.content ?? ''),
+      status: raw.status ?? 'active',
       isAnonymous,
-      user:
-        !isAnonymous && user && typeof user === 'object' && user.firstName !== undefined
-          ? {
-              _id: String(user._id),
-              name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'ThreadLearn member',
-              avatarUrl: user.avatarUrl ?? null,
-            }
-          : undefined,
+      isOwner,
+      isEdited: Boolean(raw.isEdited),
+      editedAt: dateOf(raw.editedAt),
+      createdAt: dateOf(raw.createdAt),
+      updatedAt: dateOf(raw.updatedAt),
+      reactionCount: Number(raw.reactionCount ?? 0),
+      helpfulCount: Number(raw.helpfulCount ?? 0),
+      replyCount: Number(raw.replyCount ?? 0),
+      postType: raw.postType ?? 'GENERAL',
+      questionStatus: raw.questionStatus,
+      codeShareId: idOf(raw.codeShareId),
+      acceptedReplyId: idOf(raw.acceptedReplyId),
+      learningContext: raw.learningContext,
+      instructorVerifiedAt: dateOf(raw.instructorVerifiedAt),
+      authorLabel: isAnonymous ? 'Anonymous learner' : undefined,
+      capabilities: {
+        canVerify: canModerate,
+        canModerate,
+        canAccept: isOwner,
+        canEdit: isOwner || isAdmin,
+        canDelete: isOwner || isAdmin,
+      },
     };
+
+    if (!isAnonymous) {
+      view.userId = authorId;
+      if (user && typeof user === 'object' && user.firstName !== undefined) {
+        view.user = {
+          _id: authorId,
+          name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'ThreadLearn member',
+          avatarUrl: user.avatarUrl ?? null,
+        };
+      }
+      view.instructorVerifiedBy = idOf(raw.instructorVerifiedBy);
+    }
+    return view;
   }
 }

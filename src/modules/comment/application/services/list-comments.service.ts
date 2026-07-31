@@ -27,11 +27,21 @@ export class ListCommentsService {
       throw new BadRequestError('targetType must be COURSE or LESSON.');
     }
     if (!targetId) throw new BadRequestError('targetId is required.');
-    if (targetType === 'LESSON') {
-      await this.learningAccess.assertLessonInteractionAccess(targetId, { id: userId, role: userRole });
-    } else {
-      await this.learningAccess.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
-    }
-    return this.comments.listByTarget(targetType, targetId, page, limit, filters);
+    const course = targetType === 'LESSON'
+      ? await this.learningAccess.assertCourseInteractionAccess(
+        (await this.learningAccess.assertLessonInteractionAccess(targetId, { id: userId, role: userRole })).courseId,
+        { id: userId, role: userRole },
+      )
+      : await this.learningAccess.assertCourseInteractionAccess(targetId, { id: userId, role: userRole });
+    const canModerate = userRole === 'ADMIN' || course.instructorId === userId || course.createdBy === userId;
+    const result = await this.comments.listByTarget(targetType, targetId, page, limit, filters, {
+      id: userId,
+      isAdmin: userRole === 'ADMIN',
+      canModerate,
+    });
+    return {
+      ...result,
+      capabilities: { canModerate, canVerify: canModerate },
+    };
   }
 }

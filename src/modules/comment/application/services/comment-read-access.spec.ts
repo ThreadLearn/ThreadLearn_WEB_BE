@@ -37,6 +37,10 @@ describe('comment read access', () => {
       '507f1f77bcf86cd799439012',
       { id: 'admin-1', role: 'ADMIN' },
     );
-    expect(repository.listReplies).toHaveBeenCalledWith('507f1f77bcf86cd799439014');
+    expect(repository.listReplies).toHaveBeenCalledWith('507f1f77bcf86cd799439014', {
+      id: 'admin-1',
+      isAdmin: true,
+      canModerate: true,
+    });
   });
 });

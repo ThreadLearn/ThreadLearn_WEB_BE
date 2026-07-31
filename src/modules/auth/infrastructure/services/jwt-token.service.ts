@@ -28,6 +28,7 @@ export class JwtTokenService implements ITokenService {
       id: payload.id,
       email: payload.email,
       role: payload.role as JWTPayload['role'],
+      tokenVersion: payload.tokenVersion,
     };
   }
 

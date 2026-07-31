@@ -11,6 +11,7 @@ import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/
 import { CodeShareService } from '../../../code-share/application/services/code-share.service';
 import { discussionRoom, getSocketServer } from '../../../../socket';
 import { Comment } from '../../models/comment.model';
+import { randomUUID } from 'crypto';
 
 const isObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
 type CreateCommentInput = Omit<CreateCommentDto, 'postType'> & { postType?: CommentPostType };
@@ -33,12 +34,15 @@ export class CreateCommentService {
     // The discussion model supports a root comment and one visible reply level.
     // A reply-to-reply is attached to the same root instead of creating an
     // unbounded tree, as required by UC30.
-    const parent = input.parentId ? await this.comments.findById(input.parentId) : null;
+    const requestedParent = input.parentId ? await this.comments.findById(input.parentId) : null;
+    const parent = requestedParent?.parentId
+      ? await this.comments.findById(requestedParent.parentId)
+      : requestedParent;
     if (input.parentId && !parent) throw new NotFoundError('Discussion not found.');
     if (parent && (parent.targetType !== input.targetType || parent.targetId !== String(input.targetId))) {
       throw new BadRequestError('Replies must stay in the same discussion room.');
     }
-    const parentId = parent?.parentId ?? parent?.id ?? input.parentId;
+    const parentId = parent?.id ?? input.parentId;
     if (parentId && input.postType === 'CODE_SOLUTION' && !input.codeShareId) {
       throw new BadRequestError('A code solution requires a verified code share.');
     }
@@ -51,16 +55,54 @@ export class CreateCommentService {
     if (input.isAnonymous && input.codeShareId) {
       throw new BadRequestError('Code shares cannot be posted anonymously.');
     }
+    let codeContext: {
+      courseId?: string;
+      lessonId?: string;
+      exerciseId?: string;
+      lessonVersionId?: string;
+    } = {};
     if (input.codeShareId) {
       if (!this.codeShares) throw new BadRequestError('Code sharing is unavailable.');
-      await this.codeShares.assertAttachable(userId, userRole, input.codeShareId, input.targetType, String(input.targetId));
+      const share = await this.codeShares.assertAttachable(
+        userId,
+        userRole,
+        input.codeShareId,
+        input.targetType,
+        String(input.targetId),
+      );
+      codeContext = {
+        courseId: share.courseId,
+        lessonId: share.lessonId,
+        exerciseId: share.exerciseId,
+        lessonVersionId: share.lessonVersionId,
+      };
+      if (!share.lessonId) {
+        throw new BadRequestError('A code share must be linked to a lesson.');
+      }
+      if (input.targetType === 'LESSON' && share.lessonId !== String(input.targetId)) {
+        throw new BadRequestError('Code share does not belong to this lesson.');
+      }
+      if (parentId) {
+        if (!parent?.lessonId) {
+          throw new BadRequestError('This discussion has no lesson context for a code solution.');
+        }
+        if (share.courseId !== parent.courseId || share.lessonId !== parent.lessonId) {
+          throw new BadRequestError('Code solution must use the same course and lesson as the discussion.');
+        }
+        if (parent.exerciseId && share.exerciseId !== parent.exerciseId) {
+          throw new BadRequestError('Code solution must use the same exercise as the discussion.');
+        }
+      }
     }
     const created = await this.comments.create(
       CommentEntity.createNew({
         userId,
         targetType: input.targetType,
         targetId: input.targetId,
-        courseId: access.courseId,
+        courseId: codeContext.courseId ?? access.courseId,
+        lessonId: codeContext.lessonId,
+        exerciseId: codeContext.exerciseId,
+        lessonVersionId: codeContext.lessonVersionId,
         content: input.content,
         parentId,
         isAnonymous: input.isAnonymous ?? false,
@@ -81,16 +123,19 @@ export class CreateCommentService {
           message: input.postType === 'CODE_SOLUTION' ? 'Someone submitted a verified code solution.' : 'Someone replied to your discussion.',
           type: input.postType === 'CODE_SOLUTION' ? 'CODE_SOLUTION_SUBMITTED' : 'DISCUSSION_REPLY',
           metadata: { commentId: created.id, parentId },
+          eventKey: `discussion-reply:${created.id}`,
         });
       }
     }
 
-    const view = await this.comments.findViewById(created.id);
+    const view = await this.comments.findViewById(created.id, userId);
     getSocketServer()?.to(discussionRoom(input.targetType, String(input.targetId))).emit('discussion:update', {
+      eventId: randomUUID(),
+      eventType: parentId ? 'reply-created' : 'thread-created',
       targetType: input.targetType,
       targetId: String(input.targetId),
-      action: parentId ? 'reply-created' : 'thread-created',
       discussionId: parentId ?? created.id,
+      version: new Date().toISOString(),
     });
     return view;
   }

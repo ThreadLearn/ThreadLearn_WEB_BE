@@ -32,6 +32,7 @@ export class UserMapper {
       lockedReason: doc.lockedReason,
       failedLoginAttempts: doc.failedLoginAttempts,
       lockedUntil: doc.lockedUntil,
+      tokenVersion: doc.tokenVersion ?? 0,
       planType: doc.planType,
       subscriptionExpiresAt: doc.subscriptionExpiresAt,
       subscriptionFeatures: doc.subscriptionFeatures,
@@ -62,6 +63,7 @@ export class UserMapper {
       lockedReason: p.lockedReason,
       failedLoginAttempts: p.failedLoginAttempts,
       lockedUntil: p.lockedUntil,
+      tokenVersion: p.tokenVersion ?? 0,
       lastLoginAt: p.lastLoginAt,
     };
     // KHÔNG set _id/timestamps. Loại field undefined để không đụng field legacy.

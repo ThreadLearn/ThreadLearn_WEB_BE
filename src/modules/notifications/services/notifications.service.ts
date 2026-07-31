@@ -82,7 +82,7 @@ export class NotificationsService {
     return { updated: true };
   }
 
-  static async sendNotification(data: {
+  static async createNotification(data: {
     userId: string;
     title: string;
     message: string;
@@ -91,19 +91,33 @@ export class NotificationsService {
     metadata?: Record<string, unknown>;
     link?: string;
     eventKey?: string;
-  }) {
-    const notification = await Notification.create({
-      userId: data.userId,
-      recipientRole: data.recipientRole,
-      title: data.title,
-      message: data.message,
-      type: data.type,
-      metadata: data.metadata,
-      link: data.link,
-      eventKey: data.eventKey,
-      isRead: false,
-    });
+  }, session?: mongoose.ClientSession) {
+    let notification: any;
+    try {
+      const notificationData = {
+        userId: data.userId,
+        recipientRole: data.recipientRole,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        metadata: data.metadata,
+        link: data.link,
+        eventKey: data.eventKey,
+        isRead: false,
+      };
+      const created = session
+        ? await Notification.create([notificationData], { session })
+        : await Notification.create(notificationData);
+      notification = Array.isArray(created) ? created[0] : created;
+    } catch (error: any) {
+      if (error?.code !== 11000 || !data.eventKey) throw error;
+      return { notification: await Notification.findOne({ userId: data.userId, eventKey: data.eventKey }), created: false };
+    }
 
+    return { notification, created: true };
+  }
+
+  static emitNotification(notification: any, userId: string) {
     try {
       const io = getSocketServer();
       if (io) {
@@ -116,14 +130,20 @@ export class NotificationsService {
           link: notification.link,
           createdAt: notification.createdAt,
         };
-        io.to(`user:${data.userId}`).emit('notification', payload);
-        io.to(`user:${data.userId}`).emit('notification:new', payload);
+        io.to(`user:${userId}`).emit('notification', payload);
+        io.to(`user:${userId}`).emit('notification:new', payload);
       }
     } catch {
       // Gracefully bypass if WebSocket server is not running
     }
+  }
 
-    return notification;
+  static async sendNotification(data: Parameters<typeof NotificationsService.createNotification>[0]) {
+    const result = await NotificationsService.createNotification(data);
+    if (result.created && result.notification) {
+      NotificationsService.emitNotification(result.notification, data.userId);
+    }
+    return result.notification;
   }
 
   async notifyAdminUserRegistered(userId: string) {

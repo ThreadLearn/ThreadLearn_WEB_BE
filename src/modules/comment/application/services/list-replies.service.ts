@@ -16,11 +16,17 @@ export class ListRepliesService {
   async execute(userId: string, userRole: 'STUDENT' | 'ADMIN', commentId: string) {
     const target = await this.comments.findTargetById(commentId);
     if (!target) throw new NotFoundError('Comment not found.');
-    if (target.targetType === 'LESSON') {
-      await this.learningAccess.assertLessonInteractionAccess(target.targetId, { id: userId, role: userRole });
-    } else {
-      await this.learningAccess.assertCourseInteractionAccess(target.targetId, { id: userId, role: userRole });
-    }
-    return this.comments.listReplies(commentId);
+    const course = target.targetType === 'LESSON'
+      ? await this.learningAccess.assertCourseInteractionAccess(
+        (await this.learningAccess.assertLessonInteractionAccess(target.targetId, { id: userId, role: userRole })).courseId,
+        { id: userId, role: userRole },
+      )
+      : await this.learningAccess.assertCourseInteractionAccess(target.targetId, { id: userId, role: userRole });
+    const canModerate = userRole === 'ADMIN' || course.instructorId === userId || course.createdBy === userId;
+    return this.comments.listReplies(commentId, {
+      id: userId,
+      isAdmin: userRole === 'ADMIN',
+      canModerate,
+    });
   }
 }

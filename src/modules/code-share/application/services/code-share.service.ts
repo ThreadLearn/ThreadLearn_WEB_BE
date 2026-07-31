@@ -6,6 +6,7 @@ import { CodeExecution } from '../../../code-execution/models/code-execution.mod
 import { Lesson } from '../../../lessons/models/lesson.model';
 import { CodeShare } from '../../models/code-share.model';
 import { CreateCodeShareDto } from '../dto/code-share.dto';
+import { Comment } from '../../../comment/models/comment.model';
 
 type UserRole = 'STUDENT' | 'ADMIN';
 
@@ -60,7 +61,11 @@ export class CodeShareService {
       return this.present(created.toObject());
     } catch (error: any) {
       if (error?.code === 11000) {
-        const existing = await CodeShare.findOne({ sourceExecutionId: dto.sourceExecutionId }).lean();
+        const existing = await CodeShare.findOne({
+          sourceExecutionId: dto.sourceExecutionId,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+        }).lean();
         if (existing && String(existing.authorId) === userId) return this.present(existing);
         throw new ConflictError('This execution is already shared.');
       }
@@ -77,6 +82,10 @@ export class CodeShareService {
     if (!share) throw new NotFoundError('Code share not found.');
     await this.assertTargetAccess(userId, role, share.targetType, String(share.targetId));
     const authorId = typeof share.authorId === 'object' ? String(share.authorId._id) : String(share.authorId);
+    if (authorId !== userId && role !== 'ADMIN') {
+      const isActivelyLinked = await Comment.exists({ codeShareId: share._id, status: 'active' });
+      if (!isActivelyLinked) throw new NotFoundError('Code share not found.');
+    }
     const hasAttempt = authorId === userId || !share.lessonId || await CodeExecution.exists({
       userId,
       lessonId: typeof share.lessonId === 'object' ? share.lessonId._id : share.lessonId,
@@ -119,6 +128,7 @@ export class CodeShareService {
       courseId: share.courseId ? String(share.courseId) : undefined,
       lessonId: share.lessonId ? String(typeof lesson === 'object' ? lesson._id : lesson) : undefined,
       exerciseId: share.exerciseId,
+      lessonVersionId: share.lessonVersionId ? String(share.lessonVersionId) : undefined,
       lesson: hasLessonDetails ? {
         _id: String(lesson._id),
         title: String(lesson.title),

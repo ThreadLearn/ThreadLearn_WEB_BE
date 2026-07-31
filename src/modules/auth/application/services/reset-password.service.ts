@@ -54,6 +54,7 @@ export class ResetPasswordService {
 
     const newHash = await this.passwordHasher.hash(input.newPassword);
     user.changePasswordHash(newHash);
+    user.revokeTokens();
     resetToken.markUsed();
 
     await this.userRepo.update(user);

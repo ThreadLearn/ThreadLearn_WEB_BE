@@ -22,6 +22,7 @@ export type NotificationType =
   | 'CODE_SOLUTION_SUBMITTED'
   | 'CODE_SOLUTION_ACCEPTED'
   | 'DISCUSSION_REOPENED'
+  | 'DISCUSSION_MODERATED'
   | 'AI_FEEDBACK'
   | 'SYSTEM_ERROR';
 
@@ -71,6 +72,7 @@ const NotificationSchema: Schema<INotification> = new Schema(
         'CODE_SOLUTION_SUBMITTED',
         'CODE_SOLUTION_ACCEPTED',
         'DISCUSSION_REOPENED',
+        'DISCUSSION_MODERATED',
         'AI_FEEDBACK',
         'SYSTEM_ERROR',
       ],

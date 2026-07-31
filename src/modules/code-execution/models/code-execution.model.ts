@@ -16,7 +16,6 @@ export interface ICodeExecution extends Document {
   outputTruncated?: boolean;
   runtime?: string;
   memory?: number;
-  judge0Token?: string;
   exitCode?: number;
   errorMessage?: string;
   executedAt: Date;
@@ -40,7 +39,6 @@ const CodeExecutionSchema: Schema<ICodeExecution> = new Schema(
     outputTruncated: { type: Boolean, default: false },
     runtime: { type: String },
     memory: { type: Number },
-    judge0Token: { type: String },
     exitCode: { type: Number },
     errorMessage: { type: String },
     executedAt: { type: Date, default: Date.now, index: true },

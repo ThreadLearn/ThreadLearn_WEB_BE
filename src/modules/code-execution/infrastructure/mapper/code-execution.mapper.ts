@@ -28,7 +28,6 @@ export class CodeExecutionMapper {
       outputTruncated: doc.outputTruncated,
       runtime: doc.runtime,
       memory: doc.memory,
-      judge0Token: doc.judge0Token,
       exitCode: doc.exitCode,
       errorMessage: doc.errorMessage,
       executedAt: doc.executedAt ?? new Date(),

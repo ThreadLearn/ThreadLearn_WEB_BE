@@ -15,7 +15,6 @@ export interface CodeExecutionProps {
   outputTruncated?: boolean;
   runtime?: string;
   memory?: number;
-  judge0Token?: string;
   exitCode?: number;
   errorMessage?: string;
   executedAt: Date;

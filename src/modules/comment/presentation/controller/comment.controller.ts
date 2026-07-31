@@ -27,6 +27,7 @@ import {
   createLessonCommentSchema,
   createReplySchema,
   moderationSchema,
+  moderationQueueSchema,
   reportDiscussionSchema,
   listCommentsQuerySchema,
   updateCommentSchema,
@@ -57,6 +58,21 @@ export class CommentController {
     private readonly discussionEngagementSvc: DiscussionEngagementService,
   ) {}
 
+  @Get('moderation/queue')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('BearerAuth')
+  async moderationQueue(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(moderationQueueSchema)) query: z.infer<typeof moderationQueueSchema>,
+  ) {
+    const result = await this.discussionEngagementSvc.listModerationQueue(user.id, user.role, query);
+    return ApiResponse.success({
+      message: 'Moderation queue fetched.',
+      data: result.data,
+      meta: result.meta,
+    });
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('BearerAuth')
@@ -77,7 +93,7 @@ export class CommentController {
     return ApiResponse.success({
       message: 'Comments fetched.',
       data: result.data,
-      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages, capabilities: result.capabilities },
     });
   }
 
@@ -253,7 +269,7 @@ export class LessonCommentsController {
     return ApiResponse.success({
       message: 'Comments fetched.',
       data: result.data,
-      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages },
+      meta: { page: result.page, limit: result.limit, total: result.total, totalPages: result.totalPages, capabilities: result.capabilities },
     });
   }
 

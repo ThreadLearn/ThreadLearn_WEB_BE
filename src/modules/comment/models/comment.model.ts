@@ -10,6 +10,8 @@ export interface IComment extends Document {
   targetId:   Types.ObjectId | string;
   lessonId?:  Types.ObjectId;
   courseId?:  Types.ObjectId;
+  exerciseId?: string;
+  lessonVersionId?: Types.ObjectId;
   userId:     Types.ObjectId;
   parentId?:  Types.ObjectId | null;
   content:    string;
@@ -39,6 +41,8 @@ const CommentSchema: Schema<IComment> = new Schema(
     targetId:   { type: Schema.Types.ObjectId, required: true, index: true },
     lessonId:   { type: Schema.Types.ObjectId, ref: 'Lesson', index: true },
     courseId:   { type: Schema.Types.ObjectId, ref: 'Course', index: true },
+    exerciseId: { type: String, trim: true, index: true },
+    lessonVersionId: { type: Schema.Types.ObjectId, ref: 'LessonVersion' },
     userId:     { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     parentId:   { type: Schema.Types.ObjectId, ref: 'Comment', default: null },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
@@ -56,7 +60,7 @@ const CommentSchema: Schema<IComment> = new Schema(
       enum: ['GENERAL', 'QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST', 'CODE_SOLUTION'],
       default: 'GENERAL',
     },
-    questionStatus: { type: String, enum: ['OPEN', 'SOLVED', 'CLOSED'], default: 'OPEN' },
+    questionStatus: { type: String, enum: ['OPEN', 'SOLVED', 'CLOSED'] },
     codeShareId: { type: Schema.Types.ObjectId, ref: 'CodeShare', index: true },
     acceptedReplyId: { type: Schema.Types.ObjectId, ref: 'Comment' },
     learningContext: {
@@ -72,6 +76,10 @@ const CommentSchema: Schema<IComment> = new Schema(
 
 CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, createdAt: -1 });
 CommentSchema.index({ targetType: 1, targetId: 1, parentId: 1, status: 1, createdAt: -1 });
+CommentSchema.index(
+  { targetType: 1, targetId: 1, parentId: 1, postType: 1, questionStatus: 1, createdAt: -1 },
+  { name: 'discussion_room_posttype_status_created' },
+);
 CommentSchema.index({ targetType: 1, targetId: 1, questionStatus: 1, createdAt: -1 });
 CommentSchema.index({ targetType: 1, targetId: 1, helpfulCount: -1, createdAt: -1 });
 
