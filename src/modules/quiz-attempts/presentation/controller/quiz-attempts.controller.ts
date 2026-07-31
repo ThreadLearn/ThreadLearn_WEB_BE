@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards,
+  Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../../../../common/api-handler';
@@ -11,11 +11,14 @@ import { SubmitAttemptService } from '../../application/services/submit-attempt.
 import { GetAttemptService } from '../../application/services/get-attempt.service';
 import { GetMyAttemptsService } from '../../application/services/get-my-attempts.service';
 import { GetStudentQuizByLessonService } from '../../application/services/get-student-quiz-by-lesson.service';
+import { QuizSessionService } from '../../application/services/quiz-session.service';
 import {
   quizAttemptHistoryQuerySchema,
   QuizAttemptHistoryQueryDto,
   quizSubmitSchema,
   QuizSubmitDto,
+  quizSessionSubmitSchema,
+  QuizSessionSubmitDto,
 } from '../validators/quiz-attempt.validator';
 import { QuizAttemptPresenter } from '../response/quiz-attempt.presenter';
 
@@ -29,12 +32,58 @@ export class QuizAttemptsController {
     private readonly getAttemptService: GetAttemptService,
     private readonly getMyAttemptsService: GetMyAttemptsService,
     private readonly getStudentQuizByLessonService: GetStudentQuizByLessonService,
+    private readonly quizSessionService: QuizSessionService,
   ) { }
+
+  /** Luồng mới: server tạo snapshot ngẫu nhiên, reload sẽ resume cùng attempt. */
+  @Post('lesson/:lessonId/attempts')
+  @HttpCode(201)
+  async startSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('lessonId') lessonId: string,
+  ) {
+    const session = await this.quizSessionService.start(lessonId, user);
+    return ApiResponse.success({ message: 'Quiz session started.', data: session, statusCode: 201 });
+  }
+
+  @Get('attempts/session/:sessionId')
+  async getSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    const session = await this.quizSessionService.get(sessionId, user);
+    return ApiResponse.success({ message: 'Quiz session fetched.', data: session });
+  }
+
+  @Patch('attempts/session/:sessionId/answers')
+  async saveSessionAnswers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+    @Body(new ZodValidationPipe(quizSessionSubmitSchema)) body: QuizSessionSubmitDto,
+  ) {
+    const result = await this.quizSessionService.saveAnswers(sessionId, user, body.answers);
+    return ApiResponse.success({ message: 'Quiz answers saved.', data: result });
+  }
+
+  @Post('attempts/:sessionId/submit')
+  @HttpCode(200)
+  async submitSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+    @Body(new ZodValidationPipe(quizSessionSubmitSchema)) body: QuizSessionSubmitDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const result = await this.quizSessionService.submit(sessionId, user, body.answers, idempotencyKey);
+    return ApiResponse.success({
+      message: result.passed ? 'Congratulations! You passed the quiz successfully.' : 'Attempt recorded.',
+      data: QuizAttemptPresenter.toSubmitResult(result),
+    });
+  }
 
   // ─── UC40: Học viên lấy quiz theo lesson (ẩn đáp án) ──────
   @Get('lesson/:lessonId')
-  async getQuizByLesson(@Param('lessonId') lessonId: string) {
-    const quiz = await this.getStudentQuizByLessonService.execute(lessonId);
+  async getQuizByLesson(@CurrentUser() user: AuthenticatedUser, @Param('lessonId') lessonId: string) {
+    const quiz = await this.getStudentQuizByLessonService.execute(lessonId, user);
     return ApiResponse.success({ message: 'Quiz fetched successfully.', data: QuizAttemptPresenter.toStudentQuizResponse(quiz) });
   }
 

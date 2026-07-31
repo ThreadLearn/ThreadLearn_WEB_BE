@@ -10,6 +10,7 @@ import { AddQuestionService } from './application/services/add-question.service'
 import { EditQuestionService } from './application/services/edit-question.service';
 import { DeleteQuestionService } from './application/services/delete-question.service';
 import { GetQuizByLessonService } from './application/services/get-quiz-by-lesson.service';
+import { QuizBankService } from './application/services/quiz-bank.service';
 import { MongoQuizRepository } from './infrastructure/persistence/mongo-quiz.repository';
 import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
 
@@ -36,6 +37,7 @@ import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
     EditQuestionService,
     DeleteQuestionService,
     GetQuizByLessonService,
+    QuizBankService,
   ],
   exports: [QUIZ_REPOSITORY], // PORT
 })

@@ -21,6 +21,11 @@ export class QuizAttemptRepository implements IQuizAttemptRepository {
     return doc ? QuizAttemptMapper.toEntity(doc) : null;
   }
 
+  async findBySessionIdAndUser(sessionId: string, userId: string): Promise<QuizAttempt | null> {
+    const doc = await QuizAttemptModel.findOne({ sessionId, userId }).exec();
+    return doc ? QuizAttemptMapper.toEntity(doc) : null;
+  }
+
   async findByUser(userId: string): Promise<QuizAttempt[]> {
     const docs = await QuizAttemptModel.find({ userId }).sort({ completedAt: -1 }).exec();
     return docs.map(QuizAttemptMapper.toEntity);

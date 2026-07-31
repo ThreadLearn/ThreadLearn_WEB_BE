@@ -9,6 +9,7 @@ export interface IQuizAttempt extends Document {
   passingScorePercent?: number;
   xpRewarded?: number;
   isTimeout?: boolean;
+  sessionId?: mongoose.Types.ObjectId;
   startedAt?: Date;
   createdAt: Date;
 }
@@ -23,6 +24,9 @@ const QuizAttemptSchema: Schema<IQuizAttempt> = new Schema(
     passingScorePercent: { type: Number, min: 1, max: 100 },
     xpRewarded: { type: Number, default: 0, min: 0 },
     isTimeout: { type: Boolean, default: false },
+    // A session may create exactly one attempt.  This is the durable backstop
+    // for retries/crashes between grading and marking the session submitted.
+    sessionId: { type: Schema.Types.ObjectId, ref: 'QuizSession', unique: true, sparse: true, index: { name: 'session_attempt_once' } },
     startedAt: { type: Date },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

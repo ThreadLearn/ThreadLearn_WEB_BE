@@ -12,6 +12,7 @@ export class QuizAttemptMapper {
         passingScorePercent: doc.passingScorePercent,
         xpRewarded: doc.xpRewarded,
         isTimeout: doc.isTimeout,
+        sessionId: doc.sessionId?.toString(),
         startedAt: doc.startedAt,
         completedAt: doc.completedAt,
       },
@@ -30,6 +31,7 @@ export class QuizAttemptMapper {
       passingScorePercent: props.passingScorePercent,
       xpRewarded: props.xpRewarded,
       isTimeout: props.isTimeout,
+      sessionId: props.sessionId,
       startedAt: props.startedAt,
       completedAt: props.completedAt,
     };

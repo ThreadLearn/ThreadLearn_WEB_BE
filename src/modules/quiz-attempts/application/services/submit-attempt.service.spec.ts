@@ -77,6 +77,10 @@ class InMemoryQuizAttemptRepository implements IQuizAttemptRepository {
     return null;
   }
 
+  async findBySessionIdAndUser(): Promise<QuizAttempt | null> {
+    return null;
+  }
+
   async findByUser(): Promise<QuizAttempt[]> {
     return [];
   }

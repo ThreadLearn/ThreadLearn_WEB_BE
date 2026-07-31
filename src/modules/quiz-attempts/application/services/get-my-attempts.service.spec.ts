@@ -13,6 +13,7 @@ describe('GetMyAttemptsService', () => {
     repository = {
       create: jest.fn(),
       findByIdAndUser: jest.fn(),
+      findBySessionIdAndUser: jest.fn(),
       findByUser: jest.fn(),
       findByUserPaginated: jest.fn(),
       deleteById: jest.fn(),

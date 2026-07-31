@@ -39,12 +39,40 @@ export class SubmitAttemptService {
       throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
     }
 
+    return this.executeForQuestions(userId, quiz, answers, startTime, quiz.questions);
+  }
+
+  /**
+   * Chấm snapshot đã phát bởi QuizSession. Không đọc lại question bank vì câu hỏi có thể
+   * bị admin sửa sau khi học viên bắt đầu làm bài.
+   */
+  async executeForSession(
+    userId: string,
+    quizId: string,
+    answers: Record<string, number>,
+    startedAt: Date,
+    questions: Array<{ id: string; correctAnswerIndex: number }>,
+    sessionId: string,
+  ) {
+    const quiz = await this.quizRepository.findById(quizId);
+    if (!quiz) throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
+    return this.executeForQuestions(userId, quiz, answers, startedAt.toISOString(), questions, sessionId);
+  }
+
+  private async executeForQuestions(
+    userId: string,
+    quiz: { id: string; questions: Array<{ id: string; correctAnswerIndex: number }>; passingScorePercent: number; timeLimitSeconds?: number; xpReward: number; title: string },
+    answers: Record<string, number>,
+    startTime: string | undefined,
+    questions: Array<{ id: string; correctAnswerIndex: number }>,
+    sessionId?: string,
+  ) {
     const passingThreshold = quiz.passingScorePercent;
     const limit = quiz.timeLimitSeconds;
 
     // UC41: Delegate grading business rules to Domain Service (Pure Computation)
     const grading = this.quizGradingService.grade(
-      quiz.questions,
+      questions,
       answers,
       passingThreshold,
       startTime,
@@ -55,7 +83,7 @@ export class SubmitAttemptService {
 
     // Domain factory validation
     const attemptEntity = QuizAttempt.createNew({
-      quizId,
+      quizId: quiz.id,
       userId,
       score: grading.score,
       answers,
@@ -64,6 +92,7 @@ export class SubmitAttemptService {
       xpRewarded,
       isTimeout: grading.isTimeout,
       startedAt: startTime ? new Date(startTime) : undefined,
+      sessionId,
     });
 
     // Save attempt using repository
@@ -75,7 +104,7 @@ export class SubmitAttemptService {
     // ─────────────────────────────────────────────────────────────
     this.eventPublisher.publish(
       'quiz.submitted',
-      new QuizAttemptSubmittedEvent(userId, quizId, attemptId, grading.score, grading.passed),
+      new QuizAttemptSubmittedEvent(userId, quiz.id, attemptId, grading.score, grading.passed),
     );
 
     if (grading.passed) {
@@ -83,7 +112,7 @@ export class SubmitAttemptService {
         'quiz.passed',
         new QuizPassedEvent(
           userId,
-          quizId,
+          quiz.id,
           quiz.title,
           attemptId,
           grading.score,

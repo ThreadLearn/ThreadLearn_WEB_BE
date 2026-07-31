@@ -1,10 +1,14 @@
 import {
-  Body, Controller, Delete, Get, HttpCode,
-  Param, Post, Put, UseGuards,
+  Body, Controller, Delete, Get, HttpCode, Patch,
+  Param, Post, Put, Query, Res, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import type { AuthenticatedUser } from '../../../../common/api-handler';
 import { ApiResponse } from '../../../../common/api-response';
+import { BadRequestError } from '../../../../common/custom-error';
 import { Roles } from '../../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import { CreateQuizService } from '../../application/services/create-quiz.service';
@@ -16,6 +20,7 @@ import { AddQuestionService } from '../../application/services/add-question.serv
 import { EditQuestionService } from '../../application/services/edit-question.service';
 import { DeleteQuestionService } from '../../application/services/delete-question.service';
 import { GetQuizByLessonService } from '../../application/services/get-quiz-by-lesson.service';
+import { QuizBankService } from '../../application/services/quiz-bank.service';
 
 import {
   createQuizSchema, CreateQuizDto,
@@ -24,6 +29,7 @@ import {
   updateQuestionSchema, UpdateQuestionDto,
 } from '../validators/quiz.validator';
 import { QuizPresenter } from '../response/quiz.presenter';
+import type { Response } from 'express';
 
 /**
  * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC39).
@@ -44,7 +50,143 @@ export class QuizController {
     private readonly editQuestion: EditQuestionService,
     private readonly deleteQuestion: DeleteQuestionService,
     private readonly getQuizByLesson: GetQuizByLessonService,
+    private readonly quizBank: QuizBankService,
   ) { }
+
+  @Get('import-template')
+  @Roles('ADMIN')
+  async downloadImportTemplate(@Query('format') format: string | undefined, @Res({ passthrough: true }) response: Response) {
+    if (format && format !== 'xlsx') throw new BadRequestError('Only xlsx templates are supported.');
+    response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    response.setHeader('Content-Disposition', 'attachment; filename="threadlearn-quiz-library-template.xlsx"');
+    return this.quizBank.buildXlsxTemplate();
+  }
+
+  /** Admin tải thư viện đề theo 2 bước parse/preview rồi commit. */
+  @Post('imports')
+  @HttpCode(201)
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  async uploadQuestionBank(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { quizId?: string; lessonId?: string; title?: string; questionCount?: string },
+  ) {
+    const questionCount = body.questionCount === undefined || body.questionCount === ''
+      ? undefined
+      : Number(body.questionCount);
+    const result = await this.quizBank.createImport({
+      quizId: body.quizId,
+      lessonId: body.lessonId,
+      title: body.title,
+      questionCount,
+      userId: user.id,
+      file: file as Express.Multer.File,
+    });
+    return ApiResponse.success({ message: 'Question library parsed. Review it before publishing.', data: result, statusCode: 201 });
+  }
+
+  @Get('imports/:importId')
+  @Roles('ADMIN')
+  async getQuestionBankImport(
+    @Param('importId') importId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const result = await this.quizBank.getImport(importId, user, Number(page) || 1, Number(limit) || 50);
+    return ApiResponse.success({ message: 'Question library import fetched.', data: result, meta: result.meta });
+  }
+
+  @Post('imports/:importId/commit')
+  @Roles('ADMIN')
+  async commitQuestionBankImport(
+    @Param('importId') importId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.quizBank.commitImport(importId, user);
+    return ApiResponse.success({ message: 'Question library published.', data: result });
+  }
+
+  @Patch('imports/:importId/items/:row')
+  @Roles('ADMIN')
+  async updateQuestionBankImportItem(
+    @Param('importId') importId: string,
+    @Param('row') row: string,
+    @Body() body: Record<string, unknown>,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.quizBank.updateImportItem(importId, Number(row), body as any, user);
+    return ApiResponse.success({ message: 'Import row updated.', data: result });
+  }
+
+  @Delete('imports/:importId/items/:row')
+  @Roles('ADMIN')
+  async removeQuestionBankImportItem(
+    @Param('importId') importId: string,
+    @Param('row') row: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.quizBank.removeImportItem(importId, Number(row), user);
+    return ApiResponse.success({ message: 'Import row removed.', data: result });
+  }
+
+  @Get(':quizId/question-bank')
+  @Roles('ADMIN')
+  async getQuestionBank(@Param('quizId') quizId: string) {
+    const result = await this.quizBank.getBankSummary(quizId);
+    return ApiResponse.success({ message: 'Question library fetched.', data: result });
+  }
+
+  @Get(':quizId/question-bank/questions')
+  @Roles('ADMIN')
+  async listQuestionBankQuestions(@Param('quizId') quizId: string, @Query() query: Record<string, string | undefined>) {
+    const result = await this.quizBank.listQuestions(quizId, {
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+      search: query.search,
+      status: query.status,
+      difficulty: query.difficulty,
+      tag: query.tag,
+      sort: query.sort,
+    });
+    return ApiResponse.success({ message: 'Question bank questions fetched.', data: result.items, meta: result.meta });
+  }
+
+  @Post(':quizId/question-bank/questions')
+  @HttpCode(201)
+  @Roles('ADMIN')
+  async createQuestionBankQuestion(@Param('quizId') quizId: string, @Body() body: Record<string, unknown>) {
+    const result = await this.quizBank.createQuestion(quizId, body as any);
+    return ApiResponse.success({ message: 'Question bank question created.', data: result, statusCode: 201 });
+  }
+
+  @Get(':quizId/question-bank/questions/:questionId')
+  @Roles('ADMIN')
+  async getQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string) {
+    const result = await this.quizBank.getQuestion(quizId, questionId);
+    return ApiResponse.success({ message: 'Question bank question fetched.', data: result });
+  }
+
+  @Patch(':quizId/question-bank/questions/:questionId')
+  @Roles('ADMIN')
+  async updateQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string, @Body() body: Record<string, unknown>) {
+    const result = await this.quizBank.updateQuestion(quizId, questionId, body as any);
+    return ApiResponse.success({ message: 'Question bank question updated.', data: result });
+  }
+
+  @Patch(':quizId/question-bank/questions/:questionId/status')
+  @Roles('ADMIN')
+  async setQuestionBankQuestionStatus(
+    @Param('quizId') quizId: string,
+    @Param('questionId') questionId: string,
+    @Body() body: { status?: 'active' | 'disabled' },
+  ) {
+    if (body.status !== 'active' && body.status !== 'disabled') throw new BadRequestError('status must be active or disabled.');
+    const result = await this.quizBank.setQuestionStatus(quizId, questionId, body.status);
+    return ApiResponse.success({ message: 'Question bank question status updated.', data: result });
+  }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()

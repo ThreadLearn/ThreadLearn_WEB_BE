@@ -3,6 +3,7 @@ import { SubmitAttemptService } from './submit-attempt.service';
 import { GetAttemptService } from './get-attempt.service';
 import { GetMyAttemptsService } from './get-my-attempts.service';
 import { GetStudentQuizByLessonService } from './get-student-quiz-by-lesson.service';
+import { LearningAccessViewer } from '../../../../shared/domain/interfaces/learning-access.port';
 
 @Injectable()
 export class QuizAttemptsService {
@@ -13,8 +14,8 @@ export class QuizAttemptsService {
     private readonly getStudentQuizByLessonService: GetStudentQuizByLessonService,
   ) {}
 
-  async getQuizByLesson(lessonId: string) {
-    return this.getStudentQuizByLessonService.execute(lessonId);
+  async getQuizByLesson(lessonId: string, user: LearningAccessViewer) {
+    return this.getStudentQuizByLessonService.execute(lessonId, user);
   }
 
   async submitAttempt(
