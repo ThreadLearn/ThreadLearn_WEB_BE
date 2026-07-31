@@ -52,6 +52,7 @@ const CodeShareSchema = new Schema<ICodeShare>(
 );
 
 CodeShareSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });
+CodeShareSchema.index({ targetType: 1, targetId: 1, lessonId: 1, createdAt: -1 });
 CodeShareSchema.index({ authorId: 1, createdAt: -1 });
 
 export const CodeShare: Model<ICodeShare> =

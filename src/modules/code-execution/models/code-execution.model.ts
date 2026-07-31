@@ -50,6 +50,7 @@ const CodeExecutionSchema: Schema<ICodeExecution> = new Schema(
 
 CodeExecutionSchema.index({ userId: 1, createdAt: -1 });
 CodeExecutionSchema.index({ userId: 1, lessonId: 1, createdAt: -1 });
+CodeExecutionSchema.index({ userId: 1, lessonId: 1, exerciseId: 1, createdAt: -1 });
 
 export const CodeExecution: Model<ICodeExecution> =
   mongoose.models.CodeExecution ||
