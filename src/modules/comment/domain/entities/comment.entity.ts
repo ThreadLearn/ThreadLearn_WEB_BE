@@ -2,6 +2,8 @@ import { BadRequestError, ForbiddenError } from '../../../../common/custom-error
 
 export type CommentTargetType = 'COURSE' | 'LESSON';
 export type CommentStatus = 'active' | 'hidden' | 'deleted';
+export type CommentPostType = 'GENERAL' | 'QUESTION' | 'CODE_HELP' | 'CODE_REVIEW' | 'EXPLANATION_REQUEST' | 'CODE_SOLUTION';
+export type CommentQuestionStatus = 'OPEN' | 'SOLVED' | 'CLOSED';
 
 export interface CommentProps {
   id: string;
@@ -20,14 +22,23 @@ export interface CommentProps {
   updatedAt?: Date;
   deletedAt?: Date;
   reactionCount?: number;
+  helpfulCount?: number;
+  replyCount?: number;
   mentionUserIds: string[];
+  postType?: CommentPostType;
+  questionStatus?: CommentQuestionStatus;
+  codeShareId?: string;
+  acceptedReplyId?: string;
+  learningContext?: { expectedResult?: string; actualResult?: string; tried?: string };
+  instructorVerifiedAt?: Date;
+  instructorVerifiedBy?: string;
 }
 
 export class CommentEntity {
   private constructor(private readonly props: CommentProps) {}
 
   static fromPersistence(props: CommentProps): CommentEntity {
-    return new CommentEntity({ ...props, mentionUserIds: [...props.mentionUserIds] });
+    return new CommentEntity({ ...props, postType: props.postType ?? 'GENERAL', mentionUserIds: [...props.mentionUserIds] });
   }
 
   static createNew(input: {
@@ -39,8 +50,13 @@ export class CommentEntity {
     courseId?: string;
     parentId?: string | null;
     mentionUserIds?: string[];
+    postType?: CommentPostType;
+    codeShareId?: string;
+    learningContext?: { expectedResult?: string; actualResult?: string; tried?: string };
   }): CommentEntity {
     if (!input.content?.trim()) throw new BadRequestError('content is required.');
+    const postType = input.postType ?? 'GENERAL';
+    const isDiscussionQuestion = ['QUESTION', 'CODE_HELP', 'CODE_REVIEW', 'EXPLANATION_REQUEST'].includes(postType);
     return new CommentEntity({
       id: '',
       targetType: input.targetType,
@@ -54,6 +70,10 @@ export class CommentEntity {
       status: 'active',
       isEdited: false,
       mentionUserIds: input.mentionUserIds ?? [],
+      postType,
+      questionStatus: input.parentId || !isDiscussionQuestion ? undefined : 'OPEN',
+      codeShareId: input.codeShareId,
+      learningContext: input.learningContext,
     });
   }
 
@@ -75,6 +95,18 @@ export class CommentEntity {
 
   get parentId(): string | null | undefined {
     return this.props.parentId;
+  }
+
+  get postType(): CommentPostType {
+    return this.props.postType ?? 'GENERAL';
+  }
+
+  get codeShareId(): string | undefined {
+    return this.props.codeShareId;
+  }
+
+  get questionStatus(): CommentQuestionStatus | undefined {
+    return this.props.questionStatus;
   }
 
   ensureCanModify(userId: string, userRole: 'STUDENT' | 'ADMIN'): void {

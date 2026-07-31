@@ -13,6 +13,7 @@ export interface ICodeExecution extends Document {
   stdout?: string;
   stderr?: string;
   compileOutput?: string;
+  outputTruncated?: boolean;
   runtime?: string;
   memory?: number;
   judge0Token?: string;
@@ -36,6 +37,7 @@ const CodeExecutionSchema: Schema<ICodeExecution> = new Schema(
     stdout: { type: String },
     stderr: { type: String },
     compileOutput: { type: String },
+    outputTruncated: { type: Boolean, default: false },
     runtime: { type: String },
     memory: { type: Number },
     judge0Token: { type: String },

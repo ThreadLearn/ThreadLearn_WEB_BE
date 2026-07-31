@@ -6,6 +6,7 @@ export interface LessonAccessSnapshot {
   isLocked: boolean;
   title: string;
   thumbnailUrl?: string;
+  contentLength?: number;
 }
 
 export interface CourseAccessSnapshot {

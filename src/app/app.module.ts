@@ -15,12 +15,14 @@ import { BookmarkModule } from '../modules/bookmark/bookmark.module';
 import { CertificatesModule } from '../modules/certificates/certificates.module';
 import { CommentModule } from '../modules/comment/comment.module';
 import { CodeExecutionModule } from '../modules/code-execution/code-execution.module';
+import { CodeShareModule } from '../modules/code-share/code-share.module';
 import { CourseModule } from '../modules/course/course.module';
 import { CoursesModule } from '../modules/courses/courses.module';
 import { EnrollmentsModule } from '../modules/enrollments/enrollments.module';
 import { GamificationModule } from '../modules/gamification/gamification.module';
 import { IDEModule } from '../modules/ide/ide.module';
 import { LeaderboardModule } from '../modules/leaderboard/leaderboard.module';
+import { LearningPlansModule } from '../modules/learning-plans/learning-plans.module';
 import { LessonsModule } from '../modules/lessons/lessons.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { NotesModule } from '../modules/notes/notes.module';
@@ -28,6 +30,8 @@ import { QuizModule } from '../modules/quiz/quiz.module';
 import { QuizAttemptsModule } from '../modules/quiz-attempts/quiz-attempts.module';
 import { SubscriptionModule } from '../modules/subscription/subscription.module';
 import { UsersModule } from '../modules/users/users.module';
+import { VideoBookmarksModule } from '../modules/video-bookmarks/video-bookmarks.module';
+import { VideoWatchProgressModule } from '../modules/video-watch-progress/video-watch-progress.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -44,6 +48,7 @@ import { AppController } from './app.controller';
     BookmarkModule,
     CertificatesModule,
     CodeExecutionModule,
+    CodeShareModule,
     CommentModule,
     CourseModule,
     CoursesModule,
@@ -51,6 +56,7 @@ import { AppController } from './app.controller';
     GamificationModule,
     IDEModule,
     LeaderboardModule,
+    LearningPlansModule,
     LessonsModule,
     NotificationsModule,
     NotesModule,
@@ -58,6 +64,8 @@ import { AppController } from './app.controller';
     QuizAttemptsModule,
     SubscriptionModule,
     UsersModule,
+    VideoBookmarksModule,
+    VideoWatchProgressModule,
   ],
   controllers: [AppController],
   providers: [SocketGateway],

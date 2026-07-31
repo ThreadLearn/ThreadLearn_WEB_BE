@@ -44,11 +44,12 @@ export class NotificationsHandler implements OnModuleInit {
   async onCourseCompleted(event: CourseCompletedEvent): Promise<void> {
     await NotificationsService.sendNotification({
       userId: event.userId,
-      title: 'Course completed 🏆',
-      message: 'Xuất sắc! Bạn đã hoàn thành khoá học. Certificate đã được cấp.',
+      title: 'Course completed',
+      message:
+        'Excellent work! You completed the course. View your learning credential in Certificates.',
       type: 'COURSE_COMPLETED',
       metadata: { courseId: event.courseId },
-      link: `/courses/${event.courseId}`,
+      link: '/certificates',
     });
   }
 }

@@ -8,6 +8,11 @@ export interface INote extends Document {
   anchorText?: string;
   anchorStart?: number;
   anchorEnd?: number;
+  sourceType?: 'DISCUSSION_CODE_SHARE';
+  sourceCodeShareId?: mongoose.Types.ObjectId;
+  sourceAuthorId?: mongoose.Types.ObjectId;
+  sourceAuthorName?: string;
+  sourceLink?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +26,11 @@ const NoteSchema = new Schema<INote>(
     anchorText: { type: String },
     anchorStart: { type: Number, min: 0 },
     anchorEnd: { type: Number, min: 0 },
+    sourceType: { type: String, enum: ['DISCUSSION_CODE_SHARE'] },
+    sourceCodeShareId: { type: Schema.Types.ObjectId, ref: 'CodeShare', index: true },
+    sourceAuthorId: { type: Schema.Types.ObjectId, ref: 'User' },
+    sourceAuthorName: { type: String, maxlength: 200 },
+    sourceLink: { type: String, maxlength: 500 },
   },
   { timestamps: true }
 );

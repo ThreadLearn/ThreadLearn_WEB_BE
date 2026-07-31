@@ -11,7 +11,7 @@ import {
   CODE_EXECUTION_REPOSITORY,
   ICodeExecutionRepository,
 } from '../../domain/interfaces/code-execution.repository';
-import { CodeSubmitPayload } from '../dto/code-execution.dto';
+import { CodeSubmitPayload, MAX_SOURCE_CODE_BYTES } from '../dto/code-execution.dto';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
 
 type ExecutionResult = {
@@ -27,6 +27,16 @@ type ExecutionResult = {
 const LANGUAGE_IDS: Record<string, number> = { javascript: 63, js: 63, python: 71, py: 71, java: 62, cpp: 54, c: 50 };
 const isRapidApi = (url: string) => /rapidapi\.com/i.test(url);
 const isJudge0Configured = (url: string | undefined, key: string | undefined) => Boolean(url && key);
+const MAX_OUTPUT_BYTES = 64_000;
+
+const truncateUtf8 = (value: string, maxBytes = MAX_OUTPUT_BYTES) => {
+  const bytes = Buffer.from(value ?? '', 'utf8');
+  if (bytes.length <= maxBytes) return { value: value ?? '', truncated: false };
+  return {
+    value: bytes.subarray(0, maxBytes).toString('utf8').replace(/\uFFFD$/, ''),
+    truncated: true,
+  };
+};
 
 const callJudge0 = async (
   url: string,
@@ -42,15 +52,23 @@ const callJudge0 = async (
     headers['X-Auth-Token'] = key;
   }
   logger.info(`Judge0 -> ${url} (lang ${payload.language_id}, stdin ${payload.stdin.length}B)`);
-  const response = await fetch(`${url}/submissions?base64_encoded=true&wait=true`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      source_code: Buffer.from(payload.source_code).toString('base64'),
-      language_id: payload.language_id,
-      stdin: Buffer.from(payload.stdin).toString('base64'),
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), env.JUDGE0_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${url}/submissions?base64_encoded=true&wait=true`, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        source_code: Buffer.from(payload.source_code).toString('base64'),
+        language_id: payload.language_id,
+        stdin: Buffer.from(payload.stdin).toString('base64'),
+      }),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error(`Judge0 HTTP ${response.status}: ${body.slice(0, 200)}`);
@@ -87,7 +105,9 @@ export class CodeExecutionService {
   async executeCode(userId: string, payload: CodeSubmitPayload, userRole: 'STUDENT' | 'ADMIN' = 'STUDENT') {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
-    if (sourceCode.length > 50000) throw new BadRequestError('sourceCode exceeds the 50000 character limit.');
+    if (Buffer.byteLength(sourceCode, 'utf8') > MAX_SOURCE_CODE_BYTES) {
+      throw new BadRequestError(`sourceCode exceeds the ${MAX_SOURCE_CODE_BYTES} byte limit.`);
+    }
     if (stdin.length > 10000) throw new BadRequestError('stdin exceeds the 10000 character limit.');
 
     const languageId = CodeExecutionService.resolveLanguageId(payload.language, payload.languageId);
@@ -95,7 +115,10 @@ export class CodeExecutionService {
     let courseId = payload.courseId;
     if (payload.lessonId) {
       const lesson = await this.learningAccess.assertLessonViewAccess(payload.lessonId, { id: userId, role: userRole });
-      courseId = courseId ?? lesson.courseId.toString();
+      // A lesson is the authoritative context. Never persist a caller-provided
+      // course id that disagrees with it, otherwise a run could later be
+      // attached to an unrelated course discussion.
+      courseId = lesson.courseId.toString();
     }
 
     let reservation: DailyQuotaReservation | null = null;
@@ -131,10 +154,10 @@ export class CodeExecutionService {
     }
   }
 
-  async listHistory(userId: string, lessonId?: string, page = 1, limit = 20) {
+  async listHistory(userId: string, lessonId?: string, exerciseId?: string, page = 1, limit = 20) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
-    const result = await this.executions.listHistory(userId, { lessonId, page: safePage, limit: safeLimit });
+    const result = await this.executions.listHistory(userId, { lessonId, exerciseId, page: safePage, limit: safeLimit });
     const totalPages = Math.max(1, Math.ceil(result.total / safeLimit));
     return {
       items: result.items.map((execution) => this.presentExecution(execution)),
@@ -165,6 +188,7 @@ export class CodeExecutionService {
       stdout: execution.stdout ?? '',
       stderr: execution.stderr ?? '',
       compileOutput: execution.compileOutput ?? '',
+      outputTruncated: Boolean(execution.outputTruncated),
       runtime: execution.runtime ?? '0.000',
       memory: execution.memory ?? 0,
       createdAt: execution.createdAt,
@@ -173,6 +197,10 @@ export class CodeExecutionService {
   }
 
   private async persistExecution(userId: string, payload: CodeSubmitPayload, language: string, languageId: number, courseId: string | undefined, result: ExecutionResult) {
+    const stdout = truncateUtf8(result.stdout ?? '');
+    const stderr = truncateUtf8(result.stderr ?? '');
+    const compileOutput = truncateUtf8(result.compileOutput ?? '');
+    const outputTruncated = stdout.truncated || stderr.truncated || compileOutput.truncated;
     const record: any = await this.executions.create(
       CodeExecutionEntity.createNew({
         userId,
@@ -184,9 +212,10 @@ export class CodeExecutionService {
         languageId,
         stdin: payload.stdin,
         status: result.status?.description ?? 'Unknown',
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
-        compileOutput: result.compileOutput ?? '',
+        stdout: stdout.value,
+        stderr: stderr.value,
+        compileOutput: compileOutput.value,
+        outputTruncated,
         runtime: result.time,
         memory: result.memory,
         judge0Token: result.token,
@@ -194,6 +223,6 @@ export class CodeExecutionService {
         errorMessage: result.stderr || result.compileOutput || undefined,
       }),
     );
-    return { _id: record._id, stdout: record.stdout, stderr: record.stderr, compileOutput: record.compileOutput, status: result.status, runtime: record.runtime, memory: record.memory, language: record.language, languageId: record.languageId, createdAt: record.createdAt };
+    return { _id: record._id, stdout: record.stdout, stderr: record.stderr, compileOutput: record.compileOutput, outputTruncated: record.outputTruncated, status: result.status, runtime: record.runtime, memory: record.memory, language: record.language, languageId: record.languageId, createdAt: record.createdAt };
   }
 }

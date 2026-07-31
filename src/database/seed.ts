@@ -872,19 +872,58 @@ console.log('D');`,
       },
     ]);
 
+    const jsFundCertificateSnapshot = jsFund.toObject() as {
+      title: string;
+      slug: string;
+      level: string;
+      language: string;
+      shortDescription?: string;
+      description: string;
+      tags: string[];
+      category?: string;
+      estimatedDuration: number;
+      totalLessons: number;
+    };
+
     await Certificate.create([
       {
         userId: minh._id,
         courseId: jsFund._id,
         certificateCode: 'TL-2026-JSCONC-0001',
-        pdfUrl: 'https://cdn.threadlearn.com/certs/TL-2026-JSCONC-0001.pdf',
+        recipientName: `${minh.firstName} ${minh.lastName}`,
+        courseTitle: jsFundCertificateSnapshot.title,
+        courseSlug: jsFundCertificateSnapshot.slug,
+        courseLevel: jsFundCertificateSnapshot.level,
+        courseLanguage: jsFundCertificateSnapshot.language,
+        courseDescription:
+          jsFundCertificateSnapshot.shortDescription || jsFundCertificateSnapshot.description,
+        courseTags: jsFundCertificateSnapshot.tags,
+        courseCategory: jsFundCertificateSnapshot.category,
+        courseEstimatedDuration: jsFundCertificateSnapshot.estimatedDuration,
+        courseTotalLessons: jsFundCertificateSnapshot.totalLessons,
+        completedAt: daysAgo(14),
+        templateVersion: 'forest-v1',
+        pdfUrl: '/api/v1/certificates/TL-2026-JSCONC-0001/pdf',
         issuedAt: daysAgo(13),
       },
       {
         userId: expiredPremium._id,
         courseId: jsFund._id,
         certificateCode: 'TL-2026-JSCONC-0002',
-        pdfUrl: 'https://cdn.threadlearn.com/certs/TL-2026-JSCONC-0002.pdf',
+        recipientName: `${expiredPremium.firstName} ${expiredPremium.lastName}`,
+        courseTitle: jsFundCertificateSnapshot.title,
+        courseSlug: jsFundCertificateSnapshot.slug,
+        courseLevel: jsFundCertificateSnapshot.level,
+        courseLanguage: jsFundCertificateSnapshot.language,
+        courseDescription:
+          jsFundCertificateSnapshot.shortDescription || jsFundCertificateSnapshot.description,
+        courseTags: jsFundCertificateSnapshot.tags,
+        courseCategory: jsFundCertificateSnapshot.category,
+        courseEstimatedDuration: jsFundCertificateSnapshot.estimatedDuration,
+        courseTotalLessons: jsFundCertificateSnapshot.totalLessons,
+        completedAt: daysAgo(35),
+        templateVersion: 'forest-v1',
+        pdfUrl: '/api/v1/certificates/TL-2026-JSCONC-0002/pdf',
         issuedAt: daysAgo(34),
       },
     ]);

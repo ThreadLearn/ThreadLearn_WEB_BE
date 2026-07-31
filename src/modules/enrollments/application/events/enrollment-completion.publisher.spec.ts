@@ -12,6 +12,7 @@ describe('EnrollmentCompletionPublisher', () => {
     completedLessons: 1,
     alreadyCompleted: false,
     courseCompleted: false,
+    enrollmentCompleted: false,
   };
 
   it('publishes a first-time lesson completion and returns listener effects', async () => {
@@ -42,6 +43,33 @@ describe('EnrollmentCompletionPublisher', () => {
     expect(lessonListener).not.toHaveBeenCalled();
   });
 
+  it('retries certificate issuance for a completed enrollment without replaying rewards', async () => {
+    const events = new EventEmitter2();
+    const lessonListener = jest.fn();
+    const courseListener = jest.fn();
+    const certificateListener = jest.fn();
+    events.on('lesson.completed', lessonListener);
+    events.on('course.completed', courseListener);
+    events.on('course.certificate.eligible', certificateListener);
+
+    await expect(
+      new EnrollmentCompletionPublisher(events).publishLessonCompleted({
+        ...lessonEvent,
+        progressPercent: 100,
+        completedLessons: 2,
+        alreadyCompleted: true,
+        enrollmentCompleted: true,
+      }),
+    ).resolves.toEqual({ xpRewarded: 0, stats: null });
+
+    expect(lessonListener).not.toHaveBeenCalled();
+    expect(courseListener).not.toHaveBeenCalled();
+    expect(certificateListener).toHaveBeenCalledWith({
+      userId: 'student-1',
+      courseId: 'course-1',
+    });
+  });
+
   it('publishes lesson and course events and combines their reward effects', async () => {
     const events = new EventEmitter2();
     const emitted: string[] = [];
@@ -53,6 +81,9 @@ describe('EnrollmentCompletionPublisher', () => {
       emitted.push('course.completed');
       return { xpRewarded: 500, stats: { xp: 600 } };
     });
+    events.on('course.certificate.eligible', async () => {
+      emitted.push('course.certificate.eligible');
+    });
 
     await expect(
       new EnrollmentCompletionPublisher(events).publishLessonCompleted({
@@ -60,9 +91,14 @@ describe('EnrollmentCompletionPublisher', () => {
         progressPercent: 100,
         completedLessons: 2,
         courseCompleted: true,
+        enrollmentCompleted: true,
       }),
     ).resolves.toEqual({ xpRewarded: 600, stats: { xp: 600 } });
-    expect(emitted).toEqual(['lesson.completed', 'course.completed']);
+    expect(emitted).toEqual([
+      'lesson.completed',
+      'course.completed',
+      'course.certificate.eligible',
+    ]);
   });
 
   it('ignores listener results that are not completion effects', async () => {

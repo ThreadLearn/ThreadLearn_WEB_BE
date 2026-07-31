@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
-import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
+import { BadRequestError, ConflictError, NotFoundError } from '../../../../common/custom-error';
 import { CommentEntity, CommentTargetType } from '../../domain/entities/comment.entity';
 import { CommentListResult, ICommentRepository } from '../../domain/interfaces/comment.repository';
 import { Comment } from '../../models/comment.model';
@@ -11,7 +11,7 @@ export class MongoCommentRepository implements ICommentRepository {
   async findById(id: string): Promise<CommentEntity | null> {
     if (!mongoose.isValidObjectId(id)) return null;
     const doc = await Comment.findById(id);
-    if (!doc || doc.status === 'deleted') return null;
+    if (!doc || doc.status !== 'active') return null;
     return CommentMapper.toEntity(doc);
   }
 
@@ -21,14 +21,25 @@ export class MongoCommentRepository implements ICommentRepository {
     return CommentMapper.formatView(doc);
   }
 
+  async findTargetById(id: string): Promise<{ targetType: CommentTargetType; targetId: string } | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
+    const doc = await Comment.findById(id).select('targetType targetId').lean();
+    return doc
+      ? { targetType: doc.targetType, targetId: String(doc.targetId) }
+      : null;
+  }
+
   async listByTarget(
     targetType: CommentTargetType,
     targetId: string,
     page: number,
     limit: number,
+    filters?: { postType?: import('../../domain/entities/comment.entity').CommentPostType; questionStatus?: import('../../domain/entities/comment.entity').CommentQuestionStatus },
   ): Promise<CommentListResult> {
     const skip = (page - 1) * limit;
-    const query = { targetType, targetId, parentId: null, status: { $ne: 'deleted' } };
+    // Deleted rows remain visible as tombstones so their reply thread keeps
+    // its context. Mutating a deleted comment is still blocked by findById.
+    const query = { targetType, targetId, parentId: null, status: { $ne: 'hidden' }, ...(filters?.postType ? { postType: filters.postType } : {}), ...(filters?.questionStatus ? { questionStatus: filters.questionStatus } : {}) };
     const [comments, total] = await Promise.all([
       Comment.find(query)
         .populate('userId', 'firstName lastName avatarUrl')
@@ -51,7 +62,7 @@ export class MongoCommentRepository implements ICommentRepository {
     if (!mongoose.isValidObjectId(commentId)) throw new NotFoundError('Comment not found.');
     const parent = await Comment.findById(commentId);
     if (!parent) throw new NotFoundError('Comment not found.');
-    const replies = await Comment.find({ parentId: commentId, status: { $ne: 'deleted' } })
+    const replies = await Comment.find({ parentId: commentId, status: { $ne: 'hidden' } })
       .populate('userId', 'firstName lastName avatarUrl')
       .sort({ createdAt: 1 })
       .lean();
@@ -78,12 +89,24 @@ export class MongoCommentRepository implements ICommentRepository {
   }
 
   async update(comment: CommentEntity): Promise<CommentEntity> {
-    const doc = await Comment.findByIdAndUpdate(
-      comment.id,
-      CommentMapper.toPersistence(comment),
-      { new: true },
+    const expectedUpdatedAt = comment.toProps().updatedAt;
+    const doc = await Comment.findOneAndUpdate(
+      {
+        _id: comment.id,
+        status: { $ne: 'deleted' },
+        ...(expectedUpdatedAt ? { updatedAt: expectedUpdatedAt } : {}),
+      },
+      { $set: CommentMapper.toPersistence(comment) },
+      { new: true, runValidators: true },
     );
-    if (!doc) throw new NotFoundError('Comment not found.');
+    if (!doc) {
+      const exists = await Comment.exists({ _id: comment.id });
+      if (!exists) throw new NotFoundError('Comment not found.');
+      throw new ConflictError(
+        'Comment changed before this request completed. Refresh and try again.',
+        'COMMENT_WRITE_CONFLICT',
+      );
+    }
     return CommentMapper.toEntity(doc);
   }
 

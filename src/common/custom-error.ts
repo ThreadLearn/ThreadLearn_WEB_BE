@@ -38,6 +38,12 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class ConflictError extends AppError {
+  constructor(message = 'Conflict', code?: string) {
+    super(message, 409, null, code);
+  }
+}
+
 export class TooManyRequestsError extends AppError {
   constructor(message = 'Too Many Requests', code?: string) {
     super(message, 429, null, code);

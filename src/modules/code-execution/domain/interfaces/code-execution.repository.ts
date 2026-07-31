@@ -9,6 +9,7 @@ export interface ICodeExecutionRepository {
 
 export interface CodeExecutionHistoryOptions {
   lessonId?: string;
+  exerciseId?: string;
   page: number;
   limit: number;
 }

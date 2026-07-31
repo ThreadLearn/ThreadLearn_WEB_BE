@@ -12,6 +12,7 @@ export interface CodeExecutionProps {
   stdout?: string;
   stderr?: string;
   compileOutput?: string;
+  outputTruncated?: boolean;
   runtime?: string;
   memory?: number;
   judge0Token?: string;

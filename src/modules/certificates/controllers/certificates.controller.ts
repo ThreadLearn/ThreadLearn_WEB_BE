@@ -1,5 +1,6 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AuthenticatedUser } from '../../../common/api-handler';
 import { ApiResponse } from '../../../common/api-response';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -21,5 +22,18 @@ export class CertificatesController {
   async verify(@Param('code') code: string) {
     const certificate = await CertificatesService.verify(code);
     return ApiResponse.success({ message: 'Certificate verified.', data: certificate });
+  }
+
+  @Get(':code/pdf')
+  async pdf(@Param('code') code: string, @Res() response: Response) {
+    const pdf = await CertificatesService.renderPdf(code);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Length', String(pdf.buffer.length));
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${pdf.filename}"`,
+    );
+    response.setHeader('Cache-Control', 'no-store');
+    response.status(200).send(pdf.buffer);
   }
 }

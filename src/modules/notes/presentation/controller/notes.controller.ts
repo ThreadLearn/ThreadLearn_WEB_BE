@@ -17,10 +17,13 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
 import {
   CreateNoteDto,
+  CreateLessonNoteDto,
+  createLessonNoteSchema,
   createNoteSchema,
   ListNotesQueryDto,
   listNotesQuerySchema,
   UpdateNoteDto,
+  noteIdParamSchema,
   updateNoteSchema,
 } from '../../application/dto/note.dto';
 import { CreateNoteService } from '../../application/services/create-note.service';
@@ -29,6 +32,14 @@ import { ListMyNotesService } from '../../application/services/list-my-notes.ser
 import { RemoveNoteService } from '../../application/services/remove-note.service';
 import { SearchNotesService } from '../../application/services/search-notes.service';
 import { UpdateNoteService } from '../../application/services/update-note.service';
+import { CreateNoteFromCodeShareService } from '../../application/services/create-note-from-code-share.service';
+import { z } from '../../../../common/zod/z';
+
+const createFromCodeShareSchema = z.object({
+  codeShareId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid code share id.'),
+  lessonId: z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid lesson id.'),
+  noteText: z.string().max(10000).optional(),
+});
 
 @ApiTags('Notes')
 @Controller('v1/notes')
@@ -41,7 +52,8 @@ export class NotesController {
     private readonly searchNotesSvc: SearchNotesService,
     private readonly createNoteSvc: CreateNoteService,
     private readonly updateNoteSvc: UpdateNoteService,
-    private readonly removeNoteSvc: RemoveNoteService
+    private readonly removeNoteSvc: RemoveNoteService,
+    private readonly createFromCodeShareSvc: CreateNoteFromCodeShareService,
   ) {}
 
   @Get()
@@ -82,10 +94,19 @@ export class NotesController {
     return ApiResponse.success({ message: 'Note created.', data: note });
   }
 
+  @Post('from-code-share')
+  async createFromCodeShare(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createFromCodeShareSchema)) body: z.infer<typeof createFromCodeShareSchema>,
+  ) {
+    const note = await this.createFromCodeShareSvc.execute(user.id, user.role, body);
+    return ApiResponse.success({ message: 'Community solution saved to notes.', data: note, statusCode: 201 });
+  }
+
   @Patch(':id')
   async update(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(updateNoteSchema)) body: UpdateNoteDto
   ) {
     const note = await this.updateNoteSvc.execute(user.id, id, body);
@@ -93,7 +114,10 @@ export class NotesController {
   }
 
   @Delete(':id')
-  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const result = await this.removeNoteSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Note deleted.', data: result });
   }
@@ -110,7 +134,10 @@ export class LessonNotesController {
   ) {}
 
   @Get(':id/notes/me')
-  async myLessonNotes(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async myLessonNotes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+  ) {
     const notes = await this.listByLessonSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
@@ -118,16 +145,9 @@ export class LessonNotesController {
   @Post(':id/notes')
   async createLessonNote(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body()
-    body: {
-      noteText?: string;
-      content?: string;
-      codeSnippet?: string;
-      anchorText?: string;
-      anchorStart?: number;
-      anchorEnd?: number;
-    }
+    @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(createLessonNoteSchema))
+    body: CreateLessonNoteDto,
   ) {
     const note = await this.createNoteSvc.execute(user.id, {
       lessonId: id,

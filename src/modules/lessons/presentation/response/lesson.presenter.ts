@@ -12,6 +12,9 @@ export interface LessonResponse {
   contentMarkdown?: string;
   lessonType: string;
   videoUrl?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  subtitleTracks: { language: string; label?: string; url: string }[];
   attachments: string[];
   codeSnippets: { language: string; code: string; description?: string }[];
   orderIndex: number;
@@ -47,6 +50,9 @@ export class LessonPresenter {
       contentMarkdown: p.contentMarkdown,
       lessonType: p.lessonType,
       videoUrl: p.videoUrl,
+      transcript: p.transcript,
+      transcriptLanguage: p.transcriptLanguage,
+      subtitleTracks: p.subtitleTracks,
       attachments,
       codeSnippets: p.codeSnippets,
       orderIndex: p.orderIndex,

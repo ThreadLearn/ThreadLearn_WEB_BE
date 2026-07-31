@@ -72,6 +72,7 @@ const envSchema = z.object({
   JUDGE0_API_KEY: z.string().optional(),
   /** Alias some env templates use for RapidAPI Judge0 */
   JUDGE0_RAPIDAPI_KEY: z.string().optional(),
+  JUDGE0_TIMEOUT_MS: z.coerce.number().int().positive().max(60_000).default(10_000),
   AI_API_URL: z.string().default('http://localhost:8001'),
   AI_API_TIMEOUT_MS: z.coerce.number().default(30000),
   PAYMENT_GATEWAY_MODE: z.enum(['mock', 'vnpay', 'payos']).default('mock'),
@@ -91,6 +92,18 @@ const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   console.error('❌ Environment validation failed:', parsed.error.format());
+  throw new Error('Environment validation failed');
+}
+
+if (
+  parsed.data.NODE_ENV === 'production' &&
+  !parsed.data.FRONTEND_URL.some(
+    (origin) => !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/?$/i.test(origin),
+  )
+) {
+  console.error(
+    'Environment validation failed: FRONTEND_URL must include the deployed frontend origin in production',
+  );
   throw new Error('Environment validation failed');
 }
 

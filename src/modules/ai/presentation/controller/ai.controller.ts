@@ -9,6 +9,9 @@ import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import {
   AIRecommendationPayload,
   FeedbackDto,
+  AIHistoryQuery,
+  aiHistoryIdParamSchema,
+  aiHistoryQuerySchema,
   aiRecommendationSchema,
   feedbackSchema,
 } from '../../application/dto/ai.dto';
@@ -61,26 +64,32 @@ export class AIController {
   }
 
   @Get('history')
-  async history(@CurrentUser() user: AuthenticatedUser, @Query('page') page?: string, @Query('limit') limit?: string) {
-    const histories = await this.getHistoryLogsSvc.execute(user.id, Number(page) || 1, Number(limit) || 20);
+  async history(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(aiHistoryQuerySchema)) query: AIHistoryQuery,
+  ) {
+    const histories = await this.getHistoryLogsSvc.execute(user.id, query.page, query.limit);
     return ApiResponse.success({ message: 'AI history fetched successfully.', data: histories });
   }
 
   @Get('history/:id')
-  async historyDetail(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async historyDetail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(aiHistoryIdParamSchema)) id: string,
+  ) {
     const history = await this.getHistoryByIdSvc.execute(user.id, id);
     return ApiResponse.success({ message: 'AI history fetched successfully.', data: history });
   }
 
   @Get('recommendation')
   async getHistoryLogs(@CurrentUser() user: AuthenticatedUser) {
-    return this.history(user);
+    return this.history(user, { page: 1, limit: 20 });
   }
 
   @Patch('history/:id/feedback')
   async feedback(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(aiHistoryIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(feedbackSchema)) body: FeedbackDto,
   ) {
     const updated = await this.updateFeedbackSvc.execute(user.id, id, body.feedbackRating);
@@ -90,7 +99,7 @@ export class AIController {
   @Post('history/:id/feedback')
   async feedbackPost(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(aiHistoryIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(feedbackSchema)) body: FeedbackDto,
   ) {
     return this.feedback(user, id, body);

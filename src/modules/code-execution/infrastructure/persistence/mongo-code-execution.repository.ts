@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import mongoose from 'mongoose';
 import { CodeExecutionEntity } from '../../domain/entities/code-execution.entity';
 import { CodeExecutionHistoryOptions, ICodeExecutionRepository } from '../../domain/interfaces/code-execution.repository';
 import { CodeExecution } from '../../models/code-execution.model';
@@ -18,8 +19,8 @@ export class MongoCodeExecutionRepository implements ICodeExecutionRepository {
     return CodeExecution.create(CodeExecutionMapper.toPersistence(execution));
   }
 
-  async listHistory(userId: string, { lessonId, page, limit }: CodeExecutionHistoryOptions) {
-    const filter = { userId, ...(lessonId ? { lessonId } : {}) };
+  async listHistory(userId: string, { lessonId, exerciseId, page, limit }: CodeExecutionHistoryOptions) {
+    const filter = { userId, ...(lessonId ? { lessonId } : {}), ...(exerciseId ? { exerciseId } : {}) };
     const [items, total] = await Promise.all([
       CodeExecution.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       CodeExecution.countDocuments(filter),
@@ -28,6 +29,7 @@ export class MongoCodeExecutionRepository implements ICodeExecutionRepository {
   }
 
   async findByUserAndId(userId: string, id: string): Promise<unknown | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     return CodeExecution.findOne({ _id: id, userId });
   }
 }

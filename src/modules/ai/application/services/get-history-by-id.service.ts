@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { NotFoundError } from '../../../../common/custom-error';
 import { AI_HISTORY_REPOSITORY, IAIHistoryRepository } from '../../domain/interfaces/ai-history.repository';
 import { hasActiveSubscriptionFeature } from '../../../../shared/domain/subscription-features';
+import { presentAnalysisForTier } from './ai-tier-policy';
 
 @Injectable()
 export class GetHistoryByIdService {
@@ -17,8 +18,6 @@ export class GetHistoryByIdService {
       subscriptionFeatures: user.subscriptionFeatures,
       feature: 'AI_ADVANCED_ANALYSIS',
     })));
-    const value: any = typeof (history as any).toObject === 'function' ? (history as any).toObject() : { ...(history as any) };
-    if (!canViewOptimizedCode) delete value.optimizedCode;
-    return value;
+    return presentAnalysisForTier(history, canViewOptimizedCode);
   }
 }

@@ -1,9 +1,17 @@
 import {
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { BadRequestError } from '../common/custom-error';
+import { User } from '../modules/auth/models/user.model';
+import { ILearningAccess, LEARNING_ACCESS } from '../shared/domain/interfaces/learning-access.port';
+import { Inject } from '@nestjs/common';
+import mongoose from 'mongoose';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { env } from '../configs/env';
@@ -19,6 +27,7 @@ let ioInstance: Server | null = null;
   },
 })
 export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  constructor(@Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess) {}
   @WebSocketServer()
   server!: Server;
 
@@ -53,8 +62,45 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(socket: Socket) {
     logger.info(`Realtime client disconnected: ${socket.id}`);
   }
+
+  @SubscribeMessage('discussion:join')
+  async joinDiscussion(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    payload: { targetType?: 'COURSE' | 'LESSON'; targetId?: string },
+  ) {
+    const targetType = payload?.targetType;
+    const targetId = payload?.targetId;
+    if (!targetType || !targetId || !mongoose.isValidObjectId(targetId)) {
+      throw new BadRequestError('Invalid discussion room.');
+    }
+    const userId = String(socket.data.userId);
+    const user = await User.findById(userId).select('role').lean();
+    if (!user) throw new BadRequestError('Authenticated user was not found.');
+    if (targetType === 'COURSE') {
+      await this.learningAccess.assertCourseInteractionAccess(targetId, { id: userId, role: user.role });
+    } else {
+      await this.learningAccess.assertLessonInteractionAccess(targetId, { id: userId, role: user.role });
+    }
+    socket.join(discussionRoom(targetType, targetId));
+    return { ok: true };
+  }
+
+  @SubscribeMessage('discussion:leave')
+  leaveDiscussion(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() payload: { targetType?: 'COURSE' | 'LESSON'; targetId?: string },
+  ) {
+    if (payload?.targetType && payload.targetId && mongoose.isValidObjectId(payload.targetId)) {
+      socket.leave(discussionRoom(payload.targetType, payload.targetId));
+    }
+    return { ok: true };
+  }
 }
 
 export function getSocketServer() {
   return ioInstance;
 }
+
+export const discussionRoom = (targetType: 'COURSE' | 'LESSON', targetId: string) =>
+  `discussion:${targetType}:${targetId}`;

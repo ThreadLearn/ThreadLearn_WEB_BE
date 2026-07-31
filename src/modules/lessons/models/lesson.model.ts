@@ -3,6 +3,12 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 export type LessonType = 'article' | 'video' | 'coding' | 'quiz' | 'assignment' | 'mixed';
 export type LessonStatus = 'active' | 'locked' | 'hidden' | 'deleted';
 
+export interface SubtitleTrack {
+  language: string;
+  label?: string;
+  url: string;
+}
+
 export interface ILesson extends Document {
   courseId: Types.ObjectId;
   sectionId?: Types.ObjectId;
@@ -12,6 +18,9 @@ export interface ILesson extends Document {
   contentMarkdown: string;
   lessonType: LessonType;
   videoUrl?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  subtitleTracks: SubtitleTrack[];
   attachments: string[];
   codeSnippets: { language: string; code: string; description?: string }[];
   orderIndex: number;
@@ -47,6 +56,19 @@ const LessonSchema: Schema<ILesson> = new Schema(
       default: 'article',
     },
     videoUrl: { type: String },
+    transcript: { type: String, maxlength: 100_000 },
+    transcriptLanguage: { type: String, trim: true, maxlength: 20 },
+    subtitleTracks: {
+      type: [
+        {
+          _id: false,
+          language: { type: String, required: true, trim: true, maxlength: 20 },
+          label: { type: String, trim: true, maxlength: 80 },
+          url: { type: String, required: true, trim: true },
+        },
+      ],
+      default: [],
+    },
     attachments: { type: [String], default: [] },
     codeSnippets: {
       type: [

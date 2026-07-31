@@ -9,6 +9,11 @@ export interface NoteProps {
   anchorText?: string;
   anchorStart?: number;
   anchorEnd?: number;
+  sourceType?: 'DISCUSSION_CODE_SHARE';
+  sourceCodeShareId?: string;
+  sourceAuthorId?: string;
+  sourceAuthorName?: string;
+  sourceLink?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -26,8 +31,8 @@ export class NoteEntity {
     noteText: string;
     codeSnippet?: string;
     anchorText?: string;
-    anchorStart?: number;
-    anchorEnd?: number;
+    anchorStart?: number | null;
+    anchorEnd?: number | null;
   }): NoteEntity {
     if (!input.noteText?.trim()) throw new BadRequestError('noteText is required.');
     const props: NoteProps = {
@@ -37,8 +42,8 @@ export class NoteEntity {
       noteText: input.noteText.trim(),
       codeSnippet: input.codeSnippet,
       anchorText: input.anchorText?.trim() || undefined,
-      anchorStart: input.anchorStart,
-      anchorEnd: input.anchorEnd,
+      anchorStart: input.anchorStart ?? undefined,
+      anchorEnd: input.anchorEnd ?? undefined,
     };
     this.assertValidAnchorRange(props);
     return new NoteEntity(props);
@@ -48,13 +53,17 @@ export class NoteEntity {
     return this.props.id;
   }
 
+  get lessonId(): string {
+    return this.props.lessonId;
+  }
+
   applyPatch(input: {
     noteText?: string;
     content?: string;
     codeSnippet?: string;
     anchorText?: string;
-    anchorStart?: number;
-    anchorEnd?: number;
+    anchorStart?: number | null;
+    anchorEnd?: number | null;
   }): void {
     const next = { ...this.props };
     const nextText = input.noteText ?? input.content;
@@ -65,8 +74,8 @@ export class NoteEntity {
     if (input.codeSnippet !== undefined) next.codeSnippet = input.codeSnippet;
     if (input.anchorText !== undefined)
       next.anchorText = input.anchorText.trim() || undefined;
-    if (input.anchorStart !== undefined) next.anchorStart = input.anchorStart;
-    if (input.anchorEnd !== undefined) next.anchorEnd = input.anchorEnd;
+    if (input.anchorStart !== undefined) next.anchorStart = input.anchorStart ?? undefined;
+    if (input.anchorEnd !== undefined) next.anchorEnd = input.anchorEnd ?? undefined;
     NoteEntity.assertValidAnchorRange(next);
     Object.assign(this.props, next);
   }

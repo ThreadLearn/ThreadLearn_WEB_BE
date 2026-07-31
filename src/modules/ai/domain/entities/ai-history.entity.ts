@@ -3,7 +3,7 @@ export interface AIIssue {
   lineRange: string;
   severity: 'high' | 'medium' | 'low';
   description: string;
-  fix: string;
+  fix?: string;
   codeSnippet?: string;
 }
 
