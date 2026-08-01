@@ -14,7 +14,22 @@ export class QuizAttemptMapper {
         isTimeout: doc.isTimeout,
         sessionId: doc.sessionId?.toString(),
         startedAt: doc.startedAt,
-        completedAt: doc.completedAt,
+        // Older attempts predate the completedAt field. Their immutable
+        // creation timestamp is the best available completion time.
+        completedAt: doc.completedAt ?? doc.createdAt,
+        durationSeconds: doc.durationSeconds,
+        gradedAt: doc.gradedAt,
+        reviewQuestions: doc.reviewQuestions?.map((question: any) => ({
+          sourceQuestionId: question.sourceQuestionId.toString(),
+          questionText: question.questionText,
+          options: question.options.map((option: any) => ({ optionId: option.optionId, text: option.text })),
+          selectedOptionIndex: question.selectedOptionIndex,
+          selectedOptionId: question.selectedOptionId,
+          correctOptionIndex: question.correctOptionIndex,
+          correctOptionId: question.correctOptionId,
+          isCorrect: question.isCorrect,
+          explanation: question.explanation,
+        })),
       },
       doc._id.toString(),
     );
@@ -34,6 +49,13 @@ export class QuizAttemptMapper {
       sessionId: props.sessionId,
       startedAt: props.startedAt,
       completedAt: props.completedAt,
+      durationSeconds: props.durationSeconds,
+      gradedAt: props.gradedAt,
+      reviewQuestions: props.reviewQuestions?.map((question) => ({
+        ...question,
+        sourceQuestionId: question.sourceQuestionId,
+        options: question.options.map((option) => ({ ...option })),
+      })),
     };
   }
 }

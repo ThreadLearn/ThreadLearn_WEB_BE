@@ -43,7 +43,12 @@ describe('SubmitAttemptService', () => {
       new QuizGradingService(),
     );
 
-    const result = await service.execute('student-1', 'quiz-1', { 'question-1': 1 });
+    const result = await service.execute(
+      'student-1',
+      'quiz-1',
+      { 'question-1': 1 },
+      new Date().toISOString(),
+    );
 
     expect(result).toMatchObject({
       score: 100,
@@ -61,6 +66,14 @@ describe('SubmitAttemptService', () => {
       passingScorePercent: 70,
       xpRewarded: 250,
       isTimeout: false,
+      durationSeconds: expect.any(Number),
+      reviewQuestions: [{
+        sourceQuestionId: 'question-1',
+        questionText: 'Which answer is safe?',
+        selectedOptionId: 'o2',
+        correctOptionId: 'o2',
+        isCorrect: true,
+      }],
     });
   });
 });

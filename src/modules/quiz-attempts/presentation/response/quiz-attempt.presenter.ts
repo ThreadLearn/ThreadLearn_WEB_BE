@@ -20,6 +20,34 @@ interface SubmitAttemptResult {
 export class QuizAttemptPresenter {
   static toResponse(attempt: QuizAttempt, quizProps: QuizPropsForAttempt = {}) {
     const p = attempt.toProps();
+    const questions = p.reviewQuestions?.map((question) => {
+      const selectedOption = question.options.find((option) => option.optionId === question.selectedOptionId);
+      const correctOption = question.options.find((option) => option.optionId === question.correctOptionId);
+      return {
+        sourceQuestionId: question.sourceQuestionId,
+        questionText: question.questionText,
+        options: question.options,
+        selectedOptionIndex: question.selectedOptionIndex,
+        selectedOptionId: question.selectedOptionId,
+        selectedOptionText: selectedOption?.text,
+        correctOptionIndex: question.correctOptionIndex,
+        correctOptionId: question.correctOptionId,
+        correctOptionText: correctOption?.text,
+        isCorrect: question.isCorrect,
+        answerStatus: question.selectedOptionId
+          ? (question.isCorrect ? 'correct' : 'incorrect')
+          : 'unanswered',
+        explanation: question.explanation,
+      };
+    }) ?? [];
+    const correctCount = questions.filter((question) => question.isCorrect).length;
+    const unansweredCount = questions.filter((question) => question.answerStatus === 'unanswered').length;
+    const incorrectCount = Math.max(0, questions.length - correctCount - unansweredCount);
+    const durationSeconds = p.durationSeconds ?? (
+      p.startedAt && p.completedAt
+        ? Math.max(0, Math.floor((p.completedAt.getTime() - p.startedAt.getTime()) / 1000))
+        : undefined
+    );
     return {
       _id: p.id,
       id: p.id,
@@ -30,10 +58,22 @@ export class QuizAttemptPresenter {
       passed: p.passed,
       startedAt: p.startedAt,
       completedAt: p.completedAt,
+      durationSeconds,
+      gradedAt: p.gradedAt ?? p.completedAt,
       // Legacy fields mapping
       passingScorePercent: p.passingScorePercent ?? quizProps.passingScorePercent ?? 80,
       xpRewarded: p.xpRewarded ?? (p.passed ? (quizProps.xpReward ?? 100) : 0),
       isTimeout: p.isTimeout ?? false,
+      attemptStatus: p.isTimeout ? 'timed_out' : 'submitted',
+      completionStatus: 'completed',
+      gradingStatus: 'graded',
+      rewardStatus: (p.xpRewarded ?? 0) > 0 ? 'awarded' : 'not_awarded',
+      questionCount: questions.length,
+      correctCount,
+      incorrectCount,
+      unansweredCount,
+      reviewUnavailable: questions.length === 0,
+      questions,
     };
   }
 

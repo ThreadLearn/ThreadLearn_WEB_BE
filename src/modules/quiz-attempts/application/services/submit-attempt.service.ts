@@ -6,7 +6,11 @@ import {
 import { DomainError, ErrorCode } from '../../../../shared/errors/error-codes';
 import { IQuizRepository, QUIZ_REPOSITORY } from '../../../quiz/domain/interfaces/quiz.repository';
 import { IQuizAttemptRepository, QUIZ_ATTEMPT_REPOSITORY } from '../../domain/interfaces/quiz-attempt.repository';
-import { QuizAttempt } from '../../domain/entities/quiz-attempt.entity';
+import {
+  buildQuizReviewQuestions,
+  QuizAttempt,
+  QuizReviewSourceQuestion,
+} from '../../domain/entities/quiz-attempt.entity';
 import { QuizGradingService } from '../../domain/services/quiz-grading.service';
 import { QuizAttemptSubmittedEvent } from '../../domain/events/quiz-attempt-submitted.event';
 import { QuizPassedEvent } from '../../domain/events/quiz-passed.event';
@@ -39,7 +43,18 @@ export class SubmitAttemptService {
       throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
     }
 
-    return this.executeForQuestions(userId, quiz, answers, startTime, quiz.questions);
+    return this.executeForQuestions(
+      userId,
+      quiz,
+      answers,
+      startTime,
+      quiz.questions.map((question: any) => ({
+        id: question.id,
+        questionText: question.questionText,
+        options: question.options.map((text: string, index: number) => ({ optionId: `o${index + 1}`, text })),
+        correctAnswerIndex: question.correctAnswerIndex,
+      })),
+    );
   }
 
   /**
@@ -51,12 +66,13 @@ export class SubmitAttemptService {
     quizId: string,
     answers: Record<string, number>,
     startedAt: Date,
-    questions: Array<{ id: string; correctAnswerIndex: number }>,
+    questions: QuizReviewSourceQuestion[],
     sessionId: string,
+    forceTimeout = false,
   ) {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) throw DomainError.notFound(ErrorCode.QUIZ_NOT_FOUND, 'Quiz not found.');
-    return this.executeForQuestions(userId, quiz, answers, startedAt.toISOString(), questions, sessionId);
+    return this.executeForQuestions(userId, quiz, answers, startedAt.toISOString(), questions, sessionId, forceTimeout);
   }
 
   private async executeForQuestions(
@@ -64,8 +80,9 @@ export class SubmitAttemptService {
     quiz: { id: string; questions: Array<{ id: string; correctAnswerIndex: number }>; passingScorePercent: number; timeLimitSeconds?: number; xpReward: number; title: string },
     answers: Record<string, number>,
     startTime: string | undefined,
-    questions: Array<{ id: string; correctAnswerIndex: number }>,
+    questions: QuizReviewSourceQuestion[],
     sessionId?: string,
+    forceTimeout = false,
   ) {
     const passingThreshold = quiz.passingScorePercent;
     const limit = quiz.timeLimitSeconds;
@@ -79,20 +96,30 @@ export class SubmitAttemptService {
       limit,
     );
 
-    const xpRewarded = grading.passed ? quiz.xpReward : 0;
+    const isTimeout = grading.isTimeout || forceTimeout;
+    const passed = !isTimeout && grading.score >= passingThreshold;
+    const xpRewarded = passed ? quiz.xpReward : 0;
 
     // Domain factory validation
+    const completedAt = new Date();
+    const startedAt = startTime ? new Date(startTime) : undefined;
+    const durationSeconds = startedAt
+      ? Math.max(0, Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000))
+      : undefined;
     const attemptEntity = QuizAttempt.createNew({
       quizId: quiz.id,
       userId,
       score: grading.score,
       answers,
-      passed: grading.passed,
+      passed,
       passingScorePercent: passingThreshold,
       xpRewarded,
-      isTimeout: grading.isTimeout,
-      startedAt: startTime ? new Date(startTime) : undefined,
+      isTimeout,
+      startedAt,
       sessionId,
+      durationSeconds,
+      gradedAt: completedAt,
+      reviewQuestions: buildQuizReviewQuestions(questions, answers),
     });
 
     // Save attempt using repository
@@ -104,10 +131,10 @@ export class SubmitAttemptService {
     // ─────────────────────────────────────────────────────────────
     this.eventPublisher.publish(
       'quiz.submitted',
-      new QuizAttemptSubmittedEvent(userId, quiz.id, attemptId, grading.score, grading.passed),
+      new QuizAttemptSubmittedEvent(userId, quiz.id, attemptId, grading.score, passed),
     );
 
-    if (grading.passed) {
+    if (passed) {
       this.eventPublisher.publish(
         'quiz.passed',
         new QuizPassedEvent(
@@ -124,10 +151,10 @@ export class SubmitAttemptService {
     return {
       attempt,
       score: grading.score,
-      passed: grading.passed,
+      passed,
       xpRewarded,
       passingScorePercent: passingThreshold,
-      isTimeout: grading.isTimeout,
+      isTimeout,
     };
   }
 }
