@@ -29,9 +29,73 @@ export class QuizSessionService {
     ).exec();
   }
 
+  /**
+   * A timed quiz must create a reviewable attempt even when the learner never
+   * presses Submit. The atomic claim prevents a concurrent browser request
+   * and this worker from grading the same session twice.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async finalizeExpiredSessions() {
+    const expiredSessions = await QuizSession.find({
+      status: 'in_progress',
+      expiresAt: { $lte: new Date() },
+    })
+      .sort({ expiresAt: 1 })
+      .limit(100)
+      .select('+questions.correctAnswerIndex +questions.explanation')
+      .exec();
+
+    for (const session of expiredSessions) {
+      const claimed = await QuizSession.findOneAndUpdate(
+        { _id: session._id, status: 'in_progress', expiresAt: { $lte: new Date() } },
+        { $set: { status: 'submitting', submittingAt: new Date(), submissionKey: String(session._id) } },
+        { new: true },
+      ).select('+questions.correctAnswerIndex +questions.explanation').exec();
+      if (!claimed) continue;
+
+      try {
+        const result = await this.submitAttempt.executeForSession(
+          String(claimed.userId),
+          String(claimed.quizId),
+          claimed.answers ?? {},
+          claimed.startedAt,
+          claimed.questions.map((question) => ({
+            id: String(question.sourceQuestionId),
+            questionText: question.questionText,
+            options: question.options.map((option) => ({ optionId: option.optionId, text: option.text })),
+            correctAnswerIndex: question.correctAnswerIndex,
+            explanation: question.explanation,
+          })),
+          String(claimed._id),
+          true,
+        );
+        await QuizSession.updateOne(
+          { _id: claimed._id, status: 'submitting' },
+          { $set: { status: 'submitted', submittedAt: result.attempt.toProps().completedAt, quizAttemptId: result.attempt.id }, $unset: { submittingAt: 1 } },
+        ).exec();
+      } catch (error: any) {
+        if (error?.code === 11000) {
+          const attempt = await this.quizAttemptRepository.findBySessionIdAndUser(String(claimed._id), String(claimed.userId));
+          if (attempt) {
+            await QuizSession.updateOne(
+              { _id: claimed._id },
+              { $set: { status: 'submitted', submittedAt: attempt.toProps().completedAt ?? new Date(), quizAttemptId: attempt.id }, $unset: { submittingAt: 1 } },
+            ).exec();
+            continue;
+          }
+        }
+        await QuizSession.updateOne(
+          { _id: claimed._id, status: 'submitting' },
+          { $set: { status: 'in_progress' }, $unset: { submittingAt: 1, submissionKey: 1 } },
+        ).exec();
+      }
+    }
+  }
+
   async start(lessonId: string, user: QuizViewer) {
     if (!mongoose.isValidObjectId(lessonId)) throw new BadRequestError('Invalid lesson id.');
     await this.recoverStaleSubmissions();
+    await this.finalizeExpiredSessions();
     await this.learningAccess.assertLessonInteractionAccess(lessonId, user);
     const quiz = await QuizModel.findOne({ lessonId, isDeleted: { $ne: true } }).exec();
     if (!quiz) throw new NotFoundError('Quiz not found for this lesson.');
@@ -70,10 +134,9 @@ export class QuizSessionService {
     const session = await this.getOwnedSession(sessionId, user.id);
     await this.learningAccess.assertLessonInteractionAccess(String(session.lessonId), user);
     await this.assertActive(session);
-    // A manual submission must be complete. At/after the server deadline we
-    // accept the partial autosaved snapshot so the timeout can be graded.
-    const isTimedOut = Boolean(session.expiresAt && session.expiresAt.getTime() <= Date.now());
-    this.assertAnswers(session, answers, !isTimedOut);
+    // Autosave deliberately accepts partial answers; completeness is only
+    // required at manual submission time.
+    this.assertAnswers(session, answers, false);
     session.answers = answers;
     await session.save();
     return { attemptSessionId: String(session._id), answers: session.answers, savedAt: session.updatedAt };
@@ -84,14 +147,17 @@ export class QuizSessionService {
     await this.learningAccess.assertLessonInteractionAccess(String(session.lessonId), user);
     const key = idempotencyKey?.trim() || String(session._id);
     if (session.status === 'submitted') return this.getStoredResult(session, user.id, key);
-    await this.assertActive(session);
-    this.assertAnswers(session, answers);
+    const isTimedOut = Boolean(session.expiresAt && session.expiresAt.getTime() <= Date.now());
+    if (!isTimedOut) await this.assertActive(session);
+    // A timeout grades the partial autosaved state. A learner-initiated
+    // submission must explicitly answer every question.
+    this.assertAnswers(session, answers, !isTimedOut);
 
     const claimed = await QuizSession.findOneAndUpdate(
       { _id: session._id, status: 'in_progress' },
       { $set: { status: 'submitting', submittingAt: new Date(), submissionKey: key, answers } },
       { new: true },
-    ).select('+questions.correctAnswerIndex').exec();
+    ).select('+questions.correctAnswerIndex +questions.explanation').exec();
     if (!claimed) {
       const latest = await this.getOwnedSession(sessionId, user.id, true);
       if (latest.status === 'submitted') return this.getStoredResult(latest, user.id, key);
@@ -103,8 +169,15 @@ export class QuizSessionService {
         String(claimed.quizId),
         answers,
         claimed.startedAt,
-        claimed.questions.map((question) => ({ id: String(question.sourceQuestionId), correctAnswerIndex: question.correctAnswerIndex })),
+        claimed.questions.map((question) => ({
+          id: String(question.sourceQuestionId),
+          questionText: question.questionText,
+          options: question.options.map((option) => ({ optionId: option.optionId, text: option.text })),
+          correctAnswerIndex: question.correctAnswerIndex,
+          explanation: question.explanation,
+        })),
         String(claimed._id),
+        isTimedOut,
       );
       await QuizSession.updateOne(
         { _id: claimed._id, status: 'submitting' },
@@ -146,7 +219,7 @@ export class QuizSessionService {
   private async getOwnedSession(sessionId: string, userId: string, includeAnswerKey = false) {
     if (!mongoose.isValidObjectId(sessionId)) throw new NotFoundError('Quiz session not found.');
     const query = QuizSession.findOne({ _id: sessionId, userId });
-    if (includeAnswerKey) query.select('+questions.correctAnswerIndex');
+    if (includeAnswerKey) query.select('+questions.correctAnswerIndex +questions.explanation');
     const session = await query.exec();
     if (!session) throw new NotFoundError('Quiz session not found.');
     return session;
