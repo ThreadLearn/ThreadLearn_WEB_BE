@@ -70,7 +70,10 @@ async function bootstrap() {
     origin: corsOrigins.includes('*') ? true : corsOrigins,
     credentials: !corsOrigins.includes('*'),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // Quiz submission carries an idempotency key so a retried request cannot
+    // create a second attempt. Keep this whitelist in sync with API clients,
+    // otherwise browsers reject the preflight request before it reaches Nest.
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   });
   app.useGlobalPipes(
     new ValidationPipe({

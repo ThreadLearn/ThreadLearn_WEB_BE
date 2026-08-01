@@ -20,6 +20,7 @@ export interface IQuizBankImport extends Document {
   fileName: string;
   fileType: 'xlsx' | 'docx';
   status: 'needs_review' | 'committed' | 'failed';
+  mode: 'publish' | 'replace';
   questionCount: number;
   validCount: number;
   invalidCount: number;
@@ -54,6 +55,7 @@ const QuizBankImportSchema = new Schema<IQuizBankImport>(
     fileName: { type: String, required: true },
     fileType: { type: String, enum: ['xlsx', 'docx'], required: true },
     status: { type: String, enum: ['needs_review', 'committed', 'failed'], default: 'needs_review' },
+    mode: { type: String, enum: ['publish', 'replace'], default: 'publish' },
     questionCount: { type: Number, required: true },
     validCount: { type: Number, required: true },
     invalidCount: { type: Number, required: true },

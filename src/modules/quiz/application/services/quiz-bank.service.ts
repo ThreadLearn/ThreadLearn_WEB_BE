@@ -25,6 +25,7 @@ export interface CreateImportInput {
   lessonId?: string;
   title?: string;
   questionCount?: number;
+  replaceExisting?: boolean;
   userId: string;
   file: Express.Multer.File;
 }
@@ -61,7 +62,8 @@ export class QuizBankService {
     if (rawItems.length > 1000) {
       throw new BadRequestError('A quiz library can contain at most 1,000 questions per import.');
     }
-    const items = await this.validateAndAnnotateItems(String(quiz._id), rawItems);
+    const mode = input.replaceExisting ? 'replace' : 'publish';
+    const items = await this.validateAndAnnotateItems(String(quiz._id), rawItems, mode === 'replace');
 
     const validCount = items.filter((item) => item.errors.length === 0).length;
     const importJob = await QuizBankImport.create({
@@ -71,6 +73,7 @@ export class QuizBankService {
       fileName: input.file.originalname,
       fileType: extension,
       status: 'needs_review',
+      mode,
       questionCount: input.questionCount ?? 5,
       validCount,
       invalidCount: items.length - validCount,
@@ -98,6 +101,14 @@ export class QuizBankService {
   }
 
   async commitImport(importId: string, actor: QuizBankActor) {
+    return this.publishImport(importId, actor, false);
+  }
+
+  async replaceImport(importId: string, actor: QuizBankActor) {
+    return this.publishImport(importId, actor, true);
+  }
+
+  private async publishImport(importId: string, actor: QuizBankActor, replaceExisting: boolean) {
     if (!mongoose.isValidObjectId(importId)) throw new NotFoundError('Quiz import not found.');
     const dbSession = await mongoose.startSession();
     let result: Record<string, unknown> | undefined;
@@ -112,9 +123,19 @@ export class QuizBankService {
           return;
         }
         if (importJob.status !== 'needs_review') throw new BadRequestError('Only imports awaiting review can be published.');
+        if (importJob.mode && (importJob.mode === 'replace') !== replaceExisting) {
+          throw new BadRequestError(replaceExisting ? 'This import was not prepared to replace the current library.' : 'Use the replace endpoint to publish this import.');
+        }
         this.assertPublishable(importJob);
 
         const existingBank = await QuizQuestionBank.findOne({ quizId: importJob.quizId }).session(dbSession).exec();
+        const hasPublishedLibrary = Boolean(existingBank && existingBank.status === 'published');
+        if (hasPublishedLibrary && !replaceExisting) {
+          throw new BadRequestError('This quiz already has a published library. Review the preview and use Replace question library.');
+        }
+        if (replaceExisting && !hasPublishedLibrary) {
+          throw new BadRequestError('There is no published question library to replace.');
+        }
         const bankVersion = (existingBank?.version ?? 0) + 1;
         const bank = existingBank ?? (await QuizQuestionBank.create([{
           quizId: importJob.quizId,
@@ -150,6 +171,11 @@ export class QuizBankService {
         }
         const candidateDocs = [...docsByHash.values()];
         const hashes = candidateDocs.map((doc) => String(doc.contentHash));
+        if (replaceExisting) {
+          // Sessions persist complete question snapshots, so removing old source
+          // records here cannot alter an attempt already in progress.
+          await QuizBankQuestion.deleteMany({ quizId: importJob.quizId }).session(dbSession).exec();
+        }
         const existingHashes = new Set((await QuizBankQuestion.find({ quizId: importJob.quizId, contentHash: { $in: hashes } })
           .session(dbSession).select('contentHash').lean().exec()).map((doc) => doc.contentHash));
         const newDocs = candidateDocs.filter((doc) => !existingHashes.has(String(doc.contentHash)));
@@ -168,7 +194,14 @@ export class QuizBankService {
         importJob.duplicateCount = candidateDocs.length - newDocs.length;
         importJob.committedAt = new Date();
         await importJob.save({ session: dbSession });
-        result = this.toBankSummary(bank, { inserted: newDocs.length, duplicated: importJob.duplicateCount, idempotent: false });
+        result = this.toBankSummary(bank, {
+          inserted: newDocs.length,
+          duplicated: importJob.duplicateCount,
+          idempotent: false,
+          replaced: replaceExisting,
+          totalQuestionCount: candidateDocs.length,
+          disabledQuestionCount: 0,
+        });
       });
     } finally {
       await dbSession.endSession();
@@ -180,7 +213,11 @@ export class QuizBankService {
     if (!mongoose.isValidObjectId(quizId)) throw new NotFoundError('Quiz question bank not found.');
     const bank = await QuizQuestionBank.findOne({ quizId }).lean().exec();
     if (!bank) throw new NotFoundError('Quiz question bank not found.');
-    return this.toBankSummary(bank);
+    const totalQuestionCount = await QuizBankQuestion.countDocuments({ quizId: bank.quizId });
+    return this.toBankSummary(bank, {
+      totalQuestionCount,
+      disabledQuestionCount: Math.max(0, totalQuestionCount - bank.activeQuestionCount),
+    });
   }
 
   async updateImportItem(importId: string, row: number, input: Partial<RawQuestion>, actor: QuizBankActor) {
@@ -312,6 +349,29 @@ export class QuizBankService {
     return response!;
   }
 
+  async deleteQuestion(quizId: string, questionId: string) {
+    if (!mongoose.isValidObjectId(questionId)) throw new NotFoundError('Question not found.');
+    const dbSession = await mongoose.startSession();
+    try {
+      await dbSession.withTransaction(async () => {
+        const bank = await QuizQuestionBank.findOne({ quizId }).session(dbSession).exec();
+        if (!bank) throw new NotFoundError('Quiz question bank not found.');
+        const question = await QuizBankQuestion.findOne({ _id: questionId, quizId }).session(dbSession).exec();
+        if (!question) throw new NotFoundError('Question not found.');
+        if (question.status === 'active') {
+          const activeCount = await QuizBankQuestion.countDocuments({ quizId, status: 'active' }).session(dbSession);
+          if (activeCount - 1 < bank.questionCount) throw new BadRequestError(`At least ${bank.questionCount} active questions are required.`);
+        }
+        await question.deleteOne({ session: dbSession });
+        bank.activeQuestionCount = await QuizBankQuestion.countDocuments({ quizId, status: 'active' }).session(dbSession);
+        await bank.save({ session: dbSession });
+      });
+    } finally {
+      await dbSession.endSession();
+    }
+    return { deleted: true };
+  }
+
   buildXlsxTemplate() {
     const headers = ['question', 'option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'option_f', 'correct_answer', 'explanation', 'difficulty', 'tags'];
     const sheet = XLSX.utils.aoa_to_sheet([
@@ -376,8 +436,8 @@ export class QuizBankService {
     }
   }
 
-  private async refreshImportCounts(importJob: { quizId: unknown; items: IImportedQuestion[]; validCount: number; invalidCount: number; duplicateCount: number }) {
-    importJob.items = await this.validateAndAnnotateItems(String(importJob.quizId), importJob.items as RawQuestion[]);
+  private async refreshImportCounts(importJob: { quizId: unknown; mode?: 'publish' | 'replace'; items: IImportedQuestion[]; validCount: number; invalidCount: number; duplicateCount: number }) {
+    importJob.items = await this.validateAndAnnotateItems(String(importJob.quizId), importJob.items as RawQuestion[], importJob.mode === 'replace');
     importJob.validCount = importJob.items.filter((item) => item.errors.length === 0).length;
     importJob.invalidCount = importJob.items.length - importJob.validCount;
     importJob.duplicateCount = this.countDuplicateItems(importJob.items);
@@ -570,12 +630,12 @@ export class QuizBankService {
     return normalized;
   }
 
-  private async validateAndAnnotateItems(quizId: string, rawItems: RawQuestion[]): Promise<IImportedQuestion[]> {
+  private async validateAndAnnotateItems(quizId: string, rawItems: RawQuestion[], ignoreExistingLibrary = false): Promise<IImportedQuestion[]> {
     const items = rawItems.map((item) => this.validateItem(item));
     const candidates = items.filter((item) => item.errors.length === 0 && item.questionText && item.options);
     const hashes = candidates.map((item) => this.contentHash(item.questionText!, item.options!));
     const existingHashes = new Set(
-      (await QuizBankQuestion.find({ quizId, contentHash: { $in: hashes } }).select('contentHash').lean().exec())
+      (ignoreExistingLibrary ? [] : await QuizBankQuestion.find({ quizId, contentHash: { $in: hashes } }).select('contentHash').lean().exec())
         .map((question) => question.contentHash),
     );
     const seen = new Set<string>();
@@ -608,6 +668,7 @@ export class QuizBankService {
       fileName: importJob.fileName,
       fileType: importJob.fileType,
       status: importJob.status,
+      mode: importJob.mode ?? 'publish',
       questionCount: importJob.questionCount,
       validCount: importJob.validCount,
       invalidCount: importJob.invalidCount,

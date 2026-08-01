@@ -74,7 +74,7 @@ export class QuizController {
   async uploadQuestionBank(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() body: { quizId?: string; lessonId?: string; title?: string; questionCount?: string },
+    @Body() body: { quizId?: string; lessonId?: string; title?: string; questionCount?: string; replaceExisting?: string | boolean },
   ) {
     const questionCount = body.questionCount === undefined || body.questionCount === ''
       ? undefined
@@ -84,6 +84,7 @@ export class QuizController {
       lessonId: body.lessonId,
       title: body.title,
       questionCount,
+      replaceExisting: body.replaceExisting === true || body.replaceExisting === 'true',
       userId: user.id,
       file: file as Express.Multer.File,
     });
@@ -110,6 +111,16 @@ export class QuizController {
   ) {
     const result = await this.quizBank.commitImport(importId, user);
     return ApiResponse.success({ message: 'Question library published.', data: result });
+  }
+
+  @Post('imports/:importId/replace')
+  @Roles('ADMIN')
+  async replaceQuestionBankImport(
+    @Param('importId') importId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.quizBank.replaceImport(importId, user);
+    return ApiResponse.success({ message: 'Question library replaced.', data: result });
   }
 
   @Patch('imports/:importId/items/:row')
@@ -189,6 +200,13 @@ export class QuizController {
     if (body.status !== 'active' && body.status !== 'disabled') throw new BadRequestError('status must be active or disabled.');
     const result = await this.quizBank.setQuestionStatus(quizId, questionId, body.status);
     return ApiResponse.success({ message: 'Question bank question status updated.', data: result });
+  }
+
+  @Delete(':quizId/question-bank/questions/:questionId')
+  @Roles('ADMIN')
+  async deleteQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string) {
+    const result = await this.quizBank.deleteQuestion(quizId, questionId);
+    return ApiResponse.success({ message: 'Question bank question deleted.', data: result });
   }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
