@@ -20,6 +20,15 @@ type StudentInvitationEmailPayload = {
   temporaryPassword: string;
 };
 
+type LearningPlanReminderEmailPayload = {
+  email: string;
+  firstName: string;
+  sessionMinutes: number;
+  learningPlanUrl: string;
+  atRiskGoalCount: number;
+  behindGoalCount: number;
+};
+
 /**
  * Legacy SMTP implementation (nodemailer). DEV1.5A — KHÔNG deprecated-for-removal:
  * vẫn là implementation thật phía sau port `EMAIL_SENDER`. `SmtpEmailSenderService`
@@ -104,6 +113,42 @@ export class EmailService {
         <p>An admin has created a ThreadLearn account for you.</p>
         <p><strong>Temporary password:</strong> ${this.escapeHtml(payload.temporaryPassword)}</p>
         <p>Please sign in and change your password as soon as possible.</p>
+      `,
+    });
+  }
+
+  static async sendLearningPlanReminderEmail(payload: LearningPlanReminderEmailPayload) {
+    if (!this.hasSmtpConfig()) {
+      logger.info(`Mock learning-plan reminder email sent to ${payload.email} for ${payload.firstName}.`);
+      return;
+    }
+
+    const goalSummary = [
+      payload.behindGoalCount > 0
+        ? `${payload.behindGoalCount} course target${payload.behindGoalCount === 1 ? '' : 's'} past due`
+        : '',
+      payload.atRiskGoalCount > 0
+        ? `${payload.atRiskGoalCount} course target${payload.atRiskGoalCount === 1 ? '' : 's'} need attention`
+        : '',
+    ].filter(Boolean);
+    const attentionMessage = goalSummary.length
+      ? ` You also have ${goalSummary.join(' and ')}.`
+      : '';
+
+    this.dispatch('Learning-plan reminder email', {
+      to: payload.email,
+      subject: 'Your ThreadLearn study reminder',
+      text: [
+        `Hi ${payload.firstName},`,
+        '',
+        `Set aside about ${payload.sessionMinutes} minutes for your planned study session.${attentionMessage}`,
+        '',
+        `Open your study plan: ${payload.learningPlanUrl}`,
+      ].join('\n'),
+      html: `
+        <p>Hi ${this.escapeHtml(payload.firstName)},</p>
+        <p>Set aside about <strong>${payload.sessionMinutes} minutes</strong> for your planned study session.${this.escapeHtml(attentionMessage)}</p>
+        <p><a href="${this.escapeHtml(payload.learningPlanUrl)}">Open your study plan</a></p>
       `,
     });
   }

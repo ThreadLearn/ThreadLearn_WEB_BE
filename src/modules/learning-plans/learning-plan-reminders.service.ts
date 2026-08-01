@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { env } from '../../configs/env';
 import { logger } from '../../configs/logger';
+import { EmailService } from '../auth/services/email.service';
+import { User } from '../auth/models/user.model';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { CourseLearningGoalsService } from './course-learning-goals.service';
 import { LearningPlan } from './models/learning-plan.model';
@@ -29,7 +32,7 @@ export class LearningPlanRemindersService {
   async dispatchScheduledReminders() {
     try {
       const plans = await LearningPlan.find({ reminderEnabled: true })
-        .select('_id userId weeklyHours preferredDays reminderTime timezone')
+        .select('_id userId weeklyHours preferredDays reminderEnabled emailReminderEnabled reminderTime timezone')
         .lean();
       await Promise.all(plans.map((plan) => this.dispatchForPlan(plan, new Date())));
     } catch (error) {
@@ -42,6 +45,7 @@ export class LearningPlanRemindersService {
       userId: unknown;
       weeklyHours: number;
       preferredDays: number[];
+      emailReminderEnabled?: boolean;
       reminderTime: string;
       timezone: string;
     },
@@ -56,7 +60,7 @@ export class LearningPlanRemindersService {
       15,
       Math.round((plan.weeklyHours * 60) / Math.max(1, plan.preferredDays.length))
     );
-    await this.sendOnce({
+    const studyReminderCreated = await this.sendOnce({
       userId,
       eventKey: `LEARNING_PLAN_STUDY_REMINDER:${userId}:${local.date}`,
       title: 'Your study session is due',
@@ -66,9 +70,9 @@ export class LearningPlanRemindersService {
     });
 
     const goals = await this.courseGoals.listMine(userId);
+    const attentionGoals = goals.filter((goal) => goal.status === 'AT_RISK' || goal.status === 'BEHIND');
     await Promise.all(
-      goals
-        .filter((goal) => goal.status === 'AT_RISK' || goal.status === 'BEHIND')
+      attentionGoals
         .map((goal) => {
           const isBehind = goal.status === 'BEHIND';
           return this.sendOnce({
@@ -86,8 +90,12 @@ export class LearningPlanRemindersService {
               date: local.date,
             },
           });
-        })
+      })
     );
+
+    if (studyReminderCreated && plan.emailReminderEnabled) {
+      await this.sendEmailReminder({ userId, sessionMinutes, attentionGoals });
+    }
   }
 
   private getLocalScheduleTime(now: Date, timezone: string): LocalScheduleTime | null {
@@ -123,9 +131,39 @@ export class LearningPlanRemindersService {
   ) {
     try {
       await NotificationsService.sendNotification({ ...data, type: 'SYSTEM' });
+      return true;
     } catch (error: any) {
-      if (error?.code === 11000) return;
+      if (error?.code === 11000) return false;
       throw error;
     }
+  }
+
+  private async sendEmailReminder({
+    userId,
+    sessionMinutes,
+    attentionGoals,
+  }: {
+    userId: string;
+    sessionMinutes: number;
+    attentionGoals: Array<{ status: string }>;
+  }) {
+    const user = await User.findOne({
+      _id: userId,
+      isActive: true,
+      emailVerifiedAt: { $exists: true, $ne: null },
+    })
+      .select('email firstName')
+      .lean();
+    if (!user) return;
+
+    const learningPlanUrl = new URL('/learning-plan', env.FRONTEND_URL[0]).toString();
+    await EmailService.sendLearningPlanReminderEmail({
+      email: user.email,
+      firstName: user.firstName,
+      sessionMinutes,
+      learningPlanUrl,
+      atRiskGoalCount: attentionGoals.filter((goal) => goal.status === 'AT_RISK').length,
+      behindGoalCount: attentionGoals.filter((goal) => goal.status === 'BEHIND').length,
+    });
   }
 }
