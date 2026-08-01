@@ -19,6 +19,8 @@ export class QuizPresenter {
       xpReward: p.xpReward,
       timeLimitSeconds: p.timeLimitSeconds,
       timeLimit: p.timeLimitSeconds ?? 1800, // legacy mirror
+      useQuestionBank: p.useQuestionBank === true,
+      randomQuestionCount: p.randomQuestionCount,
       questions: p.questions.map((q) => {
         const qp = q.toProps();
         return {
@@ -46,6 +48,8 @@ export class QuizPresenter {
       xpReward: p.xpReward,
       timeLimitSeconds: p.timeLimitSeconds,
       timeLimit: p.timeLimitSeconds ?? 1800,
+      useQuestionBank: p.useQuestionBank === true,
+      randomQuestionCount: p.randomQuestionCount,
       questions: p.questions.map((q) => {
         const qp = q.toProps();
         return {

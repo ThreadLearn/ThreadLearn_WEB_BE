@@ -26,6 +26,8 @@ export class QuizMapper {
         passingScorePercent: doc.passingScorePercent ?? doc.passingScore ?? 80,
         xpReward: doc.xpReward ?? 100,
         timeLimitSeconds: doc.timeLimitSeconds ?? doc.timeLimit,
+        useQuestionBank: doc.useQuestionBank === true,
+        randomQuestionCount: doc.randomQuestionCount,
         questions,
         isDeleted: doc.isDeleted === true,
         deletedAt: doc.deletedAt,
@@ -43,6 +45,8 @@ export class QuizMapper {
       passingScorePercent: p.passingScorePercent,
       xpReward: p.xpReward,
       timeLimitSeconds: p.timeLimitSeconds,
+      useQuestionBank: p.useQuestionBank === true,
+      randomQuestionCount: p.randomQuestionCount,
       // ── legacy mirror fields ──
       passingScore: p.passingScorePercent,
       timeLimit: p.timeLimitSeconds ?? 1800,

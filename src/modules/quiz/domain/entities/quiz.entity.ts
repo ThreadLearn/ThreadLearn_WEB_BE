@@ -9,6 +9,10 @@ export interface QuizProps {
   passingScorePercent: number;
   xpReward: number;
   timeLimitSeconds?: number;
+  /** Questions are served from the bank instead of the legacy embedded array. */
+  useQuestionBank?: boolean;
+  /** Number of random questions in each question-bank attempt (5-10). */
+  randomQuestionCount?: number;
   questions: Question[];
   isDeleted?: boolean;
   deletedAt?: Date;
@@ -61,6 +65,7 @@ export class Quiz extends AggregateRoot<QuizProps> {
         passingScorePercent,
         xpReward,
         timeLimitSeconds: input.timeLimitSeconds,
+        useQuestionBank: false,
         questions,
         isDeleted: false,
       },
@@ -206,6 +211,8 @@ export class Quiz extends AggregateRoot<QuizProps> {
       passingScorePercent: this.props.passingScorePercent,
       xpReward: this.props.xpReward,
       timeLimitSeconds: this.props.timeLimitSeconds,
+      useQuestionBank: this.props.useQuestionBank === true,
+      randomQuestionCount: this.props.randomQuestionCount,
       questions: this.props.questions,
       isDeleted: this.props.isDeleted,
       deletedAt: this.props.deletedAt,
