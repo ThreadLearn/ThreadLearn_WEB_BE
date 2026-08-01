@@ -45,4 +45,17 @@ describe('EmailService sensitive logging', () => {
 
     expect(JSON.stringify((logger.info as jest.Mock).mock.calls)).not.toContain('secret-token');
   });
+
+  it('records a safe mock learning-plan reminder when SMTP is unavailable', async () => {
+    await EmailService.sendLearningPlanReminderEmail({
+      email: 'user@example.com',
+      firstName: 'Thread',
+      sessionMinutes: 45,
+      learningPlanUrl: 'https://app.example/learning-plan',
+      atRiskGoalCount: 1,
+      behindGoalCount: 0,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith('Mock learning-plan reminder email sent to user@example.com for Thread.');
+  });
 });
