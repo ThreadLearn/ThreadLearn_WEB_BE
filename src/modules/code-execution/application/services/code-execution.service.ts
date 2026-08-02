@@ -14,7 +14,7 @@ import {
 import { CodeSubmitPayload, MAX_SOURCE_CODE_BYTES } from '../dto/code-execution.dto';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
 
-type ExecutionResult = {
+export type ExecutionResult = {
   stdout: string;
   stderr: string;
   compileOutput: string;
@@ -41,7 +41,7 @@ const truncateUtf8 = (value: string, maxBytes = MAX_OUTPUT_BYTES) => {
 const callJudge0 = async (
   url: string,
   key: string | undefined,
-  payload: { source_code: string; language_id: number; stdin: string },
+  payload: { source_code: string; language_id: number; stdin: string; timeLimitMs?: number; memoryLimitKb?: number },
 ): Promise<ExecutionResult> => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (isRapidApi(url)) {
@@ -64,6 +64,11 @@ const callJudge0 = async (
         source_code: Buffer.from(payload.source_code).toString('base64'),
         language_id: payload.language_id,
         stdin: Buffer.from(payload.stdin).toString('base64'),
+        ...(payload.timeLimitMs ? {
+          cpu_time_limit: Math.max(0.1, payload.timeLimitMs / 1000),
+          wall_time_limit: Math.max(1, payload.timeLimitMs / 1000 + 1),
+        } : {}),
+        ...(payload.memoryLimitKb ? { memory_limit: payload.memoryLimitKb } : {}),
       }),
     });
   } finally {
@@ -102,6 +107,40 @@ export class CodeExecutionService {
     return resolved;
   }
 
+  /**
+   * Executes an assignment case without persisting it to the learner-visible
+   * playground history.  Keeping hidden inputs out of CodeExecution is a
+   * deliberate security boundary; callers are responsible for authorization.
+   */
+  async executeAssignmentCase(payload: Required<Pick<CodeSubmitPayload, 'sourceCode' | 'language' | 'stdin'>> & {
+    timeLimitMs?: number;
+    memoryLimitKb?: number;
+  }): Promise<ExecutionResult> {
+    if (!payload.sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
+    if (Buffer.byteLength(payload.sourceCode, 'utf8') > MAX_SOURCE_CODE_BYTES) {
+      throw new BadRequestError(`sourceCode exceeds the ${MAX_SOURCE_CODE_BYTES} byte limit.`);
+    }
+    if (payload.stdin.length > 10000) throw new BadRequestError('stdin exceeds the 10000 character limit.');
+    if (!isJudge0Configured(env.JUDGE0_API_URL, env.JUDGE0_API_KEY)) {
+      throw new ServiceUnavailableError('Code execution is temporarily unavailable. Configure Judge0 before running code.', 'JUDGE0_NOT_CONFIGURED');
+    }
+
+    const languageId = CodeExecutionService.resolveLanguageId(payload.language);
+    try {
+      return await callJudge0(env.JUDGE0_API_URL, env.JUDGE0_API_KEY, {
+        source_code: payload.sourceCode,
+        language_id: languageId,
+        stdin: payload.stdin,
+        timeLimitMs: payload.timeLimitMs,
+        memoryLimitKb: payload.memoryLimitKb,
+      });
+    } catch (error) {
+      if (error instanceof ServiceUnavailableError) throw error;
+      logger.error('Judge0 assignment execution failed.', error);
+      throw new ServiceUnavailableError('Code execution service is temporarily unavailable.', 'JUDGE0_UNAVAILABLE');
+    }
+  }
+
   async executeCode(userId: string, payload: CodeSubmitPayload, userRole: 'STUDENT' | 'ADMIN' = 'STUDENT') {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
@@ -136,6 +175,8 @@ export class CodeExecutionService {
         source_code: sourceCode,
         language_id: languageId,
         stdin,
+        timeLimitMs: payload.timeLimitMs,
+        memoryLimitKb: payload.memoryLimitKb,
       });
     } catch (error) {
       // A failed infrastructure call is not a completed execution, so return

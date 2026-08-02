@@ -5,67 +5,120 @@ import { ApiResponse } from '../../../../common/api-response';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe';
+import {
+  AssignmentRunPayload,
+  AssignmentSubmitPayload,
+  ExerciseUpsertPayload,
+  ExerciseUpdatePayload,
+  SubmissionListQuery,
+  assignmentRunSchema,
+  assignmentSubmitSchema,
+  exerciseCreateSchema,
+  exerciseIdParamSchema,
+  exerciseListQuerySchema,
+  exerciseUpdateSchema,
+  submissionListQuerySchema,
+} from '../../application/dto/exercise.dto';
 import { ExercisesService } from '../../application/services/exercises.service';
 
-@ApiTags('Exercises')
-@Controller('v1/exercises')
+@ApiTags('Code Assignments')
+@Controller(['v1/exercises', 'v1/code-assignments'])
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('BearerAuth')
 export class ExercisesController {
   constructor(private readonly exercises: ExercisesService) {}
 
   @Get()
-  async list(@Query('lessonId') lessonId: string) {
-    const data = await this.exercises.listByLesson(lessonId);
-    return ApiResponse.success({ message: 'Exercises fetched.', data });
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(exerciseListQuerySchema)) query: { lessonId: string },
+  ) {
+    const data = await this.exercises.listByLesson(user, query.lessonId);
+    return ApiResponse.success({ message: 'Code assignments fetched.', data });
   }
 
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('BearerAuth')
-  async getOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    const ex = await this.exercises.getById(id);
-    if (user.role !== 'ADMIN') {
-      const visible = ex.toObject ? ex.toObject() : { ...ex };
-      visible.testCases = (visible.testCases ?? []).map((tc: any) =>
-        tc.isHidden ? { ...tc, input: '', expectedOutput: '' } : tc,
-      );
-      return ApiResponse.success({ message: 'Exercise fetched.', data: visible });
-    }
-    return ApiResponse.success({ message: 'Exercise fetched.', data: ex });
-  }
-
-  @Post()
-  @UseGuards(JwtAuthGuard)
+  @Get('admin/all')
   @Roles('ADMIN')
-  @ApiBearerAuth('BearerAuth')
-  async create(@Body() body: any) {
-    const ex = await this.exercises.create(body);
-    return ApiResponse.success({ message: 'Exercise created.', data: ex, statusCode: 201 });
+  async listAllForAdmin() {
+    const data = await this.exercises.listAllForAdmin();
+    return ApiResponse.success({ message: 'Code assignments fetched.', data });
   }
 
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
-  @ApiBearerAuth('BearerAuth')
-  async update(@Param('id') id: string, @Body() body: any) {
-    const ex = await this.exercises.update(id, body);
-    return ApiResponse.success({ message: 'Exercise updated.', data: ex });
+  @Get(':id/submissions/me')
+  async listMine(
+    @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(submissionListQuerySchema)) query: SubmissionListQuery,
+  ) {
+    const data = await this.exercises.listMine(user, id, query.page, query.limit);
+    return ApiResponse.success({ message: 'Submission history fetched.', data });
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @Get(':id/submissions')
   @Roles('ADMIN')
-  @ApiBearerAuth('BearerAuth')
-  async remove(@Param('id') id: string) {
-    const result = await this.exercises.remove(id);
-    return ApiResponse.success({ message: 'Exercise deleted.', data: result });
+  async listForAdmin(
+    @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @Query(new ZodValidationPipe(submissionListQuerySchema)) query: SubmissionListQuery,
+  ) {
+    const data = await this.exercises.listForAdmin(id, query.page, query.limit);
+    return ApiResponse.success({ message: 'Assignment submissions fetched.', data });
+  }
+
+  @Get('submissions/:submissionId')
+  async getMine(@Param('submissionId', new ZodValidationPipe(exerciseIdParamSchema)) submissionId: string, @CurrentUser() user: AuthenticatedUser) {
+    const data = await this.exercises.getMine(user, submissionId);
+    return ApiResponse.success({ message: 'Submission fetched.', data });
+  }
+
+  @Post(':id/run-public')
+  async runPublic(
+    @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(assignmentRunSchema)) body: AssignmentRunPayload,
+  ) {
+    const data = await this.exercises.runPublic(user, id, body);
+    return ApiResponse.success({ message: 'Public test cases completed.', data });
   }
 
   @Post(':id/submit')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('BearerAuth')
-  async submit(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser, @Body() body: { sourceCode: string }) {
-    const result = await this.exercises.grade(user.id, id, body?.sourceCode ?? '');
-    return ApiResponse.success({ message: 'Exercise graded.', data: result, statusCode: 201 });
+  async submit(
+    @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(assignmentSubmitSchema)) body: AssignmentSubmitPayload,
+  ) {
+    const data = await this.exercises.submit(user, id, body);
+    return ApiResponse.success({ message: 'Assignment submitted.', data, statusCode: 201 });
+  }
+
+  @Get(':id')
+  async getOne(@Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string, @CurrentUser() user: AuthenticatedUser) {
+    const data = await this.exercises.getById(user, id);
+    return ApiResponse.success({ message: 'Code assignment fetched.', data });
+  }
+
+  @Post()
+  @Roles('ADMIN')
+  async create(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(exerciseCreateSchema)) body: ExerciseUpsertPayload) {
+    const data = await this.exercises.create(user.id, body);
+    return ApiResponse.success({ message: 'Code assignment created.', data, statusCode: 201 });
+  }
+
+  @Patch(':id')
+  @Roles('ADMIN')
+  async update(
+    @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @Body(new ZodValidationPipe(exerciseUpdateSchema)) body: ExerciseUpdatePayload,
+  ) {
+    const data = await this.exercises.update(id, body);
+    return ApiResponse.success({ message: 'Code assignment updated.', data });
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN')
+  async remove(@Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string) {
+    const data = await this.exercises.remove(id);
+    return ApiResponse.success({ message: 'Code assignment deleted.', data });
   }
 }
 

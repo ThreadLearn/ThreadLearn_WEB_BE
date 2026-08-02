@@ -41,6 +41,13 @@ interface AnalyzeResponse {
   cached: boolean;
 }
 
+export interface AssignmentAiFeedback {
+  summary: string;
+  suggestions: string[];
+  timeComplexity: string;
+  memoryComplexity: string;
+}
+
 @Injectable()
 export class RequestRecommendationService {
   constructor(
@@ -126,6 +133,29 @@ export class RequestRecommendationService {
     created.remainingQuota = Math.max(0, limit - usedToday - 1);
     created.quotaLimit = limit;
     return created;
+  }
+
+  /**
+   * Assignment feedback is system-triggered after grading. It deliberately
+   * bypasses the learner's Advisor quota and receives no hidden test data.
+   */
+  async analyzeAssignment(userId: string, inputCode: string, language: string): Promise<AssignmentAiFeedback> {
+    const aiToken = jwt.sign({ sub: userId, scope: 'assignment-feedback' }, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
+    const { data } = await firstValueFrom(
+      this.http.post<AnalyzeResponse>(
+        `${env.AI_API_URL}/api/v1/ai/analyze`,
+        { code: inputCode, language, user_id: userId },
+        { timeout: env.AI_API_TIMEOUT_MS, headers: { Authorization: `Bearer ${aiToken}` } },
+      ),
+    );
+    const issues = data.issues ?? [];
+    const nestedLoops = (inputCode.match(/\b(for|while)\b/g) ?? []).length >= 2;
+    return {
+      summary: issues.length ? `AI found ${issues.length} area${issues.length === 1 ? '' : 's'} to review.` : 'AI found no obvious issues in this submission.',
+      suggestions: issues.slice(0, 5).map((issue) => issue.fix || issue.description),
+      timeComplexity: nestedLoops ? 'Likely O(n²) or higher; verify whether nested loops are necessary.' : 'Review loop bounds against input constraints.',
+      memoryComplexity: /\b(array|list|map|set|dict)\b/i.test(inputCode) ? 'Uses auxiliary collections; memory may grow with input.' : 'Likely O(1) auxiliary memory, subject to runtime behavior.',
+    };
   }
 
   private async assertDailyLimit(userId: string, premium: boolean) {
