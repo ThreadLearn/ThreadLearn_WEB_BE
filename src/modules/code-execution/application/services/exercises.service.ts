@@ -80,6 +80,10 @@ export class ExercisesService {
   }
 
   async create(userId: string, payload: ExerciseUpsertPayload) {
+    // An exercise must always belong to an existing, non-deleted lesson. The
+    // admin selector is a convenience only; this server-side check remains the
+    // authoritative protection against stale or crafted lesson ids.
+    await this.learningAccess.assertLessonViewAccess(payload.lessonId, { id: userId, role: 'ADMIN' });
     this.assertPublishable(payload);
     const entity = ExerciseEntity.createNew({ ...payload, createdBy: userId });
     return this.exercises.create(entity);
