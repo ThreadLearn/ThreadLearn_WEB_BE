@@ -50,6 +50,31 @@ describe('ExercisesService', () => {
     expect(result.testResults[0]).toMatchObject({ input: '1 2', expectedOutput: '3', actualOutput: '3' });
   });
 
+  it('validates that an admin-created assignment belongs to an existing lesson', async () => {
+    repository.create.mockResolvedValue({ _id: ids.exercise });
+
+    await service.create('507f1f77bcf86cd799439099', {
+      ...exerciseProps(),
+      testCases: exerciseProps().testCases,
+    } as any);
+
+    expect(access.assertLessonViewAccess).toHaveBeenCalledWith(ids.lesson, {
+      id: '507f1f77bcf86cd799439099', role: 'ADMIN',
+    });
+    expect(repository.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create an assignment when its lesson is missing or deleted', async () => {
+    access.assertLessonViewAccess.mockRejectedValueOnce(new Error('Lesson not found.'));
+
+    await expect(service.create(ids.student, {
+      ...exerciseProps(),
+      testCases: exerciseProps().testCases,
+    } as any)).rejects.toThrow('Lesson not found.');
+
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
   it('redacts hidden test input and expected output in student exercise views', async () => {
     const result: any = await service.getById({ id: ids.student, role: 'STUDENT' }, ids.exercise);
 
