@@ -49,9 +49,14 @@ export class SubmitAttemptService {
       answers,
       startTime,
       quiz.questions.map((question: any) => ({
-        id: question.id,
-        questionText: question.questionText,
-        options: question.options.map((text: string, index: number) => ({ optionId: `o${index + 1}`, text })),
+        // Old quiz documents and the legacy regression fixtures do not carry
+        // review-only option text. Grading only needs id + answer index, so
+        // preserve backwards compatibility rather than crashing on submit.
+        id: question.id ?? String(question._id),
+        questionText: question.questionText ?? '',
+        options: Array.isArray(question.options)
+          ? question.options.map((text: string, index: number) => ({ optionId: `o${index + 1}`, text }))
+          : [],
         correctAnswerIndex: question.correctAnswerIndex,
       })),
     );
