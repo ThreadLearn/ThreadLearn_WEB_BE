@@ -32,6 +32,8 @@ export class MongoExerciseSeederAdapter implements IExerciseSeederPort {
       testCases: [{ input: '', expectedOutput: 'Hello, ThreadLearn!', isHidden: false, points: 1 }],
       totalPoints: 1,
       timeLimitMs: 5000,
+      memoryLimitKb: 131072,
+      status: 'DRAFT',
     });
   }
 }

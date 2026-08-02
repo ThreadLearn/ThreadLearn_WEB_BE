@@ -27,6 +27,6 @@ import { AIController } from './presentation/controller/ai.controller';
     AIAnalysisCacheService,
     DailyQuotaService,
   ],
-  exports: [AI_HISTORY_REPOSITORY],
+  exports: [AI_HISTORY_REPOSITORY, RequestRecommendationService],
 })
 export class AIModule {}

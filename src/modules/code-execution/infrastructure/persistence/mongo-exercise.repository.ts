@@ -8,9 +8,15 @@ import { ExerciseMapper } from '../mapper/exercise.mapper';
 
 @Injectable()
 export class MongoExerciseRepository implements IExerciseRepository {
-  async listByLesson(lessonId: string): Promise<unknown[]> {
+  async listAll(): Promise<ExerciseEntity[]> {
+    const documents = await Exercise.find({}).sort({ updatedAt: -1 });
+    return documents.map((document) => ExerciseMapper.toEntity(document));
+  }
+
+  async listByLesson(lessonId: string): Promise<ExerciseEntity[]> {
     if (!mongoose.isValidObjectId(lessonId)) throw new BadRequestError('Invalid lesson id.');
-    return Exercise.find({ lessonId }).sort({ createdAt: 1 });
+    const documents = await Exercise.find({ lessonId }).sort({ createdAt: 1 });
+    return documents.map((document) => ExerciseMapper.toEntity(document));
   }
 
   async findById(id: string): Promise<ExerciseEntity | null> {

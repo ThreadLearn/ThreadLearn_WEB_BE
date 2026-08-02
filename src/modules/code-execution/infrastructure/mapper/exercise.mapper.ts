@@ -21,6 +21,12 @@ export class ExerciseMapper {
       testCases: doc.testCases ?? [],
       totalPoints: doc.totalPoints ?? 0,
       timeLimitMs: doc.timeLimitMs ?? 5000,
+      memoryLimitKb: doc.memoryLimitKb ?? 131072,
+      status: doc.status ?? 'PUBLISHED',
+      deadline: doc.deadline ?? null,
+      maxSubmissions: doc.maxSubmissions ?? null,
+      createdBy: idOf(doc.createdBy),
+      publishedAt: doc.publishedAt,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -39,7 +45,14 @@ export class ExerciseMapper {
       starterCode: props.starterCode,
       language: props.language,
       testCases: props.testCases,
+      totalPoints: props.totalPoints,
       timeLimitMs: props.timeLimitMs,
+      memoryLimitKb: props.memoryLimitKb,
+      status: props.status,
+      deadline: props.deadline,
+      maxSubmissions: props.maxSubmissions,
+      createdBy: props.createdBy,
+      publishedAt: props.publishedAt,
     };
   }
 }

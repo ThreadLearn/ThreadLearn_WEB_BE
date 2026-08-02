@@ -43,4 +43,7 @@ export interface CodeSubmitPayload {
   courseId?: string;
   lessonId?: string;
   exerciseId?: string;
+  /** Assignment judges use these limits but must never accept them from students. */
+  timeLimitMs?: number;
+  memoryLimitKb?: number;
 }

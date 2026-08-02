@@ -1,7 +1,8 @@
 import { ExerciseEntity } from '../entities/exercise.entity';
 
 export interface IExerciseRepository {
-  listByLesson(lessonId: string): Promise<unknown[]>;
+  listByLesson(lessonId: string): Promise<ExerciseEntity[]>;
+  listAll(): Promise<ExerciseEntity[]>;
   findById(id: string): Promise<ExerciseEntity | null>;
   findViewById(id: string): Promise<any | null>;
   create(exercise: ExerciseEntity): Promise<unknown>;
