@@ -13,6 +13,66 @@ export interface QuizAttemptProps {
   sessionId?: string;
   startedAt?: Date;
   completedAt?: Date;
+  durationSeconds?: number;
+  gradedAt?: Date;
+  reviewQuestions?: QuizReviewQuestion[];
+}
+
+export interface QuizReviewOption {
+  optionId: string;
+  text: string;
+}
+
+/** Immutable question and answer data used to review a completed attempt. */
+export interface QuizReviewQuestion {
+  sourceQuestionId: string;
+  questionText: string;
+  options: QuizReviewOption[];
+  selectedOptionIndex?: number;
+  selectedOptionId?: string;
+  correctOptionIndex: number;
+  correctOptionId: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
+export interface QuizReviewSourceQuestion {
+  id: string;
+  questionText: string;
+  options: QuizReviewOption[];
+  correctAnswerIndex: number;
+  explanation?: string;
+}
+
+/**
+ * Creates a self-contained review snapshot. It must be called before the
+ * attempt is persisted, while the session/question snapshot is still known.
+ */
+export function buildQuizReviewQuestions(
+  questions: QuizReviewSourceQuestion[],
+  answers: Record<string, number>,
+): QuizReviewQuestion[] {
+  return questions.map((question, index) => {
+    const selectedOptionIndex = answers[question.id] ?? answers[index.toString()];
+    const selectedOption = Number.isInteger(selectedOptionIndex)
+      ? question.options[selectedOptionIndex]
+      : undefined;
+    const correctOption = question.options[question.correctAnswerIndex];
+
+    return {
+      sourceQuestionId: question.id,
+      questionText: question.questionText,
+      options: question.options.map((option) => ({ ...option })),
+      ...(selectedOption ? {
+        selectedOptionIndex,
+        selectedOptionId: selectedOption.optionId,
+      } : {}),
+      correctOptionIndex: question.correctAnswerIndex,
+      correctOptionId: correctOption?.optionId ?? '',
+      isCorrect: selectedOptionIndex === question.correctAnswerIndex,
+      ...(question.explanation ? { explanation: question.explanation } : {}),
+    };
+  });
 }
 
 export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
@@ -81,6 +141,12 @@ export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
       sessionId: this.props.sessionId,
       startedAt: this.props.startedAt,
       completedAt: this.props.completedAt,
+      durationSeconds: this.props.durationSeconds,
+      gradedAt: this.props.gradedAt,
+      reviewQuestions: this.props.reviewQuestions?.map((question) => ({
+        ...question,
+        options: question.options.map((option) => ({ ...option })),
+      })),
     };
   }
 
@@ -101,6 +167,9 @@ export class QuizAttempt extends BaseEntity<QuizAttemptProps> {
     }
     if (props.xpRewarded !== undefined && props.xpRewarded < 0) {
       throw DomainError.badRequest(ErrorCode.QUIZ_INVALID_INPUT, 'XP rewarded cannot be negative.');
+    }
+    if (props.durationSeconds !== undefined && props.durationSeconds < 0) {
+      throw DomainError.badRequest(ErrorCode.QUIZ_INVALID_INPUT, 'Duration cannot be negative.');
     }
   }
 }
