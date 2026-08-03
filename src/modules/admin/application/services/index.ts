@@ -5,3 +5,8 @@ export * from './get-student-list.service';
 export * from './update-student-info.service';
 export * from './get-admin-basic-stats.service';
 export * from './get-admin-dashboard-statistics.service';
+export * from './add-instructor.service';
+export * from './get-instructor-list.service';
+export * from './update-instructor-info.service';
+export * from './lock-instructor.service';
+export * from './unlock-instructor.service';

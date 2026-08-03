@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { AuthenticatedUser } from '../../../common/api-handler';
@@ -17,6 +27,11 @@ import {
   LockStudentService,
   UnlockStudentService,
   UpdateStudentInfoService,
+  AddInstructorService,
+  GetInstructorListService,
+  UpdateInstructorInfoService,
+  LockInstructorService,
+  UnlockInstructorService,
 } from '../application/services';
 import {
   createStudentSchema,
@@ -26,6 +41,12 @@ import {
   objectIdParamSchema,
   updateStudentSchema,
 } from '../validators/admin.validator';
+import {
+  createInstructorSchema,
+  listInstructorsQuerySchema,
+  lockInstructorSchema,
+  updateInstructorSchema,
+} from '../validators/instructor-management.validator';
 
 const executeSchema = z.object({
   sourceCode: z.string().min(1, 'Source code is required.'),
@@ -47,8 +68,101 @@ export class AdminController {
     private readonly getStudentListService: GetStudentListService,
     private readonly updateStudentInfoService: UpdateStudentInfoService,
     private readonly getAdminBasicStatsService: GetAdminBasicStatsService,
-    private readonly getAdminDashboardStatisticsService: GetAdminDashboardStatisticsService
+    private readonly getAdminDashboardStatisticsService: GetAdminDashboardStatisticsService,
+    private readonly addInstructorService: AddInstructorService,
+    private readonly getInstructorListService: GetInstructorListService,
+    private readonly updateInstructorInfoService: UpdateInstructorInfoService,
+    private readonly lockInstructorService: LockInstructorService,
+    private readonly unlockInstructorService: UnlockInstructorService
   ) {}
+
+  @Post('instructors')
+  @ApiOperation({ summary: 'Create an instructor account.' })
+  async createInstructor(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createInstructorSchema))
+    body: { email: string; firstName: string; lastName: string }
+  ) {
+    const result = await this.addInstructorService.execute({
+      adminId: this.getAdminId(admin),
+      ...body,
+    });
+    return ApiResponse.success({
+      message: result.passwordSetupEmailSent
+        ? 'Instructor created successfully. A password setup link was sent by email.'
+        : 'Instructor created successfully.',
+      data: result.user,
+      statusCode: 201,
+    });
+  }
+
+  @Get('instructors')
+  @ApiOperation({ summary: 'List instructor accounts.' })
+  async listInstructors(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Query(new ZodValidationPipe(listInstructorsQuerySchema))
+    query: {
+      page: number;
+      limit: number;
+      search?: string;
+      isActive?: boolean;
+      isVerified?: boolean;
+    }
+  ) {
+    const result = await this.getInstructorListService.execute({
+      adminId: this.getAdminId(admin),
+      ...query,
+    });
+    return ApiResponse.success({
+      message: 'Instructors retrieved successfully.',
+      data: result.instructors,
+      meta: result.meta,
+    });
+  }
+
+  @Patch('instructors/:id')
+  @ApiOperation({ summary: 'Update an instructor account.' })
+  async updateInstructor(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(objectIdParamSchema)) instructorId: string,
+    @Body(new ZodValidationPipe(updateInstructorSchema))
+    body: { firstName?: string; lastName?: string; avatarUrl?: string; isVerified?: boolean }
+  ) {
+    const result = await this.updateInstructorInfoService.execute({
+      adminId: this.getAdminId(admin),
+      instructorId,
+      ...body,
+    });
+    return ApiResponse.success({ message: 'Instructor updated successfully.', data: result.user });
+  }
+
+  @Patch('instructors/:id/lock')
+  @ApiOperation({ summary: 'Lock an instructor account.' })
+  async lockInstructor(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(objectIdParamSchema)) instructorId: string,
+    @Body(new ZodValidationPipe(lockInstructorSchema)) body: { lockedReason?: string }
+  ) {
+    const result = await this.lockInstructorService.execute({
+      adminId: this.getAdminId(admin),
+      instructorId,
+      ...body,
+    });
+    return ApiResponse.success({ message: 'Instructor locked successfully.', data: result.user });
+  }
+
+  @Patch('instructors/:id/unlock')
+  @ApiOperation({ summary: 'Unlock an instructor account.' })
+  async unlockInstructor(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(objectIdParamSchema)) instructorId: string
+  ) {
+    const result = await this.unlockInstructorService.execute({
+      adminId: this.getAdminId(admin),
+      instructorId,
+    });
+    return ApiResponse.success({ message: 'Instructor unlocked successfully.', data: result.user });
+  }
 
   @Post('students')
   @ApiOperation({ summary: 'Create a student account.' })
@@ -78,7 +192,13 @@ export class AdminController {
   async listStudents(
     @CurrentUser() admin: AuthenticatedUser,
     @Query(new ZodValidationPipe(listStudentsQuerySchema))
-    query: { page: number; limit: number; search?: string; isActive?: boolean; isVerified?: boolean }
+    query: {
+      page: number;
+      limit: number;
+      search?: string;
+      isActive?: boolean;
+      isVerified?: boolean;
+    }
   ) {
     const result = await this.getStudentListService.execute({
       adminId: this.getAdminId(admin),

@@ -24,6 +24,17 @@ export interface StudentListResult {
   totalPages: number;
 }
 
+/** Query/list result riêng cho tài khoản Instructor. Giữ contract Student hiện có không đổi. */
+export interface InstructorListQuery extends StudentListQuery {}
+
+export interface InstructorListResult {
+  instructors: UserEntity[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 /**
  * PORT: hợp đồng truy cập dữ liệu User (ngôn ngữ domain). Nhận/trả Entity,
  * KHÔNG biết Mongoose, KHÔNG trả document thô. Adapter (infrastructure) hiện thực.
@@ -53,6 +64,8 @@ export interface IUserRepository {
    * Trả `StudentListResult` (Entity[] + pagination) — KHÔNG trả doc thô.
    */
   listStudents(query: StudentListQuery): Promise<StudentListResult>;
+  /** Liệt kê Instructor; cùng bộ lọc phân trang với Student nhưng role cố định INSTRUCTOR. */
+  listInstructors(query: InstructorListQuery): Promise<InstructorListResult>;
   /**
    * Persist mutation admin student management (UC11 lock/unlock, UC13 update).
    * Tách riêng `update` thường vì cần `$unset` rõ ràng cho field clearable

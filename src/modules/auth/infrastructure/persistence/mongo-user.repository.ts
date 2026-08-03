@@ -3,6 +3,8 @@ import { User } from '../../models/user.model';
 import { UserEntity } from '../../domain/entities/user.entity';
 import {
   IUserRepository,
+  InstructorListQuery,
+  InstructorListResult,
   StudentListQuery,
   StudentListResult,
 } from '../../domain/interfaces/user.repository';
@@ -68,16 +70,19 @@ export class MongoUserRepository implements IUserRepository {
 
     if (p.emailVerifiedAt !== undefined) set.emailVerifiedAt = p.emailVerifiedAt;
     else unset.emailVerifiedAt = '';
-    if (p.emailVerificationCodeHash !== undefined) set.emailVerificationCodeHash = p.emailVerificationCodeHash;
+    if (p.emailVerificationCodeHash !== undefined)
+      set.emailVerificationCodeHash = p.emailVerificationCodeHash;
     else unset.emailVerificationCodeHash = '';
     if (p.emailVerificationCodeExpiresAt !== undefined) {
       set.emailVerificationCodeExpiresAt = p.emailVerificationCodeExpiresAt;
     } else {
       unset.emailVerificationCodeExpiresAt = '';
     }
-    if (p.emailVerificationCodeAttempts !== undefined) set.emailVerificationCodeAttempts = p.emailVerificationCodeAttempts;
+    if (p.emailVerificationCodeAttempts !== undefined)
+      set.emailVerificationCodeAttempts = p.emailVerificationCodeAttempts;
     else unset.emailVerificationCodeAttempts = '';
-    if (p.emailVerificationLastSentAt !== undefined) set.emailVerificationLastSentAt = p.emailVerificationLastSentAt;
+    if (p.emailVerificationLastSentAt !== undefined)
+      set.emailVerificationLastSentAt = p.emailVerificationLastSentAt;
     else unset.emailVerificationLastSentAt = '';
 
     const update: Record<string, unknown> = { $set: set };
@@ -140,6 +145,30 @@ export class MongoUserRepository implements IUserRepository {
 
     return {
       students: docs.map((doc) => UserMapper.toEntity(doc)),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  async listInstructors(query: InstructorListQuery): Promise<InstructorListResult> {
+    const filter: Record<string, unknown> = { role: 'INSTRUCTOR' };
+    if (query.isActive !== undefined) filter.isActive = query.isActive;
+    if (query.isVerified !== undefined) filter.isVerified = query.isVerified;
+    if (query.search) {
+      const searchRegex = new RegExp(escapeRegex(query.search), 'i');
+      filter.$or = [{ email: searchRegex }, { firstName: searchRegex }, { lastName: searchRegex }];
+    }
+
+    const skip = (query.page - 1) * query.limit;
+    const [docs, total] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit),
+      User.countDocuments(filter),
+    ]);
+
+    return {
+      instructors: docs.map((doc) => UserMapper.toEntity(doc)),
       total,
       page: query.page,
       limit: query.limit,
