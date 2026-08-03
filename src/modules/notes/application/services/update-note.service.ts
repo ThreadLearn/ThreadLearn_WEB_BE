@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { INoteRepository, NOTE_REPOSITORY } from '../../domain/interfaces/note.repository';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../../shared/domain/interfaces/learning-access.port';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class UpdateNoteService {
@@ -13,6 +14,7 @@ export class UpdateNoteService {
   async execute(
     userId: string,
     noteId: string,
+    role: UserRole,
     input: {
       noteText?: string;
       content?: string;
@@ -25,7 +27,7 @@ export class UpdateNoteService {
     const note = await this.notes.findOwned(userId, noteId);
     if (!note) throw new NotFoundError('Note not found.');
     if (input.anchorEnd !== undefined && input.anchorEnd !== null) {
-      const lesson = await this.learningAccess.assertLessonInteractionAccess(note.lessonId, { id: userId, role: 'STUDENT' });
+      const lesson = await this.learningAccess.assertLessonInteractionAccess(note.lessonId, { id: userId, role });
       if (lesson.contentLength !== undefined && input.anchorEnd > lesson.contentLength) {
         throw new BadRequestError('anchorEnd exceeds lesson content length.');
       }

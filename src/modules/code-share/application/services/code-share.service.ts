@@ -7,8 +7,7 @@ import { Lesson } from '../../../lessons/models/lesson.model';
 import { CodeShare } from '../../models/code-share.model';
 import { CreateCodeShareDto } from '../dto/code-share.dto';
 import { Comment } from '../../../comment/models/comment.model';
-
-type UserRole = 'STUDENT' | 'ADMIN';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class CodeShareService {

@@ -2,7 +2,7 @@
  * Global type extensions for the ThreadLearn application.
  */
 
-export type UserRole = 'STUDENT' | 'ADMIN';
+export type UserRole = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
 
 export interface JWTPayload {
   id: string;

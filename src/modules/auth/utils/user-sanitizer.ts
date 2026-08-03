@@ -7,7 +7,7 @@ export type SafeUser = {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   isVerified?: boolean;
   isActive?: boolean;
   lastLoginAt?: Date;
@@ -22,7 +22,7 @@ type SanitizableUser = {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   isVerified?: boolean;
   isActive?: boolean;
   lockedAt?: Date | null;

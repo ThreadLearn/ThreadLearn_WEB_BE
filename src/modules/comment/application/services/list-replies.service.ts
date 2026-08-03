@@ -5,6 +5,7 @@ import {
   LEARNING_ACCESS,
 } from '../../../../shared/domain/interfaces/learning-access.port';
 import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/comment.repository';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class ListRepliesService {
@@ -13,7 +14,7 @@ export class ListRepliesService {
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
   ) {}
 
-  async execute(userId: string, userRole: 'STUDENT' | 'ADMIN', commentId: string) {
+  async execute(userId: string, userRole: UserRole, commentId: string) {
     const target = await this.comments.findTargetById(commentId);
     if (!target) throw new NotFoundError('Comment not found.');
     const course = target.targetType === 'LESSON'

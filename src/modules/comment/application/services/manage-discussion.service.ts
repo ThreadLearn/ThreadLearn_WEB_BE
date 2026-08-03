@@ -8,8 +8,7 @@ import { CommentMapper } from '../../infrastructure/mapper/comment.mapper';
 import { discussionRoom, getSocketServer } from '../../../../socket';
 import { ILearningAccess, LEARNING_ACCESS } from '../../../../shared/domain/interfaces/learning-access.port';
 import { randomUUID } from 'crypto';
-
-type UserRole = 'STUDENT' | 'ADMIN';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class ManageDiscussionService {

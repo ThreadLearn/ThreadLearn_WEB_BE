@@ -62,7 +62,7 @@ export class NotesController {
     @Query(new ZodValidationPipe(listNotesQuerySchema)) query: ListNotesQueryDto
   ) {
     if (query.lessonId) {
-      const notes = await this.listByLessonSvc.execute(user.id, query.lessonId);
+      const notes = await this.listByLessonSvc.execute(user.id, user.role, query.lessonId);
       return ApiResponse.success({ message: 'Notes fetched.', data: notes });
     }
 
@@ -90,7 +90,7 @@ export class NotesController {
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(createNoteSchema)) body: CreateNoteDto
   ) {
-    const note = await this.createNoteSvc.execute(user.id, body);
+    const note = await this.createNoteSvc.execute(user.id, user.role, body);
     return ApiResponse.success({ message: 'Note created.', data: note });
   }
 
@@ -109,7 +109,7 @@ export class NotesController {
     @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(updateNoteSchema)) body: UpdateNoteDto
   ) {
-    const note = await this.updateNoteSvc.execute(user.id, id, body);
+    const note = await this.updateNoteSvc.execute(user.id, id, user.role, body);
     return ApiResponse.success({ message: 'Note updated.', data: note });
   }
 
@@ -138,7 +138,7 @@ export class LessonNotesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ZodValidationPipe(noteIdParamSchema)) id: string,
   ) {
-    const notes = await this.listByLessonSvc.execute(user.id, id);
+    const notes = await this.listByLessonSvc.execute(user.id, user.role, id);
     return ApiResponse.success({ message: 'Notes fetched.', data: notes });
   }
 
@@ -149,7 +149,7 @@ export class LessonNotesController {
     @Body(new ZodValidationPipe(createLessonNoteSchema))
     body: CreateLessonNoteDto,
   ) {
-    const note = await this.createNoteSvc.execute(user.id, {
+    const note = await this.createNoteSvc.execute(user.id, user.role, {
       lessonId: id,
       noteText: body.noteText ?? body.content ?? '',
       codeSnippet: body.codeSnippet,
