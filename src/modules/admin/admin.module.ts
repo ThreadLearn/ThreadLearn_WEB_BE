@@ -21,6 +21,11 @@ import {
   LockStudentService,
   UnlockStudentService,
   UpdateStudentInfoService,
+  AddInstructorService,
+  GetInstructorListService,
+  UpdateInstructorInfoService,
+  LockInstructorService,
+  UnlockInstructorService,
 } from './application/services';
 
 /**
@@ -58,6 +63,11 @@ import {
     UpdateStudentInfoService,
     GetAdminBasicStatsService,
     GetAdminDashboardStatisticsService,
+    AddInstructorService,
+    GetInstructorListService,
+    UpdateInstructorInfoService,
+    LockInstructorService,
+    UnlockInstructorService,
   ],
   exports: [AdminService],
 })

@@ -129,6 +129,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     USER_REPOSITORY,
     PASSWORD_HASHER,
     USER_STATS_PROVISIONER,
+    ForgotPasswordService,
   ],
 })
 export class AuthModule {}
