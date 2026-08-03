@@ -16,7 +16,7 @@ describe('note anchor bounds', () => {
     };
     const service = new CreateNoteService(notes as any, access as any);
 
-    await expect(service.execute('507f1f77bcf86cd799439011', {
+    await expect(service.execute('507f1f77bcf86cd799439011', 'STUDENT', {
       lessonId: lesson.id,
       noteText: 'Remember this',
       anchorStart: 10,
@@ -46,6 +46,7 @@ describe('note anchor bounds', () => {
     await expect(service.execute(
       '507f1f77bcf86cd799439011',
       note.id,
+      'STUDENT',
       { anchorEnd: 21 },
     )).rejects.toMatchObject({ statusCode: 400 });
     expect(access.assertLessonInteractionAccess).toHaveBeenCalledWith(

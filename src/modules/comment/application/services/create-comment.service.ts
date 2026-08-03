@@ -12,6 +12,7 @@ import { CodeShareService } from '../../../code-share/application/services/code-
 import { discussionRoom, getSocketServer } from '../../../../socket';
 import { Comment } from '../../models/comment.model';
 import { randomUUID } from 'crypto';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 const isObjectId = (value: string) => /^[a-fA-F0-9]{24}$/.test(value);
 type CreateCommentInput = Omit<CreateCommentDto, 'postType'> & { postType?: CommentPostType };
@@ -26,7 +27,7 @@ export class CreateCommentService {
 
   async execute(
     userId: string,
-    userRole: 'STUDENT' | 'ADMIN',
+    userRole: UserRole,
     input: Omit<CreateCommentInput, 'isAnonymous'> & { isAnonymous?: boolean },
   ) {
     const access = await this.checkTargetAccess(userId, userRole, input.targetType, String(input.targetId));
@@ -142,7 +143,7 @@ export class CreateCommentService {
 
   private async checkTargetAccess(
     userId: string,
-    userRole: 'STUDENT' | 'ADMIN',
+    userRole: UserRole,
     targetType: CommentTargetType,
     targetId: string,
   ): Promise<{ courseId?: string }> {

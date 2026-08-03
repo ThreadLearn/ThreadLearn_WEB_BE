@@ -5,6 +5,7 @@ import { ILearningAccess, LEARNING_ACCESS } from '../../../../shared/domain/inte
 import { Comment } from '../../models/comment.model';
 import { discussionRoom, getSocketServer } from '../../../../socket';
 import { randomUUID } from 'crypto';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class DeleteCommentService {
@@ -13,7 +14,7 @@ export class DeleteCommentService {
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess,
   ) {}
 
-  async execute(userId: string, userRole: 'STUDENT' | 'ADMIN', commentId: string) {
+  async execute(userId: string, userRole: UserRole, commentId: string) {
     const comment = await this.comments.findById(commentId);
     if (!comment) throw new NotFoundError('Comment not found.');
     await this.assertAccess(userId, userRole, comment.targetType, comment.targetId);
@@ -37,7 +38,7 @@ export class DeleteCommentService {
     return { deleted: true };
   }
 
-  private async assertAccess(userId: string, role: 'STUDENT' | 'ADMIN', targetType: 'COURSE' | 'LESSON', targetId: string) {
+  private async assertAccess(userId: string, role: UserRole, targetType: 'COURSE' | 'LESSON', targetId: string) {
     if (targetType === 'COURSE') {
       await this.learningAccess.assertCourseInteractionAccess(targetId, { id: userId, role });
     } else {

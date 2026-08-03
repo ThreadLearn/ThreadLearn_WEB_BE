@@ -112,4 +112,19 @@ describe('LoginUserService', () => {
 
     expect(deps.refreshTokenRepo.create).not.toHaveBeenCalled();
   });
+
+  it('signs both tokens with the persisted instructor role', async () => {
+    const deps = makeDeps();
+    deps.userRepo.findByEmail.mockResolvedValue(makeUser({ role: 'INSTRUCTOR' }));
+    deps.passwordHasher.compare.mockResolvedValue(true);
+
+    await deps.service.execute({ email: 'user@example.com', password: 'correct-password' });
+
+    expect(deps.tokenService.signAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'INSTRUCTOR' }),
+    );
+    expect(deps.tokenService.signRefreshToken).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'INSTRUCTOR' }),
+    );
+  });
 });

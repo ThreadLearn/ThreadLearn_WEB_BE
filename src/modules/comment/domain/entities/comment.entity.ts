@@ -1,4 +1,5 @@
 import { BadRequestError, ForbiddenError } from '../../../../common/custom-error';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 export type CommentTargetType = 'COURSE' | 'LESSON';
 export type CommentStatus = 'active' | 'hidden' | 'deleted';
@@ -132,7 +133,7 @@ export class CommentEntity {
     return this.props.questionStatus;
   }
 
-  ensureCanModify(userId: string, userRole: 'STUDENT' | 'ADMIN'): void {
+  ensureCanModify(userId: string, userRole: UserRole): void {
     if (userRole !== 'ADMIN' && this.props.userId !== userId) {
       throw new ForbiddenError('You can only edit your own comments.');
     }
@@ -145,7 +146,7 @@ export class CommentEntity {
     this.props.editedAt = new Date();
   }
 
-  softDelete(userId: string, userRole: 'STUDENT' | 'ADMIN'): void {
+  softDelete(userId: string, userRole: UserRole): void {
     if (userRole !== 'ADMIN' && this.props.userId !== userId) {
       throw new ForbiddenError('You can only delete your own comments.');
     }

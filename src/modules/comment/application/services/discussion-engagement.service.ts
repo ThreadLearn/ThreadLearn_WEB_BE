@@ -11,8 +11,7 @@ import { DiscussionReport, DiscussionReportReason } from '../../models/discussio
 import { DiscussionModerationAudit } from '../../models/discussion-moderation-audit.model';
 import { NotificationsService } from '../../../notifications/services/notifications.service';
 import { randomUUID } from 'crypto';
-
-type UserRole = 'STUDENT' | 'ADMIN';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class DiscussionEngagementService {

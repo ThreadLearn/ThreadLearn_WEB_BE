@@ -1,10 +1,12 @@
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
+
 export type AdminSafeUser = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   avatarUrl?: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: UserRole;
   isVerified?: boolean;
   isActive?: boolean;
   lastLoginAt?: Date;

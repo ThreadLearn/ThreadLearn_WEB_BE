@@ -7,6 +7,7 @@ import { NoteEntity } from '../../domain/entities/note.entity';
 import { INoteRepository, NOTE_REPOSITORY } from '../../domain/interfaces/note.repository';
 import { CreateNoteDto } from '../dto/note.dto';
 import { BadRequestError } from '../../../../common/custom-error';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class CreateNoteService {
@@ -15,10 +16,10 @@ export class CreateNoteService {
     @Inject(LEARNING_ACCESS) private readonly learningAccess: ILearningAccess
   ) {}
 
-  async execute(userId: string, input: CreateNoteDto) {
+  async execute(userId: string, role: UserRole, input: CreateNoteDto) {
     const lesson = await this.learningAccess.assertLessonInteractionAccess(input.lessonId, {
       id: userId,
-      role: 'STUDENT',
+      role,
     });
     if (
       typeof input.anchorEnd === 'number'
