@@ -8,6 +8,8 @@ import { AdaptiveMasteryService } from './adaptive-mastery.service';
 import { AdaptivePlanService } from './adaptive-plan.service';
 import { AdaptivePlanRuleService } from './adaptive-plan-rule.service';
 import { GeminiAdaptivePlanService } from './gemini-adaptive-plan.service';
+import { AdaptiveGoalPolicyService } from './adaptive-goal-policy.service';
+import { GeminiDiagnosticQuestionService } from './gemini-diagnostic-question.service';
 
 @Module({
   controllers: [LearningPlansController],
@@ -19,6 +21,8 @@ import { GeminiAdaptivePlanService } from './gemini-adaptive-plan.service';
     AdaptiveMasteryService,
     AdaptivePlanService,
     AdaptivePlanRuleService,
+    AdaptiveGoalPolicyService,
+    GeminiDiagnosticQuestionService,
     GeminiAdaptivePlanService,
   ],
 })
