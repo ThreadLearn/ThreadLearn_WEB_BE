@@ -10,6 +10,9 @@ import { AssignCourseInstructorService } from './application/services/assign-cou
 import { CourseInstructorAssignmentPolicy } from './application/services/course-instructor-assignment.policy';
 import { CourseManagementPolicy } from './application/policies/course-management.policy';
 import { ListMyInstructorCoursesService } from './application/services/list-my-instructor-courses.service';
+import { CreateInstructorCourseService } from './application/services/create-instructor-course.service';
+import { UpdateInstructorCourseService } from './application/services/update-instructor-course.service';
+import { GetInstructorCourseDetailService } from './application/services/get-instructor-course-detail.service';
 import { AuthModule } from '../auth/auth.module';
 import { COURSE_CONTENT_PORT } from './domain/interfaces/course-content.port';
 import { COURSE_REPOSITORY } from './domain/interfaces/course.repository';
@@ -17,10 +20,16 @@ import { MongoCourseContentAdapter } from './infrastructure/persistence/mongo-co
 import { MongoCourseRepository } from './infrastructure/persistence/mongo-course.repository';
 import { CourseController } from './presentation/controller/course.controller';
 import { AdminCourseOwnershipController, InstructorCoursesController } from './presentation/controller/course-ownership.controller';
+import { InstructorCourseController } from './presentation/controller/instructor-course.controller';
 
 @Module({
   imports: [AuthModule],
-  controllers: [CourseController, AdminCourseOwnershipController, InstructorCoursesController],
+  controllers: [
+    CourseController,
+    AdminCourseOwnershipController,
+    InstructorCoursesController,
+    InstructorCourseController,
+  ],
   providers: [
     MongoCourseRepository,
     MongoCourseContentAdapter,
@@ -37,7 +46,17 @@ import { AdminCourseOwnershipController, InstructorCoursesController } from './p
     CourseManagementPolicy,
     AssignCourseInstructorService,
     ListMyInstructorCoursesService,
+    CreateInstructorCourseService,
+    UpdateInstructorCourseService,
+    GetInstructorCourseDetailService,
   ],
-  exports: [COURSE_REPOSITORY, COURSE_CONTENT_PORT, CourseManagementPolicy],
+  exports: [
+    COURSE_REPOSITORY,
+    COURSE_CONTENT_PORT,
+    CourseManagementPolicy,
+    CreateInstructorCourseService,
+    UpdateInstructorCourseService,
+    GetInstructorCourseDetailService,
+  ],
 })
 export class CourseModule {}

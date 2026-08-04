@@ -46,8 +46,23 @@ export function isSameId(a?: unknown, b?: unknown): boolean {
  */
 @Injectable()
 export class CourseManagementPolicy {
+  private getCourseTargetProps(course: CourseManagementCourseTarget): CourseManagementCourseTarget {
+    if (typeof (course as any).toProps === 'function') {
+      const props = (course as any).toProps();
+      return {
+        id: course.id || props.id,
+        instructorId: props.instructorId,
+        status: props.status,
+        isDeleted: props.status === 'deleted' || Boolean(props.deletedAt),
+        deletedAt: props.deletedAt,
+      };
+    }
+    return course;
+  }
+
   private isCourseDeleted(course: CourseManagementCourseTarget): boolean {
-    return Boolean(course.isDeleted || course.status === 'deleted' || course.deletedAt);
+    const target = this.getCourseTargetProps(course);
+    return Boolean(target.isDeleted || target.status === 'deleted' || target.deletedAt);
   }
 
   isAssignedInstructor(
@@ -55,7 +70,8 @@ export class CourseManagementPolicy {
     course?: CourseManagementCourseTarget | null,
   ): boolean {
     if (!actor?.id || actor.role !== 'INSTRUCTOR' || !course) return false;
-    return isSameId(actor.id, course.instructorId);
+    const target = this.getCourseTargetProps(course);
+    return isSameId(actor.id, target.instructorId);
   }
 
   canAuthorCourse(
@@ -66,7 +82,11 @@ export class CourseManagementPolicy {
     if (this.isCourseDeleted(course)) return false;
 
     if (actor.role === 'ADMIN') return true;
-    if (actor.role === 'INSTRUCTOR') return this.isAssignedInstructor(actor, course);
+    if (actor.role === 'INSTRUCTOR') {
+      const target = this.getCourseTargetProps(course);
+      if (target.status !== undefined && target.status !== 'draft') return false;
+      return this.isAssignedInstructor(actor, course);
+    }
 
     return false;
   }
