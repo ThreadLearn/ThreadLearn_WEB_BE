@@ -19,10 +19,19 @@ import { MongoLessonReadAdapter } from './infrastructure/persistence/mongo-lesso
 import { MongoLessonRepository } from './infrastructure/persistence/mongo-lesson.repository';
 import { MongoLessonVersionRepository } from './infrastructure/persistence/mongo-lesson-version.repository';
 import { LessonController } from './presentation/controller/lesson.controller';
+import { InstructorLessonAccessResolver } from './application/services/instructor-lesson-access.resolver';
+import { ListInstructorLessonsBySectionService } from './application/services/list-instructor-lessons-by-section.service';
+import { GetInstructorLessonDetailService } from './application/services/get-instructor-lesson-detail.service';
+import { CreateInstructorLessonService } from './application/services/create-instructor-lesson.service';
+import { UpdateInstructorLessonService } from './application/services/update-instructor-lesson.service';
+import { SoftDeleteInstructorLessonService } from './application/services/soft-delete-instructor-lesson.service';
+import { ReorderInstructorLessonsService } from './application/services/reorder-instructor-lessons.service';
+import { UploadInstructorLessonAttachmentService } from './application/services/upload-instructor-lesson-attachment.service';
+import { InstructorLessonController } from './presentation/controller/instructor-lesson.controller';
 
 @Module({
   imports: [LearningAccessModule, CourseModule],
-  controllers: [LessonController],
+  controllers: [LessonController, InstructorLessonController],
   providers: [
     MongoLessonRepository,
     MongoLessonVersionRepository,
@@ -41,6 +50,14 @@ import { LessonController } from './presentation/controller/lesson.controller';
     SetLessonLockService,
     SoftDeleteLessonService,
     UpdateLessonAttachmentService,
+    InstructorLessonAccessResolver,
+    ListInstructorLessonsBySectionService,
+    GetInstructorLessonDetailService,
+    CreateInstructorLessonService,
+    UpdateInstructorLessonService,
+    SoftDeleteInstructorLessonService,
+    ReorderInstructorLessonsService,
+    UploadInstructorLessonAttachmentService,
   ],
   exports: [LESSON_READ_PORT],
 })
