@@ -102,9 +102,13 @@ export class LessonController {
 
   @Get(':id/versions')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @ApiBearerAuth('BearerAuth')
-  async listVersions(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string) {
+  async listVersions(
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.resourceAccess.assertCanReadLessonResource(user, id);
     const versions = await this.listVersionsSvc.execute(id);
     return ApiResponse.success({
       message: 'Versions fetched.',
@@ -114,12 +118,13 @@ export class LessonController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @ApiBearerAuth('BearerAuth')
   async create(
     @Body(new ZodValidationPipe(createLessonSchema)) body: CreateLessonDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.resourceAccess.assertCanMutateCourse(user, body.courseId);
     const lesson = await this.createLessonSvc.execute({ ...body, createdBy: user?.id });
     return ApiResponse.success({
       message: 'Lesson created.',
@@ -130,25 +135,28 @@ export class LessonController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @ApiBearerAuth('BearerAuth')
   async update(
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(updateLessonSchema)) body: UpdateLessonDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.resourceAccess.assertCanMutateLessonResource(user, id);
     const lesson = await this.updateLessonSvc.execute(id, body, { id: user?.id });
     return ApiResponse.success({ message: 'Lesson updated.', data: LessonPresenter.toResponse(lesson) });
   }
 
   @Patch(':id/lock')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @ApiBearerAuth('BearerAuth')
   async lock(
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(setLockSchema)) body: SetLockDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.resourceAccess.assertCanMutateLessonResource(user, id);
     const lesson = await this.setLockSvc.execute(id, body?.locked ?? true);
     return ApiResponse.success({
       message: lesson.isLocked ? 'Lesson locked.' : 'Lesson unlocked.',
@@ -158,25 +166,31 @@ export class LessonController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @ApiBearerAuth('BearerAuth')
-  async remove(@Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string) {
+  async remove(
+    @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.resourceAccess.assertCanMutateLessonResource(user, id);
     const result = await this.softDeleteSvc.execute(id);
     return ApiResponse.success({ message: 'Lesson deleted.', data: result });
   }
 
   @Post(':id/attachment')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @UseInterceptors(FileInterceptor('attachment'))
   @ApiBearerAuth('BearerAuth')
   @ApiConsumes('multipart/form-data')
   async uploadAttachment(
     @Param('id', new ZodValidationPipe(lessonIdParamSchema)) id: string,
     @UploadedFile() file?: Express.Multer.File,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
     try {
       if (!file) throw new BadRequestError('No attachment file provided in FormData.');
+      await this.resourceAccess.assertCanMutateLessonResource(user!, id);
       const fileUrl = await saveUploadedFile(file, 'attachments');
       const lesson = await this.updateAttachmentSvc.execute(id, fileUrl);
       return ApiResponse.success({

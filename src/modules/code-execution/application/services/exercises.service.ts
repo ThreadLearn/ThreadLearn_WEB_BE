@@ -74,8 +74,14 @@ export class ExercisesService {
       .map((exercise) => this.presentExercise(exercise, false));
   }
 
-  async listAllForAdmin() {
-    return (await this.exercises.listAll()).map((exercise) => this.presentExercise(exercise.toProps(), true));
+  async listAllForManagement(user: ExerciseViewer) {
+    const all = await this.exercises.listAll();
+    if (user.role === 'ADMIN') return all.map((exercise) => this.presentExercise(exercise.toProps(), true));
+
+    const lessonIds = new Set(await this.resourceAccess?.listManagedLessonIds(user) ?? []);
+    return all
+      .filter((exercise) => lessonIds.has(exercise.toProps().lessonId))
+      .map((exercise) => this.presentExercise(exercise.toProps(), true));
   }
 
   async getById(user: ExerciseViewer, id: string) {

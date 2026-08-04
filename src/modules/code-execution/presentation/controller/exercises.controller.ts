@@ -39,9 +39,9 @@ export class ExercisesController {
   }
 
   @Get('admin/all')
-  @Roles('ADMIN')
-  async listAllForAdmin() {
-    const data = await this.exercises.listAllForAdmin();
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async listAllForManagement(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.exercises.listAllForManagement(user);
     return ApiResponse.success({ message: 'Code assignments fetched.', data });
   }
 
