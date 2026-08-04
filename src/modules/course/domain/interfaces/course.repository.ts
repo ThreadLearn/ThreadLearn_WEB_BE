@@ -15,6 +15,8 @@ export interface CourseListFilter {
   isPremium?: boolean;
   minPrice?: number;
   maxPrice?: number;
+  /** Internal-only: supplied from the authenticated Instructor, never from a public query. */
+  instructorId?: string;
 }
 
 /**

@@ -63,6 +63,11 @@ export class CourseMapper {
       estimatedDuration: p.estimatedDuration,
       publishedAt: p.publishedAt,
       deletedAt: p.deletedAt ?? null,
+      // Domain normalizes unassigned ownership to undefined; persistence uses null so updates clear it.
+      instructorId:
+        p.instructorId && Types.ObjectId.isValid(p.instructorId)
+          ? new Types.ObjectId(p.instructorId)
+          : null,
       createdBy: p.createdBy && Types.ObjectId.isValid(p.createdBy) ? new Types.ObjectId(p.createdBy) : undefined,
       // legacy mirrors (suy ra, không phải nguồn sự thật)
       isPublished: p.status === 'published',

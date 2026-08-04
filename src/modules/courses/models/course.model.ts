@@ -75,6 +75,7 @@ const CourseSchema: Schema<ICourse> = new Schema(
 );
 
 CourseSchema.index({ status: 1, isPremium: 1, level: 1 });
+CourseSchema.index({ instructorId: 1, status: 1 });
 // `language` is a course programming-language field. MongoDB otherwise treats
 // it as the text index language override and rejects values such as "python".
 CourseSchema.index(

@@ -13,6 +13,8 @@ export const courseIdParamSchema = z
   .string()
   .regex(/^[a-fA-F0-9]{24}$/, 'Invalid course id.');
 
+const instructorIdSchema = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid instructor id.');
+
 export const createCourseSchema = z.object({
   title: z.string().min(1, 'title is required.').max(200),
   description: z.string().min(1, 'description is required.'),
@@ -27,12 +29,18 @@ export const createCourseSchema = z.object({
   prerequisites: z.array(z.string()).optional(),
   prerequisiteThreshold: z.number().min(0).max(100).optional(),
   estimatedDuration: z.number().min(0).optional(),
+  instructorId: instructorIdSchema.optional(),
   // A course can only be published through PATCH /:id/publish, which verifies
   // that it has active lessons before exposing it to learners.
   status: z.enum(['draft', 'hidden']).optional(),
 });
 
-export const updateCourseSchema = createCourseSchema.partial();
+// Ownership has a dedicated Admin-only endpoint and must never be mass-assigned by PUT /courses/:id.
+export const updateCourseSchema = createCourseSchema.omit({ instructorId: true }).partial();
+
+export const assignCourseInstructorSchema = z.object({
+  instructorId: instructorIdSchema.nullable(),
+});
 
 export const setVisibilitySchema = z.object({
   status: z.enum(['published', 'hidden', 'draft']).default('published'),
@@ -58,3 +66,4 @@ export type CreateCourseDto = z.infer<typeof createCourseSchema>;
 export type UpdateCourseDto = z.infer<typeof updateCourseSchema>;
 export type SetVisibilityDto = z.infer<typeof setVisibilitySchema>;
 export type ListCoursesQueryDto = z.infer<typeof listCoursesQuerySchema>;
+export type AssignCourseInstructorDto = z.infer<typeof assignCourseInstructorSchema>;

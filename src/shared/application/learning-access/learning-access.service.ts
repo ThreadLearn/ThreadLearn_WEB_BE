@@ -35,7 +35,8 @@ export class LearningAccessService implements ILearningAccess {
     const assignedCourse = viewer?.id ? await this.data.findCourse(lesson.courseId) : null;
     if (
       viewer?.id &&
-      (assignedCourse?.instructorId === viewer.id || assignedCourse?.createdBy === viewer.id)
+      viewer.role === 'INSTRUCTOR' &&
+      assignedCourse?.instructorId === viewer.id
     ) {
       return { canView: true, reason: 'INSTRUCTOR' };
     }
@@ -110,7 +111,7 @@ export class LearningAccessService implements ILearningAccess {
     const course = await this.data.findCourse(courseId);
     if (!course) throw new NotFoundError('Course not found.');
     if (viewer.role === 'ADMIN') return course;
-    if (viewer.id && (course.instructorId === viewer.id || course.createdBy === viewer.id)) return course;
+    if (viewer.role === 'INSTRUCTOR' && viewer.id && course.instructorId === viewer.id) return course;
 
     if (course.status !== 'published') {
       throw new ForbiddenError('Comments are disabled on this course.');
