@@ -5,6 +5,9 @@ import { LearningPlanRemindersService } from './learning-plan-reminders.service'
 import { LearningPlansService } from './learning-plans.service';
 import { AdaptiveLearningService } from './adaptive-learning.service';
 import { AdaptiveMasteryService } from './adaptive-mastery.service';
+import { AdaptivePlanService } from './adaptive-plan.service';
+import { AdaptivePlanRuleService } from './adaptive-plan-rule.service';
+import { GeminiAdaptivePlanService } from './gemini-adaptive-plan.service';
 
 @Module({
   controllers: [LearningPlansController],
@@ -14,6 +17,9 @@ import { AdaptiveMasteryService } from './adaptive-mastery.service';
     LearningPlanRemindersService,
     AdaptiveLearningService,
     AdaptiveMasteryService,
+    AdaptivePlanService,
+    AdaptivePlanRuleService,
+    GeminiAdaptivePlanService,
   ],
 })
 export class LearningPlansModule {}
