@@ -1,5 +1,6 @@
 import { AvatarUploadFile } from '../../domain/interfaces/avatar-storage.port';
 import { UserProfileStats } from '../../domain/interfaces/user-stats-reader.port';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 /**
  * DTO/result types cho UC09 (Profile / Avatar). Thuần application — KHÔNG import
@@ -21,7 +22,7 @@ export type ProfileSafeUser = {
   firstName: string;
   lastName: string;
   avatarUrl?: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: UserRole;
   isVerified?: boolean;
   isActive?: boolean;
   planType: 'FREE' | 'PREMIUM';

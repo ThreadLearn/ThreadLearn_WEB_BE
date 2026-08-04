@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/domain/interfaces/learning-access.port';
 import { CommentTargetType } from '../../domain/entities/comment.entity';
 import { COMMENT_REPOSITORY, ICommentRepository } from '../../domain/interfaces/comment.repository';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class ListCommentsService {
@@ -16,7 +17,7 @@ export class ListCommentsService {
 
   async execute(
     userId: string,
-    userRole: 'STUDENT' | 'ADMIN',
+    userRole: UserRole,
     targetType: CommentTargetType,
     targetId: string,
     page = 1,

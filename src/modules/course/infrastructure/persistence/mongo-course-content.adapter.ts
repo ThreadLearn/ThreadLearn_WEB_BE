@@ -14,12 +14,18 @@ import {
 @Injectable()
 export class MongoCourseContentAdapter implements ICourseContentPort {
   async getContent(courseId: string): Promise<CourseContentSnapshot> {
-    const [sections, lessons] = await Promise.all([
+    const [sections, allLessons] = await Promise.all([
       Section.find({ courseId, status: { $ne: 'deleted' } }).sort({ orderIndex: 1 }),
       Lesson.find({ courseId, status: { $ne: 'deleted' } })
         .sort({ orderIndex: 1 })
         .select('-contentMarkdown -content'),
     ]);
+
+    const activeSectionIds = new Set(sections.map((s) => s._id.toString()));
+    const lessons = allLessons.filter(
+      (l) => !l.sectionId || activeSectionIds.has(l.sectionId.toString()),
+    );
+
     return { sections, lessons };
   }
 

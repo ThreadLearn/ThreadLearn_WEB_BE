@@ -89,7 +89,8 @@ export class RefreshTokenService {
     // Rotation: xoá token cũ trước, tạo token mới sau (mirror legacy).
     await this.refreshTokenRepo.deleteByToken(rawToken);
 
-    const payload = { id: decoded.id, email: decoded.email, role: decoded.role, tokenVersion: userTokenVersion };
+    const props = user.toProps();
+    const payload = { id: props.id, email: props.email, role: props.role, tokenVersion: userTokenVersion };
     const accessToken = this.tokenService.signAccessToken(payload);
     const refreshToken = this.tokenService.signRefreshToken(payload);
 

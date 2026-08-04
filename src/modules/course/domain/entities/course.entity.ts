@@ -69,6 +69,7 @@ export interface CreateCourseEntityInput {
   prerequisiteThreshold?: number;
   estimatedDuration?: number;
   status?: CourseStatus;
+  instructorId?: string;
   createdBy?: string;
 }
 
@@ -110,6 +111,7 @@ export class CourseEntity {
       totalEnrollments: 0,
       averageRating: 0,
       totalReviews: 0,
+      instructorId: input.instructorId || undefined,
       createdBy: input.createdBy,
     });
   }
@@ -147,6 +149,11 @@ export class CourseEntity {
     if (patch.prerequisiteThreshold !== undefined) p.prerequisiteThreshold = patch.prerequisiteThreshold;
     if (patch.estimatedDuration !== undefined) p.estimatedDuration = patch.estimatedDuration;
     if (patch.prerequisites !== undefined) p.prerequisites = patch.prerequisites.filter(Boolean);
+  }
+
+  /** Ownership is separate from editable course metadata. `undefined` means unassigned. */
+  assignInstructor(instructorId?: string): void {
+    this.props.instructorId = instructorId || undefined;
   }
 
   /** BR: chỉ publish được khi có ≥ 1 lesson active. Số lesson do port cung cấp. */

@@ -29,17 +29,37 @@ describe('LearningAccessService instructor discussion access', () => {
 
   it('allows the assigned instructor without student enrollment or premium', async () => {
     await expect(service.assertLessonInteractionAccess(lessonId, {
-      id: assignedInstructorId, role: 'STUDENT',
+      id: assignedInstructorId, role: 'INSTRUCTOR',
     })).resolves.toMatchObject({ id: lessonId, courseId });
     await expect(service.assertCourseInteractionAccess(courseId, {
-      id: assignedInstructorId, role: 'STUDENT',
+      id: assignedInstructorId, role: 'INSTRUCTOR',
     })).resolves.toMatchObject({ id: courseId });
     expect(data.isEnrolled).not.toHaveBeenCalled();
   });
 
   it('does not grant another instructor access to an unassigned course', async () => {
     await expect(service.assertCourseInteractionAccess(courseId, {
-      id: anotherInstructorId, role: 'STUDENT',
+      id: anotherInstructorId, role: 'INSTRUCTOR',
     })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('does not grant Student ownership even if the identifier matches instructorId', async () => {
+    await expect(
+      service.assertCourseInteractionAccess(courseId, { id: assignedInstructorId, role: 'STUDENT' }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('does not treat createdBy as Instructor ownership when the Course is unassigned', async () => {
+    data.findCourse.mockResolvedValue({
+      id: courseId,
+      status: 'draft',
+      isPremium: false,
+      title: 'Unassigned course',
+      createdBy: assignedInstructorId,
+    });
+
+    await expect(
+      service.assertCourseInteractionAccess(courseId, { id: assignedInstructorId, role: 'INSTRUCTOR' }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

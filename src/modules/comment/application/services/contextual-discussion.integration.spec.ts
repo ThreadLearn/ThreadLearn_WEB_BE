@@ -147,7 +147,7 @@ describe('Contextual Code Discussion isolated A/B/C flow', () => {
   });
 
   it('allows only the assigned instructor to access the course without enrollment', async () => {
-    await expect(access.assertLessonInteractionAccess(ids.lesson1, { id: ids.instructor, role: 'STUDENT' }))
+    await expect(access.assertLessonInteractionAccess(ids.lesson1, { id: ids.instructor, role: 'INSTRUCTOR' }))
       .resolves.toMatchObject({ id: ids.lesson1 });
     await expect(access.assertLessonInteractionAccess(ids.lesson1, { id: ids.c, role: 'STUDENT' }))
       .rejects.toBeInstanceOf(ForbiddenError);

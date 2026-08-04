@@ -5,7 +5,7 @@ export interface IUser extends Document {
   passwordHash?: string;
   firstName: string;
   lastName: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   planType?: 'FREE' | 'PREMIUM';
   subscriptionExpiresAt?: Date;
   subscriptionFeatures?: string[];
@@ -35,7 +35,7 @@ const UserSchema: Schema<IUser> = new Schema(
     passwordHash: { type: String },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
-    role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT' },
+    role: { type: String, enum: ['STUDENT', 'INSTRUCTOR', 'ADMIN'], default: 'STUDENT' },
     planType: { type: String, enum: ['FREE', 'PREMIUM'], default: 'FREE' },
     subscriptionExpiresAt: { type: Date },
     subscriptionFeatures: { type: [String] },

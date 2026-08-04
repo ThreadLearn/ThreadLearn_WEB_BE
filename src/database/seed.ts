@@ -129,7 +129,7 @@ async function seed() {
         passwordHash: adminHash,
         firstName: 'Lan',
         lastName: 'Nguyen',
-        role: 'ADMIN',
+        role: 'INSTRUCTOR',
         planType: 'PREMIUM',
         subscriptionExpiresAt: daysFromNow(365),
         isVerified: true,

@@ -13,8 +13,10 @@ import { MongoSubmissionRepository } from '../../infrastructure/persistence/mong
 import { AssignmentRunPayload, AssignmentSubmitPayload, ExerciseUpsertPayload, ExerciseUpdatePayload } from '../dto/exercise.dto';
 import { CodeExecutionService, ExecutionResult } from './code-execution.service';
 import { RequestRecommendationService } from '../../../ai/application/services/request-recommendation.service';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 export type Verdict = 'PASS' | 'PARTIAL' | 'FAIL' | 'ERROR';
+type ExerciseViewer = { id: string; role: UserRole };
 type TestResult = {
   index: number;
   passed: boolean;
@@ -57,7 +59,7 @@ export class ExercisesService {
     private readonly ai?: RequestRecommendationService,
   ) {}
 
-  async listByLesson(user: { id: string; role: 'STUDENT' | 'ADMIN' }, lessonId: string) {
+  async listByLesson(user: ExerciseViewer, lessonId: string) {
     if (user.role === 'ADMIN') return (await this.exercises.listByLesson(lessonId)).map((exercise) => this.presentExercise(exercise.toProps(), true));
     await this.learningAccess.assertLessonViewAccess(lessonId, user);
     return (await this.exercises.listByLesson(lessonId))
@@ -70,7 +72,7 @@ export class ExercisesService {
     return (await this.exercises.listAll()).map((exercise) => this.presentExercise(exercise.toProps(), true));
   }
 
-  async getById(user: { id: string; role: 'STUDENT' | 'ADMIN' }, id: string) {
+  async getById(user: ExerciseViewer, id: string) {
     const props = await this.getProps(id);
     if (user.role !== 'ADMIN') {
       await this.learningAccess.assertLessonViewAccess(props.lessonId, user);
@@ -105,7 +107,7 @@ export class ExercisesService {
     return { id };
   }
 
-  async runPublic(user: { id: string; role: 'STUDENT' | 'ADMIN' }, exerciseId: string, payload: AssignmentRunPayload) {
+  async runPublic(user: ExerciseViewer, exerciseId: string, payload: AssignmentRunPayload) {
     const { props } = await this.assertLearnerAccess(user, exerciseId, false);
     this.assertLanguage(props, payload.language);
     const publicCases = props.testCases.filter((testCase) => !testCase.isHidden);
@@ -113,7 +115,7 @@ export class ExercisesService {
     return this.presentRun(props.id, results, false);
   }
 
-  async submit(user: { id: string; role: 'STUDENT' | 'ADMIN' }, exerciseId: string, payload: AssignmentSubmitPayload) {
+  async submit(user: ExerciseViewer, exerciseId: string, payload: AssignmentSubmitPayload) {
     if (user.role !== 'STUDENT') throw new ForbiddenError('Only students can submit assignments.');
     const { props, courseId } = await this.assertLearnerAccess(user, exerciseId, true);
     this.assertLanguage(props, payload.language);
@@ -196,13 +198,13 @@ export class ExercisesService {
     }
   }
 
-  async listMine(user: { id: string; role: 'STUDENT' | 'ADMIN' }, exerciseId: string, page: number, limit: number) {
+  async listMine(user: ExerciseViewer, exerciseId: string, page: number, limit: number) {
     await this.assertLearnerAccess(user, exerciseId, false);
     const result = await this.submissions.listForStudent(user.id, exerciseId, page, limit);
     return this.presentPage(result, false, page, limit);
   }
 
-  async getMine(user: { id: string; role: 'STUDENT' | 'ADMIN' }, submissionId: string) {
+  async getMine(user: ExerciseViewer, submissionId: string) {
     const submission = await this.submissions.findForStudent(user.id, submissionId);
     if (!submission) throw new NotFoundError('Submission not found.');
     return this.presentSubmission(submission, false);
@@ -219,7 +221,7 @@ export class ExercisesService {
     return exercise.toProps();
   }
 
-  private async assertLearnerAccess(user: { id: string; role: 'STUDENT' | 'ADMIN' }, exerciseId: string, interaction: boolean) {
+  private async assertLearnerAccess(user: ExerciseViewer, exerciseId: string, interaction: boolean) {
     const props = await this.getProps(exerciseId);
     let courseId: string | undefined;
     if (user.role !== 'ADMIN') {

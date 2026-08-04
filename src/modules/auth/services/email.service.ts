@@ -93,7 +93,9 @@ export class EmailService {
 
   static async sendStudentInvitationEmail(payload: StudentInvitationEmailPayload) {
     if (!this.hasSmtpConfig()) {
-      logger.info(`Mock student invitation email sent to ${payload.email} for ${payload.firstName}.`);
+      logger.info(
+        `Mock student invitation email sent to ${payload.email} for ${payload.firstName}.`
+      );
       return;
     }
 
@@ -119,7 +121,9 @@ export class EmailService {
 
   static async sendLearningPlanReminderEmail(payload: LearningPlanReminderEmailPayload) {
     if (!this.hasSmtpConfig()) {
-      logger.info(`Mock learning-plan reminder email sent to ${payload.email} for ${payload.firstName}.`);
+      logger.info(
+        `Mock learning-plan reminder email sent to ${payload.email} for ${payload.firstName}.`
+      );
       return;
     }
 
@@ -163,14 +167,20 @@ export class EmailService {
    * (~1ms instead of 1-3s waiting on Gmail). If all retries fail we log loudly
    * so ops can investigate; the user is never surfaced an SMTP error.
    */
-  private static dispatch(label: string, message: { to: string; subject: string; text: string; html: string }) {
+  private static dispatch(
+    label: string,
+    message: { to: string; subject: string; text: string; html: string }
+  ) {
     const attempt = async (n: number): Promise<void> => {
       try {
         await this.sendMail(message);
         logger.info(`${label} delivered to ${message.to}${n > 1 ? ` (retry ${n - 1})` : ''}`);
       } catch (err) {
         if (n >= 3) {
-          logger.error(`${label} permanently failed for ${message.to} after ${n} attempts.`, err as Error);
+          logger.error(
+            `${label} permanently failed for ${message.to} after ${n} attempts.`,
+            err as Error
+          );
           return;
         }
         const delay = 1000 * Math.pow(2, n - 1); // 1s, 2s
@@ -181,7 +191,12 @@ export class EmailService {
     void attempt(1);
   }
 
-  private static async sendMail(message: { to: string; subject: string; text: string; html: string }) {
+  private static async sendMail(message: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+  }) {
     const transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,

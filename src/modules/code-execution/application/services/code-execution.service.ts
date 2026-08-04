@@ -13,6 +13,7 @@ import {
 } from '../../domain/interfaces/code-execution.repository';
 import { CodeSubmitPayload, MAX_SOURCE_CODE_BYTES } from '../dto/code-execution.dto';
 import { DailyQuotaReservation, DailyQuotaService } from '../../../../shared/infrastructure/quota/daily-quota.service';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 export type ExecutionResult = {
   stdout: string;
@@ -141,7 +142,7 @@ export class CodeExecutionService {
     }
   }
 
-  async executeCode(userId: string, payload: CodeSubmitPayload, userRole: 'STUDENT' | 'ADMIN' = 'STUDENT') {
+  async executeCode(userId: string, payload: CodeSubmitPayload, userRole: UserRole = 'STUDENT') {
     const { sourceCode, stdin = '' } = payload;
     if (!sourceCode?.trim()) throw new BadRequestError('sourceCode is required.');
     if (Buffer.byteLength(sourceCode, 'utf8') > MAX_SOURCE_CODE_BYTES) {

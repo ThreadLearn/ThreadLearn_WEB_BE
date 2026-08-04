@@ -1,7 +1,7 @@
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  role: 'STUDENT' | 'ADMIN';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
 }
 
 export interface AuthenticatedRequest extends Request {

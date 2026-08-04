@@ -4,12 +4,13 @@ import { CodeShareService } from '../../../code-share/application/services/code-
 import { Note } from '../../models/note.model';
 import { NoteMapper } from '../../infrastructure/mapper/note.mapper';
 import { Comment } from '../../../comment/models/comment.model';
+import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
 
 @Injectable()
 export class CreateNoteFromCodeShareService {
   constructor(private readonly codeShares: CodeShareService) {}
 
-  async execute(userId: string, role: 'STUDENT' | 'ADMIN', input: { codeShareId: string; lessonId: string; noteText?: string }) {
+  async execute(userId: string, role: UserRole, input: { codeShareId: string; lessonId: string; noteText?: string }) {
     const share = await this.codeShares.getVisible(userId, role, input.codeShareId);
     if (share.isCodeLocked || !share.sourceCode) {
       throw new ForbiddenError('Run this exercise yourself before saving a community code solution.');
