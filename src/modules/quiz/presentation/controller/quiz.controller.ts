@@ -36,7 +36,7 @@ import type { Response } from 'express';
  * QuizController — luồng ADMIN quản lý quiz & câu hỏi (UC36–UC39).
  * Luồng học viên làm quiz nằm ở QuizAttemptsController.
  */
-@ApiTags('Quiz - Admin')
+@ApiTags('Quiz - Management')
 @Controller('v1/quiz')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('BearerAuth')
@@ -55,7 +55,7 @@ export class QuizController {
   ) { }
 
   @Get('import-template')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async downloadImportTemplate(@Query('format') format: string | undefined, @Res({ passthrough: true }) response: Response) {
     if (format && format !== 'xlsx') throw new BadRequestError('Only xlsx templates are supported.');
     response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -66,7 +66,7 @@ export class QuizController {
   /** Admin tải thư viện đề theo 2 bước parse/preview rồi commit. */
   @Post('imports')
   @HttpCode(201)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   @UseInterceptors(FileInterceptor('file', {
     limits: { fileSize: env.MAX_FILE_SIZE_MB * 1024 * 1024, files: 1 },
   }))
@@ -86,13 +86,14 @@ export class QuizController {
       questionCount,
       replaceExisting: body.replaceExisting === true || body.replaceExisting === 'true',
       userId: user.id,
+      actor: user,
       file: file as Express.Multer.File,
     });
     return ApiResponse.success({ message: 'Question library parsed. Review it before publishing.', data: result, statusCode: 201 });
   }
 
   @Get('imports/:importId')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async getQuestionBankImport(
     @Param('importId') importId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -104,7 +105,7 @@ export class QuizController {
   }
 
   @Post('imports/:importId/commit')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async commitQuestionBankImport(
     @Param('importId') importId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -114,7 +115,7 @@ export class QuizController {
   }
 
   @Post('imports/:importId/replace')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async replaceQuestionBankImport(
     @Param('importId') importId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -124,7 +125,7 @@ export class QuizController {
   }
 
   @Patch('imports/:importId/items/:row')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async updateQuestionBankImportItem(
     @Param('importId') importId: string,
     @Param('row') row: string,
@@ -136,7 +137,7 @@ export class QuizController {
   }
 
   @Delete('imports/:importId/items/:row')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async removeQuestionBankImportItem(
     @Param('importId') importId: string,
     @Param('row') row: string,
@@ -147,15 +148,15 @@ export class QuizController {
   }
 
   @Get(':quizId/question-bank')
-  @Roles('ADMIN')
-  async getQuestionBank(@Param('quizId') quizId: string) {
-    const result = await this.quizBank.getBankSummary(quizId);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async getQuestionBank(@Param('quizId') quizId: string, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.quizBank.getBankSummary(quizId, user);
     return ApiResponse.success({ message: 'Question library fetched.', data: result });
   }
 
   @Get(':quizId/question-bank/questions')
-  @Roles('ADMIN')
-  async listQuestionBankQuestions(@Param('quizId') quizId: string, @Query() query: Record<string, string | undefined>) {
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async listQuestionBankQuestions(@Param('quizId') quizId: string, @Query() query: Record<string, string | undefined>, @CurrentUser() user: AuthenticatedUser) {
     const result = await this.quizBank.listQuestions(quizId, {
       page: query.page ? Number(query.page) : undefined,
       limit: query.limit ? Number(query.limit) : undefined,
@@ -164,129 +165,134 @@ export class QuizController {
       difficulty: query.difficulty,
       tag: query.tag,
       sort: query.sort,
-    });
+    }, user);
     return ApiResponse.success({ message: 'Question bank questions fetched.', data: result.items, meta: result.meta });
   }
 
   @Post(':quizId/question-bank/questions')
   @HttpCode(201)
-  @Roles('ADMIN')
-  async createQuestionBankQuestion(@Param('quizId') quizId: string, @Body() body: Record<string, unknown>) {
-    const result = await this.quizBank.createQuestion(quizId, body as any);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async createQuestionBankQuestion(@Param('quizId') quizId: string, @Body() body: Record<string, unknown>, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.quizBank.createQuestion(quizId, body as any, user);
     return ApiResponse.success({ message: 'Question bank question created.', data: result, statusCode: 201 });
   }
 
   @Get(':quizId/question-bank/questions/:questionId')
-  @Roles('ADMIN')
-  async getQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string) {
-    const result = await this.quizBank.getQuestion(quizId, questionId);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async getQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.quizBank.getQuestion(quizId, questionId, user);
     return ApiResponse.success({ message: 'Question bank question fetched.', data: result });
   }
 
   @Patch(':quizId/question-bank/questions/:questionId')
-  @Roles('ADMIN')
-  async updateQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string, @Body() body: Record<string, unknown>) {
-    const result = await this.quizBank.updateQuestion(quizId, questionId, body as any);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async updateQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string, @Body() body: Record<string, unknown>, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.quizBank.updateQuestion(quizId, questionId, body as any, user);
     return ApiResponse.success({ message: 'Question bank question updated.', data: result });
   }
 
   @Patch(':quizId/question-bank/questions/:questionId/status')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async setQuestionBankQuestionStatus(
     @Param('quizId') quizId: string,
     @Param('questionId') questionId: string,
     @Body() body: { status?: 'active' | 'disabled' },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (body.status !== 'active' && body.status !== 'disabled') throw new BadRequestError('status must be active or disabled.');
-    const result = await this.quizBank.setQuestionStatus(quizId, questionId, body.status);
+    const result = await this.quizBank.setQuestionStatus(quizId, questionId, body.status, user);
     return ApiResponse.success({ message: 'Question bank question status updated.', data: result });
   }
 
   @Delete(':quizId/question-bank/questions/:questionId')
-  @Roles('ADMIN')
-  async deleteQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string) {
-    const result = await this.quizBank.deleteQuestion(quizId, questionId);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async deleteQuestionBankQuestion(@Param('quizId') quizId: string, @Param('questionId') questionId: string, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.quizBank.deleteQuestion(quizId, questionId, user);
     return ApiResponse.success({ message: 'Question bank question deleted.', data: result });
   }
 
   // ─── UC36-1: Admin tạo quiz ──────────────────────────────
   @Post()
   @HttpCode(201)
-  @Roles('ADMIN')
-  async create(@Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto) {
-    const quiz = await this.createQuiz.execute(dto);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async create(@Body(new ZodValidationPipe(createQuizSchema)) dto: CreateQuizDto, @CurrentUser() user: AuthenticatedUser) {
+    const quiz = await this.createQuiz.execute(dto, user);
     return ApiResponse.success({ message: 'Quiz created successfully.', data: QuizPresenter.toResponse(quiz), statusCode: 201 });
   }
 
   // ─── UC36-5: Admin xem danh sách quiz ────────────────────
   @Get()
-  @Roles('ADMIN')
-  async list() {
-    const quizzes = await this.listQuizzes.execute();
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async list(@CurrentUser() user: AuthenticatedUser) {
+    const quizzes = await this.listQuizzes.execute(user);
     return ApiResponse.success({ message: 'Quizzes fetched successfully.', data: QuizPresenter.toList(quizzes) });
   }
 
   // ─── UC37: Admin thêm câu hỏi ────────────────────────────
   @Post(':quizId/questions')
   @HttpCode(201)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async addQuestionToQuiz(
     @Param('quizId') quizId: string,
     @Body(new ZodValidationPipe(addQuestionSchema)) question: QuestionDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const quiz = await this.addQuestion.execute(quizId, question);
+    const quiz = await this.addQuestion.execute(quizId, question, user);
     return ApiResponse.success({ message: 'Question added successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC38: Admin sửa câu hỏi ──────────────────────────────
   @Put(':quizId/questions/:questionId')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async editQuestionInQuiz(
     @Param('quizId') quizId: string,
     @Param('questionId') questionId: string,
     @Body(new ZodValidationPipe(updateQuestionSchema)) dto: UpdateQuestionDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const quiz = await this.editQuestion.execute(quizId, questionId, dto);
+    const quiz = await this.editQuestion.execute(quizId, questionId, dto, user);
     return ApiResponse.success({ message: 'Question updated successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC39: Admin xoá câu hỏi ──────────────────────────────
   @Delete(':quizId/questions/:questionId')
   @HttpCode(200)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async removeQuestionFromQuiz(
     @Param('quizId') quizId: string,
     @Param('questionId') questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const quiz = await this.deleteQuestion.execute(quizId, questionId);
+    const quiz = await this.deleteQuestion.execute(quizId, questionId, user);
     return ApiResponse.success({ message: 'Question deleted successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-3: Admin xem chi tiết quiz ─────────────────────
   @Get(':quizId')
-  @Roles('ADMIN')
-  async getById(@Param('quizId') quizId: string) {
-    const quiz = await this.getQuiz.execute(quizId);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async getById(@Param('quizId') quizId: string, @CurrentUser() user: AuthenticatedUser) {
+    const quiz = await this.getQuiz.execute(quizId, user);
     return ApiResponse.success({ message: 'Quiz fetched successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-2: Admin cập nhật quiz ─────────────────────────
   @Put(':quizId')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async update(
     @Param('quizId') quizId: string,
     @Body(new ZodValidationPipe(updateQuizSchema)) dto: UpdateQuizDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const quiz = await this.updateQuiz.execute(quizId, dto);
+    const quiz = await this.updateQuiz.execute(quizId, dto, user);
     return ApiResponse.success({ message: 'Quiz updated successfully.', data: QuizPresenter.toResponse(quiz) });
   }
 
   // ─── UC36-4: Admin xóa quiz ──────────────────────────────
   @Delete(':quizId')
   @HttpCode(200)
-  @Roles('ADMIN')
-  async remove(@Param('quizId') quizId: string) {
-    await this.deleteQuiz.execute(quizId);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async remove(@Param('quizId') quizId: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.deleteQuiz.execute(quizId, user);
     return ApiResponse.success({ message: 'Quiz deleted successfully.', data: null });
   }
 }

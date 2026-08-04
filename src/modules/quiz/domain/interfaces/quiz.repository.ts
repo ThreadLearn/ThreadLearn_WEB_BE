@@ -9,6 +9,7 @@ export interface IQuizRepository {
   findById(id: string): Promise<Quiz | null>;
   findByLessonId(lessonId: string): Promise<Quiz | null>;
   findAll(): Promise<Quiz[]>;
+  findByLessonIds?(lessonIds: string[]): Promise<Quiz[]>;
   create(entity: Quiz): Promise<Quiz>;
   update(entity: Quiz): Promise<Quiz>;
 }

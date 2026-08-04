@@ -14,6 +14,7 @@ import { AssignmentRunPayload, AssignmentSubmitPayload, ExerciseUpsertPayload, E
 import { CodeExecutionService, ExecutionResult } from './code-execution.service';
 import { RequestRecommendationService } from '../../../ai/application/services/request-recommendation.service';
 import type { UserRole } from '../../../auth/domain/value-objects/user-role.vo';
+import { InstructorResourceAccessService } from '../../../course/application/services/instructor-resource-access.service';
 
 export type Verdict = 'PASS' | 'PARTIAL' | 'FAIL' | 'ERROR';
 type ExerciseViewer = { id: string; role: UserRole };
@@ -57,10 +58,15 @@ export class ExercisesService {
     private readonly codeExecution: CodeExecutionService,
     private readonly submissions: MongoSubmissionRepository,
     private readonly ai?: RequestRecommendationService,
+    private readonly resourceAccess?: InstructorResourceAccessService,
   ) {}
 
   async listByLesson(user: ExerciseViewer, lessonId: string) {
     if (user.role === 'ADMIN') return (await this.exercises.listByLesson(lessonId)).map((exercise) => this.presentExercise(exercise.toProps(), true));
+    if (user.role === 'INSTRUCTOR') {
+      await this.resourceAccess?.assertCanReadLessonResource(user, lessonId);
+      return (await this.exercises.listByLesson(lessonId)).map((exercise) => this.presentExercise(exercise.toProps(), true));
+    }
     await this.learningAccess.assertLessonViewAccess(lessonId, user);
     return (await this.exercises.listByLesson(lessonId))
       .map((exercise) => exercise.toProps())
@@ -68,12 +74,22 @@ export class ExercisesService {
       .map((exercise) => this.presentExercise(exercise, false));
   }
 
-  async listAllForAdmin() {
-    return (await this.exercises.listAll()).map((exercise) => this.presentExercise(exercise.toProps(), true));
+  async listAllForManagement(user: ExerciseViewer) {
+    const all = await this.exercises.listAll();
+    if (user.role === 'ADMIN') return all.map((exercise) => this.presentExercise(exercise.toProps(), true));
+
+    const lessonIds = new Set(await this.resourceAccess?.listManagedLessonIds(user) ?? []);
+    return all
+      .filter((exercise) => lessonIds.has(exercise.toProps().lessonId))
+      .map((exercise) => this.presentExercise(exercise.toProps(), true));
   }
 
   async getById(user: ExerciseViewer, id: string) {
     const props = await this.getProps(id);
+    if (user.role === 'INSTRUCTOR') {
+      await this.resourceAccess?.assertCanReadLessonResource(user, props.lessonId);
+      return this.presentExercise(props, true);
+    }
     if (user.role !== 'ADMIN') {
       await this.learningAccess.assertLessonViewAccess(props.lessonId, user);
       if (props.status !== 'PUBLISHED') throw new NotFoundError('Exercise not found.');
@@ -81,28 +97,34 @@ export class ExercisesService {
     return this.presentExercise(props, user.role === 'ADMIN');
   }
 
-  async create(userId: string, payload: ExerciseUpsertPayload) {
+  async create(user: ExerciseViewer | string, payload: ExerciseUpsertPayload) {
     // An exercise must always belong to an existing, non-deleted lesson. The
     // admin selector is a convenience only; this server-side check remains the
     // authoritative protection against stale or crafted lesson ids.
-    await this.learningAccess.assertLessonViewAccess(payload.lessonId, { id: userId, role: 'ADMIN' });
+    if (typeof user === 'string') {
+      await this.learningAccess.assertLessonViewAccess(payload.lessonId, { id: user, role: 'ADMIN' });
+    } else {
+      await this.resourceAccess?.assertCanMutateLessonResource(user, payload.lessonId);
+    }
     this.assertPublishable(payload);
-    const entity = ExerciseEntity.createNew({ ...payload, createdBy: userId });
+    const entity = ExerciseEntity.createNew({ ...payload, createdBy: typeof user === 'string' ? user : user.id });
     return this.exercises.create(entity);
   }
 
-  async update(id: string, payload: ExerciseUpdatePayload) {
+  async update(user: ExerciseViewer, id: string, payload: ExerciseUpdatePayload) {
     const exercise = await this.exercises.findById(id);
     if (!exercise) throw new NotFoundError('Exercise not found.');
+    await this.resourceAccess?.assertCanMutateLessonResource(user, exercise.toProps().lessonId);
     const next = { ...exercise.toProps(), ...payload } as ExerciseProps;
     this.assertPublishable(next);
     exercise.applyPatch(payload);
     return this.exercises.update(exercise);
   }
 
-  async remove(id: string) {
+  async remove(user: ExerciseViewer, id: string) {
     const exercise = await this.exercises.findById(id);
     if (!exercise) throw new NotFoundError('Exercise not found.');
+    await this.resourceAccess?.assertCanMutateLessonResource(user, exercise.toProps().lessonId);
     await this.exercises.remove(id);
     return { id };
   }
@@ -210,8 +232,9 @@ export class ExercisesService {
     return this.presentSubmission(submission, false);
   }
 
-  async listForAdmin(exerciseId: string, page: number, limit: number) {
-    await this.getProps(exerciseId);
+  async listForManagement(user: ExerciseViewer, exerciseId: string, page: number, limit: number) {
+    const props = await this.getProps(exerciseId);
+    await this.resourceAccess?.assertCanReadLessonResource(user, props.lessonId);
     return this.presentPage(await this.submissions.listForAdmin(exerciseId, page, limit), true, page, limit);
   }
 

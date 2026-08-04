@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { BadRequestError, NotFoundError } from '../../../../common/custom-error';
 import { env } from '../../../../configs/env';
 import { Lesson } from '../../../lessons/models/lesson.model';
+import { InstructorResourceAccessService } from '../../../course/application/services/instructor-resource-access.service';
 import { Quiz as QuizModel } from '../../infrastructure/persistence/schemas/quiz.schema';
 import {
   IImportedQuestion,
@@ -27,12 +28,13 @@ export interface CreateImportInput {
   questionCount?: number;
   replaceExisting?: boolean;
   userId: string;
+  actor: QuizBankActor;
   file: Express.Multer.File;
 }
 
 export interface QuizBankActor {
   id: string;
-  role?: string;
+  role: string;
 }
 
 export interface QuestionBankQuestionInput {
@@ -49,12 +51,15 @@ export interface QuestionBankQuestionInput {
  */
 @Injectable()
 export class QuizBankService {
+  constructor(private readonly access?: InstructorResourceAccessService) {}
+
   async createImport(input: CreateImportInput) {
     this.assertFile(input.file);
     if (input.questionCount !== undefined && (!Number.isInteger(input.questionCount) || input.questionCount < 5 || input.questionCount > 10)) {
       throw new BadRequestError('questionCount must be an integer between 5 and 10.');
     }
     const quiz = await this.resolveQuiz(input);
+    await this.access?.assertCanMutateQuiz(input.actor, String(quiz._id));
     const extension = path.extname(input.file.originalname).toLowerCase().slice(1) as 'xlsx' | 'docx';
     const rawItems = extension === 'xlsx'
       ? this.parseXlsx(input.file.buffer)
@@ -90,7 +95,7 @@ export class QuizBankService {
     if (!mongoose.isValidObjectId(importId)) throw new NotFoundError('Quiz import not found.');
     const importJob = await QuizBankImport.findById(importId).exec();
     if (!importJob) throw new NotFoundError('Quiz import not found.');
-    this.assertImportAccess(importJob, actor);
+    await this.assertImportAccess(importJob, actor, false);
     const safePage = Math.max(1, page);
     const safeLimit = Math.max(1, Math.min(100, limit));
     const start = (safePage - 1) * safeLimit;
@@ -116,7 +121,7 @@ export class QuizBankService {
       await dbSession.withTransaction(async () => {
         const importJob = await QuizBankImport.findById(importId).session(dbSession).exec();
         if (!importJob) throw new NotFoundError('Quiz import not found.');
-        this.assertImportAccess(importJob, actor);
+        await this.assertImportAccess(importJob, actor, true);
         if (importJob.status === 'committed') {
           const bank = await QuizQuestionBank.findOne({ quizId: importJob.quizId }).session(dbSession).lean().exec();
           result = this.toBankSummary(bank, { inserted: 0, duplicated: importJob.duplicateCount, idempotent: true });
@@ -209,7 +214,8 @@ export class QuizBankService {
     return result!;
   }
 
-  async getBankSummary(quizId: string) {
+  async getBankSummary(quizId: string, actor: QuizBankActor) {
+    await this.access?.assertCanReadQuiz(actor, quizId);
     if (!mongoose.isValidObjectId(quizId)) throw new NotFoundError('Quiz question bank not found.');
     const bank = await QuizQuestionBank.findOne({ quizId }).lean().exec();
     if (!bank) throw new NotFoundError('Quiz question bank not found.');
@@ -251,7 +257,8 @@ export class QuizBankService {
     return this.toImportResponse(importJob, []);
   }
 
-  async listQuestions(quizId: string, query: { page?: number; limit?: number; search?: string; status?: string; difficulty?: string; tag?: string; sort?: string }) {
+  async listQuestions(quizId: string, query: { page?: number; limit?: number; search?: string; status?: string; difficulty?: string; tag?: string; sort?: string }, actor: QuizBankActor) {
+    await this.access?.assertCanReadQuiz(actor, quizId);
     const bank = await this.getBankOrThrow(quizId);
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.max(1, Math.min(100, query.limit ?? 20));
@@ -271,7 +278,8 @@ export class QuizBankService {
     };
   }
 
-  async getQuestion(quizId: string, questionId: string) {
+  async getQuestion(quizId: string, questionId: string, actor: QuizBankActor) {
+    await this.access?.assertCanReadQuiz(actor, quizId);
     await this.getBankOrThrow(quizId);
     if (!mongoose.isValidObjectId(questionId)) throw new NotFoundError('Question not found.');
     const question = await QuizBankQuestion.findOne({ _id: questionId, quizId }).lean().exec();
@@ -279,7 +287,8 @@ export class QuizBankService {
     return this.toAdminQuestion(question);
   }
 
-  async createQuestion(quizId: string, input: QuestionBankQuestionInput) {
+  async createQuestion(quizId: string, input: QuestionBankQuestionInput, actor: QuizBankActor) {
+    await this.access?.assertCanMutateQuiz(actor, quizId);
     const bank = await this.getBankOrThrow(quizId);
     const normalized = this.validateBankQuestion(input);
     const contentHash = this.contentHash(normalized.questionText, normalized.options.map((option) => option.text));
@@ -299,7 +308,8 @@ export class QuizBankService {
     return this.toAdminQuestion(question.toObject());
   }
 
-  async updateQuestion(quizId: string, questionId: string, patch: Partial<QuestionBankQuestionInput>) {
+  async updateQuestion(quizId: string, questionId: string, patch: Partial<QuestionBankQuestionInput>, actor: QuizBankActor) {
+    await this.access?.assertCanMutateQuiz(actor, quizId);
     const bank = await this.getBankOrThrow(quizId);
     if (!mongoose.isValidObjectId(questionId)) throw new NotFoundError('Question not found.');
     const current = await QuizBankQuestion.findOne({ _id: questionId, quizId }).exec();
@@ -320,7 +330,8 @@ export class QuizBankService {
     return this.toAdminQuestion(current.toObject());
   }
 
-  async setQuestionStatus(quizId: string, questionId: string, status: 'active' | 'disabled') {
+  async setQuestionStatus(quizId: string, questionId: string, status: 'active' | 'disabled', actor: QuizBankActor) {
+    await this.access?.assertCanMutateQuiz(actor, quizId);
     const dbSession = await mongoose.startSession();
     let response: Record<string, unknown> | undefined;
     try {
@@ -349,7 +360,8 @@ export class QuizBankService {
     return response!;
   }
 
-  async deleteQuestion(quizId: string, questionId: string) {
+  async deleteQuestion(quizId: string, questionId: string, actor: QuizBankActor) {
+    await this.access?.assertCanMutateQuiz(actor, quizId);
     if (!mongoose.isValidObjectId(questionId)) throw new NotFoundError('Question not found.');
     const dbSession = await mongoose.startSession();
     try {
@@ -415,15 +427,14 @@ export class QuizBankService {
     if (!mongoose.isValidObjectId(importId)) throw new NotFoundError('Quiz import not found.');
     const importJob = await QuizBankImport.findById(importId).exec();
     if (!importJob) throw new NotFoundError('Quiz import not found.');
-    this.assertImportAccess(importJob, actor);
+    await this.assertImportAccess(importJob, actor, true);
     if (importJob.status !== 'needs_review') throw new BadRequestError('Only imports awaiting review can be edited.');
     return importJob;
   }
 
-  private assertImportAccess(importJob: { createdBy: unknown }, actor: QuizBankActor) {
-    if (actor.role !== 'ADMIN' && String(importJob.createdBy) !== actor.id) {
-      throw new NotFoundError('Quiz import not found.');
-    }
+  private async assertImportAccess(importJob: { quizId: unknown }, actor: QuizBankActor, mutate: boolean) {
+    if (mutate) await this.access?.assertCanMutateQuiz(actor, String(importJob.quizId));
+    else await this.access?.assertCanReadQuiz(actor, String(importJob.quizId));
   }
 
   private assertPublishable(importJob: { validCount: number; questionCount: number }) {
