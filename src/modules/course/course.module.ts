@@ -8,6 +8,7 @@ import { SetCourseVisibilityService } from './application/services/set-course-vi
 import { UpdateCourseService } from './application/services/update-course.service';
 import { AssignCourseInstructorService } from './application/services/assign-course-instructor.service';
 import { CourseInstructorAssignmentPolicy } from './application/services/course-instructor-assignment.policy';
+import { CourseManagementPolicy } from './application/policies/course-management.policy';
 import { ListMyInstructorCoursesService } from './application/services/list-my-instructor-courses.service';
 import { AuthModule } from '../auth/auth.module';
 import { COURSE_CONTENT_PORT } from './domain/interfaces/course-content.port';
@@ -33,9 +34,10 @@ import { AdminCourseOwnershipController, InstructorCoursesController } from './p
     DeleteCourseService,
     RestoreCourseService,
     CourseInstructorAssignmentPolicy,
+    CourseManagementPolicy,
     AssignCourseInstructorService,
     ListMyInstructorCoursesService,
   ],
-  exports: [COURSE_REPOSITORY, COURSE_CONTENT_PORT],
+  exports: [COURSE_REPOSITORY, COURSE_CONTENT_PORT, CourseManagementPolicy],
 })
 export class CourseModule {}
