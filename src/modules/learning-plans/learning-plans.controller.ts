@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../../common/api-handler';
 import { ApiResponse } from '../../common/api-response';
@@ -18,6 +28,7 @@ import {
 import { CourseLearningGoalsService } from './course-learning-goals.service';
 import { LearningPlansService } from './learning-plans.service';
 import { AdaptiveLearningService } from './adaptive-learning.service';
+import { AdaptivePlanService } from './adaptive-plan.service';
 
 @ApiTags('Learning plan')
 @Controller('v1/learning-plan')
@@ -28,6 +39,7 @@ export class LearningPlansController {
     private readonly learningPlans: LearningPlansService,
     private readonly courseGoals: CourseLearningGoalsService,
     private readonly adaptiveLearning: AdaptiveLearningService,
+    private readonly adaptivePlan: AdaptivePlanService
   ) {}
 
   @Get('me')
@@ -40,7 +52,7 @@ export class LearningPlansController {
 
   @Get('adaptive/diagnostic/:courseSlug')
   async getAdaptiveDiagnostic(
-    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
   ) {
     return ApiResponse.success({
       message: 'Adaptive diagnostic fetched.',
@@ -53,7 +65,7 @@ export class LearningPlansController {
   async submitAdaptiveDiagnostic(
     @CurrentUser() user: AuthenticatedUser,
     @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
-    @Body(new ZodValidationPipe(submitAdaptiveDiagnosticSchema)) body: SubmitAdaptiveDiagnosticDto,
+    @Body(new ZodValidationPipe(submitAdaptiveDiagnosticSchema)) body: SubmitAdaptiveDiagnosticDto
   ) {
     return ApiResponse.success({
       message: 'Adaptive diagnostic evaluated.',
@@ -64,11 +76,45 @@ export class LearningPlansController {
   @Get('adaptive/me/:courseSlug')
   async getAdaptiveProfile(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
   ) {
     return ApiResponse.success({
       message: 'Adaptive learning profile fetched.',
       data: await this.adaptiveLearning.getMine(user.id, courseSlug),
+    });
+  }
+
+  @Post('adaptive/plan/:courseSlug')
+  @HttpCode(200)
+  async generateAdaptivePlan(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive learning plan generated.',
+      data: await this.adaptivePlan.generate(user.id, courseSlug),
+    });
+  }
+
+  @Get('adaptive/plan/:courseSlug')
+  async getAdaptivePlan(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive learning plan fetched.',
+      data: await this.adaptivePlan.getLatest(user.id, courseSlug),
+    });
+  }
+
+  @Get('adaptive/plan/:courseSlug/history')
+  async getAdaptivePlanHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive learning plan history fetched.',
+      data: await this.adaptivePlan.getHistory(user.id, courseSlug),
     });
   }
 
