@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../../common/api-handler';
 import { ApiResponse } from '../../common/api-response';
@@ -7,13 +7,17 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   courseIdParamSchema,
+  adaptiveCourseSlugParamSchema,
+  SubmitAdaptiveDiagnosticDto,
   UpdateCourseLearningGoalDto,
   UpdateLearningPlanDto,
+  submitAdaptiveDiagnosticSchema,
   updateCourseLearningGoalSchema,
   updateLearningPlanSchema,
 } from './learning-plan.dto';
 import { CourseLearningGoalsService } from './course-learning-goals.service';
 import { LearningPlansService } from './learning-plans.service';
+import { AdaptiveLearningService } from './adaptive-learning.service';
 
 @ApiTags('Learning plan')
 @Controller('v1/learning-plan')
@@ -22,7 +26,8 @@ import { LearningPlansService } from './learning-plans.service';
 export class LearningPlansController {
   constructor(
     private readonly learningPlans: LearningPlansService,
-    private readonly courseGoals: CourseLearningGoalsService
+    private readonly courseGoals: CourseLearningGoalsService,
+    private readonly adaptiveLearning: AdaptiveLearningService,
   ) {}
 
   @Get('me')
@@ -30,6 +35,40 @@ export class LearningPlansController {
     return ApiResponse.success({
       message: 'Learning plan fetched.',
       data: await this.learningPlans.getMine(user.id),
+    });
+  }
+
+  @Get('adaptive/diagnostic/:courseSlug')
+  async getAdaptiveDiagnostic(
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive diagnostic fetched.',
+      data: await this.adaptiveLearning.getDiagnostic(courseSlug),
+    });
+  }
+
+  @Post('adaptive/diagnostic/:courseSlug')
+  @HttpCode(200)
+  async submitAdaptiveDiagnostic(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
+    @Body(new ZodValidationPipe(submitAdaptiveDiagnosticSchema)) body: SubmitAdaptiveDiagnosticDto,
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive diagnostic evaluated.',
+      data: await this.adaptiveLearning.submitDiagnostic(user.id, courseSlug, body),
+    });
+  }
+
+  @Get('adaptive/me/:courseSlug')
+  async getAdaptiveProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string,
+  ) {
+    return ApiResponse.success({
+      message: 'Adaptive learning profile fetched.',
+      data: await this.adaptiveLearning.getMine(user.id, courseSlug),
     });
   }
 

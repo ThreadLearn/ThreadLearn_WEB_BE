@@ -27,3 +27,13 @@ export const updateCourseLearningGoalSchema = z.object({
 });
 
 export type UpdateCourseLearningGoalDto = z.infer<typeof updateCourseLearningGoalSchema>;
+
+export const adaptiveCourseSlugParamSchema = z.string().min(1).max(100);
+
+export const submitAdaptiveDiagnosticSchema = z.object({
+  goal: z.enum(['COMPLETE_COURSE', 'INTERVIEW_PREP', 'BUILD_PROJECT']),
+  weeklyHours: z.number().int().min(1).max(40).optional(),
+  answers: z.record(z.string().min(1), z.number().int().min(0).max(20)),
+});
+
+export type SubmitAdaptiveDiagnosticDto = z.infer<typeof submitAdaptiveDiagnosticSchema>;

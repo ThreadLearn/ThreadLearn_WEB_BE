@@ -3,9 +3,17 @@ import { LearningPlansController } from './learning-plans.controller';
 import { CourseLearningGoalsService } from './course-learning-goals.service';
 import { LearningPlanRemindersService } from './learning-plan-reminders.service';
 import { LearningPlansService } from './learning-plans.service';
+import { AdaptiveLearningService } from './adaptive-learning.service';
+import { AdaptiveMasteryService } from './adaptive-mastery.service';
 
 @Module({
   controllers: [LearningPlansController],
-  providers: [LearningPlansService, CourseLearningGoalsService, LearningPlanRemindersService],
+  providers: [
+    LearningPlansService,
+    CourseLearningGoalsService,
+    LearningPlanRemindersService,
+    AdaptiveLearningService,
+    AdaptiveMasteryService,
+  ],
 })
 export class LearningPlansModule {}
