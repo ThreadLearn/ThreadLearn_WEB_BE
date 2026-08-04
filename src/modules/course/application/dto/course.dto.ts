@@ -67,3 +67,21 @@ export type UpdateCourseDto = z.infer<typeof updateCourseSchema>;
 export type SetVisibilityDto = z.infer<typeof setVisibilitySchema>;
 export type ListCoursesQueryDto = z.infer<typeof listCoursesQuerySchema>;
 export type AssignCourseInstructorDto = z.infer<typeof assignCourseInstructorSchema>;
+
+export const createInstructorCourseSchema = z.object({
+  title: z.string().min(1, 'title is required.').max(200),
+  description: z.string().min(1, 'description is required.'),
+  shortDescription: z.string().max(500).optional(),
+  language: courseLanguageSchema.optional(),
+  level: courseLevelSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  category: z.string().optional(),
+  prerequisites: z.array(z.string()).optional(),
+  prerequisiteThreshold: z.number().min(0).max(100).optional(),
+  estimatedDuration: z.number().min(0).optional(),
+});
+
+export const updateInstructorCourseSchema = createInstructorCourseSchema.partial();
+
+export type CreateInstructorCourseDto = z.infer<typeof createInstructorCourseSchema>;
+export type UpdateInstructorCourseDto = z.infer<typeof updateInstructorCourseSchema>;

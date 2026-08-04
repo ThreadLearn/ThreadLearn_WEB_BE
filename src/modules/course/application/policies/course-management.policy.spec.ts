@@ -104,7 +104,7 @@ describe('CourseManagementPolicy', () => {
     });
 
     it('Missing isDeleted / deletedAt fields do not cause technical errors', () => {
-      const minimalCourse = { id: 'c-min', instructorId: 'inst-1' };
+      const minimalCourse = { id: 'c-min', instructorId: 'inst-1', status: 'draft' };
       expect(() => policy.canAuthorCourse(instructor1Actor, minimalCourse)).not.toThrow();
       expect(policy.canAuthorCourse(instructor1Actor, minimalCourse)).toBe(true);
 

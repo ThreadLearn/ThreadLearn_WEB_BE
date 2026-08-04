@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CourseModule } from '../course/course.module';
 import { EnrollmentsModule } from '../enrollments/enrollments.module';
 import { CourseLegacyController } from './controllers/course-legacy.controller';
 import { SectionsController } from './controllers/sections.controller';
@@ -7,7 +8,7 @@ import { CourseReviewsService } from './services/course-reviews.service';
 import { SectionsService } from './services/sections.service';
 
 @Module({
-  imports: [EnrollmentsModule],
+  imports: [EnrollmentsModule, CourseModule],
   controllers: [CourseLegacyController, SectionsController],
   providers: [CoursesService, CourseReviewsService, SectionsService],
   exports: [CoursesService, CourseReviewsService, SectionsService],
