@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LearningAccessModule } from '../../shared/application/learning-access/learning-access.module';
+import { CourseModule } from '../course/course.module';
 import { AIModule } from '../ai/ai.module';
 import { CodeExecutionService } from './application/services/code-execution.service';
 import { ExercisesService } from './application/services/exercises.service';
@@ -13,7 +14,7 @@ import { ExercisesController } from './presentation/controller/exercises.control
 import { DailyQuotaService } from '../../shared/infrastructure/quota/daily-quota.service';
 
 @Module({
-  imports: [LearningAccessModule, AIModule],
+  imports: [LearningAccessModule, AIModule, CourseModule],
   controllers: [CodeExecutionController, ExercisesController],
   providers: [
     MongoCodeExecutionRepository,

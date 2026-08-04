@@ -26,6 +26,12 @@ export class MongoQuizRepository implements IQuizRepository {
     return docs.map(QuizMapper.toEntity);
   }
 
+  async findByLessonIds(lessonIds: string[]): Promise<Quiz[]> {
+    if (!lessonIds.length) return [];
+    const docs = await QuizModel.find({ lessonId: { $in: lessonIds }, ...this.activeFilter }).exec();
+    return docs.map(QuizMapper.toEntity);
+  }
+
   async create(entity: Quiz): Promise<Quiz> {
     const data = QuizMapper.toPersistence(entity);
     const doc = await QuizModel.create(data);

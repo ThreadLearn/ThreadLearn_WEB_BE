@@ -17,7 +17,8 @@
     "db:migrate:notes-multiple": "ts-node src/database/migrations/migrate-note-multiple-per-lesson.ts",
     "db:migrate:quiz-question-bank": "ts-node src/database/migrations/migrate-quiz-question-bank.ts",
     "db:backfill:certificates": "ts-node src/database/migrations/backfill-missing-certificates.ts",
-    "db:migrate:contextual-discussion": "ts-node src/database/migrations/contextual-discussion-production-readiness.ts"
+    "db:migrate:contextual-discussion": "ts-node src/database/migrations/contextual-discussion-production-readiness.ts",
+    "db:assign-qa-instructor": "ts-node scripts/assign-qa-course-instructor.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",

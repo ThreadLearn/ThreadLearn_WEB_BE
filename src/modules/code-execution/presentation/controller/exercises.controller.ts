@@ -56,12 +56,13 @@ export class ExercisesController {
   }
 
   @Get(':id/submissions')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async listForAdmin(
     @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query(new ZodValidationPipe(submissionListQuerySchema)) query: SubmissionListQuery,
   ) {
-    const data = await this.exercises.listForAdmin(id, query.page, query.limit);
+    const data = await this.exercises.listForManagement(user, id, query.page, query.limit);
     return ApiResponse.success({ message: 'Assignment submissions fetched.', data });
   }
 
@@ -98,26 +99,27 @@ export class ExercisesController {
   }
 
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async create(@CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(exerciseCreateSchema)) body: ExerciseUpsertPayload) {
-    const data = await this.exercises.create(user.id, body);
+    const data = await this.exercises.create(user, body);
     return ApiResponse.success({ message: 'Code assignment created.', data, statusCode: 201 });
   }
 
   @Patch(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'INSTRUCTOR')
   async update(
     @Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string,
     @Body(new ZodValidationPipe(exerciseUpdateSchema)) body: ExerciseUpdatePayload,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const data = await this.exercises.update(id, body);
+    const data = await this.exercises.update(user, id, body);
     return ApiResponse.success({ message: 'Code assignment updated.', data });
   }
 
   @Delete(':id')
-  @Roles('ADMIN')
-  async remove(@Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string) {
-    const data = await this.exercises.remove(id);
+  @Roles('ADMIN', 'INSTRUCTOR')
+  async remove(@Param('id', new ZodValidationPipe(exerciseIdParamSchema)) id: string, @CurrentUser() user: AuthenticatedUser) {
+    const data = await this.exercises.remove(user, id);
     return ApiResponse.success({ message: 'Code assignment deleted.', data });
   }
 }

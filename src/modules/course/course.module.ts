@@ -13,6 +13,7 @@ import { ListMyInstructorCoursesService } from './application/services/list-my-i
 import { CreateInstructorCourseService } from './application/services/create-instructor-course.service';
 import { UpdateInstructorCourseService } from './application/services/update-instructor-course.service';
 import { GetInstructorCourseDetailService } from './application/services/get-instructor-course-detail.service';
+import { InstructorResourceAccessService } from './application/services/instructor-resource-access.service';
 import { AuthModule } from '../auth/auth.module';
 import { COURSE_CONTENT_PORT } from './domain/interfaces/course-content.port';
 import { COURSE_REPOSITORY } from './domain/interfaces/course.repository';
@@ -49,6 +50,7 @@ import { InstructorCourseController } from './presentation/controller/instructor
     CreateInstructorCourseService,
     UpdateInstructorCourseService,
     GetInstructorCourseDetailService,
+    InstructorResourceAccessService,
   ],
   exports: [
     COURSE_REPOSITORY,
@@ -57,6 +59,7 @@ import { InstructorCourseController } from './presentation/controller/instructor
     CreateInstructorCourseService,
     UpdateInstructorCourseService,
     GetInstructorCourseDetailService,
+    InstructorResourceAccessService,
   ],
 })
 export class CourseModule {}

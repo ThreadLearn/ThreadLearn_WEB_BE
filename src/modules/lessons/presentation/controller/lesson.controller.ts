@@ -42,6 +42,7 @@ import { SetLessonLockService } from '../../application/services/set-lesson-lock
 import { SoftDeleteLessonService } from '../../application/services/soft-delete-lesson.service';
 import { UpdateLessonAttachmentService } from '../../application/services/update-lesson-attachment.service';
 import { UpdateLessonService } from '../../application/services/update-lesson.service';
+import { InstructorResourceAccessService } from '../../../course/application/services/instructor-resource-access.service';
 import { LessonPresenter } from '../response/lesson.presenter';
 import { LessonVersionPresenter } from '../response/lesson-version.presenter';
 
@@ -59,6 +60,7 @@ export class LessonController {
     private readonly setLockSvc: SetLessonLockService,
     private readonly softDeleteSvc: SoftDeleteLessonService,
     private readonly updateAttachmentSvc: UpdateLessonAttachmentService,
+    private readonly resourceAccess: InstructorResourceAccessService,
   ) {}
 
   @Get()

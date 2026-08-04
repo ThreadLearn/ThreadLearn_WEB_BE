@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LessonsModule } from '../lessons/lessons.module';
+import { CourseModule } from '../course/course.module';
 import { QuizController } from './presentation/controller/quiz.controller';
 import { CreateQuizService } from './application/services/create-quiz.service';
 import { UpdateQuizService } from './application/services/update-quiz.service';
@@ -21,7 +22,7 @@ import { QUIZ_REPOSITORY } from './domain/interfaces/quiz.repository';
  * - QUIZ_REPOSITORY (PORT) — chuẩn cross-module
  */
 @Module({
-  imports: [LessonsModule], // inject LESSON_READ_PORT cho CreateQuizService
+  imports: [LessonsModule, CourseModule], // inject LESSON_READ_PORT cho CreateQuizService
   controllers: [QuizController],
   providers: [
     // ── Infrastructure ──
