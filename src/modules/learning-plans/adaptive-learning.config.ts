@@ -60,9 +60,8 @@ export const ADAPTIVE_SKILLS: readonly AdaptiveSkillDefinition[] = [
 ] as const;
 
 /**
- * The diagnostic deliberately reuses the 11 existing questions from the JS
- * midterm and final. Keeping the mapping beside the curriculum avoids exposing
- * correct answers or duplicating a second question bank for the MVP.
+ * These existing quiz questions are the resilient fallback when Gemini is not
+ * configured or returns an invalid diagnostic.
  */
 export const DIAGNOSTIC_QUIZ_BLUEPRINT: ReadonlyArray<{
   lessonSlug: 'js-midterm-quiz' | 'js-final-quiz';
@@ -90,6 +89,17 @@ export const DIAGNOSTIC_QUIZ_BLUEPRINT: ReadonlyArray<{
     ],
   },
 ] as const;
+
+const ADAPTIVE_ASSESSMENT_SKILLS: Readonly<Record<string, AdaptiveSkillKey>> = {
+  'js-midterm-quiz': 'ASYNC_PRIMITIVES',
+  'js-final-quiz': 'JOB_QUEUE_CAPSTONE',
+};
+
+export const getAdaptiveLessonSkill = (slug?: string): AdaptiveSkillKey | undefined => {
+  if (!slug) return undefined;
+  const curriculumSkill = ADAPTIVE_SKILLS.find((skill) => skill.lessonSlugs.includes(slug))?.key;
+  return curriculumSkill ?? ADAPTIVE_ASSESSMENT_SKILLS[slug];
+};
 
 export const getAdaptiveSkillDefinition = (key: AdaptiveSkillKey) => {
   const definition = ADAPTIVE_SKILLS.find((skill) => skill.key === key);

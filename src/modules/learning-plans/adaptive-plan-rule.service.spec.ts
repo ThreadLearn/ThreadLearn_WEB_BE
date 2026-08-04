@@ -5,11 +5,18 @@ describe('AdaptivePlanRuleService', () => {
   const service = new AdaptivePlanRuleService();
   const context: AdaptivePlanContext = {
     goal: 'COMPLETE_COURSE',
+    scope: 'FULL_COURSE',
     weeklyHours: 1,
     progressPercent: 30,
     overallMastery: 48,
     riskLevel: 'HIGH',
     riskSignals: ['Low mastery'],
+    requiredLessonIds: [
+      '64b000000000000000000001',
+      '64b000000000000000000002',
+    ],
+    selectedRemainingLessons: 2,
+    totalRemainingLessons: 2,
     skills: [
       { skillKey: 'RUNTIME_EVENT_LOOP', label: 'Runtime', score: 80, confidence: 100 },
       { skillKey: 'ASYNC_PRIMITIVES', label: 'Async', score: 30, confidence: 100 },
@@ -47,13 +54,13 @@ describe('AdaptivePlanRuleService', () => {
     ],
   };
 
-  it('starts with an incomplete lesson from the weakest skill', () => {
+  it('preserves curriculum order even when a later lesson belongs to the weakest skill', () => {
     const plan = service.generate(context);
 
-    expect(plan.nextBestLessonId).toBe('64b000000000000000000002');
+    expect(plan.nextBestLessonId).toBe('64b000000000000000000001');
     expect(plan.weeklyPlan[0]).toMatchObject({
-      focusSkillKey: 'ASYNC_PRIMITIVES',
-      lessonIds: ['64b000000000000000000002'],
+      focusSkillKey: 'RUNTIME_EVENT_LOOP',
+      lessonIds: ['64b000000000000000000001'],
     });
     expect(plan.weaknesses[0].skillKey).toBe('ASYNC_PRIMITIVES');
   });
@@ -61,6 +68,9 @@ describe('AdaptivePlanRuleService', () => {
   it('uses completed lessons only as review when no incomplete lesson remains', () => {
     const completedContext = {
       ...context,
+      requiredLessonIds: [],
+      selectedRemainingLessons: 0,
+      totalRemainingLessons: 0,
       lessons: context.lessons.map((lesson) => ({ ...lesson, isCompleted: true })),
     };
 
