@@ -73,6 +73,12 @@ export class MongoCourseRepository implements ICourseRepository {
       f.status = filter.status;
     }
 
+    if (filter.instructorId && mongoose.isValidObjectId(filter.instructorId)) {
+      f.instructorId = new mongoose.Types.ObjectId(filter.instructorId);
+      // My Courses is never a deleted-course recovery API, even when an Instructor requests a status.
+      f.status = filter.status && filter.status !== 'deleted' ? filter.status : { $ne: 'deleted' };
+    }
+
     if (filter.keyword) f.$text = { $search: filter.keyword };
     if (filter.level) f.level = filter.level;
     if (filter.language) f.language = filter.language;
