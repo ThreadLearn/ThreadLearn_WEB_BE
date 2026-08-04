@@ -24,7 +24,7 @@ export const adaptivePlanDraftSchema = z.object({
   weeklyPlan: z
     .array(
       z.object({
-        week: z.number().int().min(1).max(8),
+        week: z.number().int().min(1).max(24),
         focusSkillKey: adaptiveSkillKeySchema,
         lessonIds: z.array(z.string().min(1)).min(1).max(6),
         goal: z.string().min(1).max(250),
@@ -32,12 +32,14 @@ export const adaptivePlanDraftSchema = z.object({
       })
     )
     .min(1)
-    .max(8),
+    .max(24),
   nextBestLessonId: z.string().min(1),
   coachMessage: z.string().min(1).max(500),
 });
 
 export type AdaptivePlanDraft = z.infer<typeof adaptivePlanDraftSchema>;
+
+export type AdaptivePlanScope = 'FULL_COURSE' | 'FOCUSED';
 
 export interface AdaptiveLessonCandidate {
   id: string;
@@ -51,11 +53,15 @@ export interface AdaptiveLessonCandidate {
 
 export interface AdaptivePlanContext {
   goal: AdaptiveLearningGoal;
+  scope: AdaptivePlanScope;
   weeklyHours: number;
   progressPercent: number;
   overallMastery: number;
   riskLevel: AdaptiveRiskLevel;
   riskSignals: string[];
+  requiredLessonIds: string[];
+  selectedRemainingLessons: number;
+  totalRemainingLessons: number;
   skills: Array<{
     skillKey: AdaptiveSkillKey;
     label: string;
@@ -95,13 +101,13 @@ export const ADAPTIVE_PLAN_JSON_SCHEMA = {
     weeklyPlan: {
       type: 'array',
       minItems: 1,
-      maxItems: 8,
+      maxItems: 24,
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['week', 'focusSkillKey', 'lessonIds', 'goal', 'reason'],
         properties: {
-          week: { type: 'integer', minimum: 1, maximum: 8 },
+          week: { type: 'integer', minimum: 1, maximum: 24 },
           focusSkillKey: { type: 'string', enum: adaptiveSkillKeySchema.options },
           lessonIds: {
             type: 'array',

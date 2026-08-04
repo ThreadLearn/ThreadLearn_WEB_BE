@@ -52,11 +52,12 @@ export class LearningPlansController {
 
   @Get('adaptive/diagnostic/:courseSlug')
   async getAdaptiveDiagnostic(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('courseSlug', new ZodValidationPipe(adaptiveCourseSlugParamSchema)) courseSlug: string
   ) {
     return ApiResponse.success({
       message: 'Adaptive diagnostic fetched.',
-      data: await this.adaptiveLearning.getDiagnostic(courseSlug),
+      data: await this.adaptiveLearning.getDiagnostic(user.id, courseSlug),
     });
   }
 

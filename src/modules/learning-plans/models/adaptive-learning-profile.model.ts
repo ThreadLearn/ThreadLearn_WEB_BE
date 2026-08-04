@@ -1,6 +1,7 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { AdaptiveRiskLevel } from '../adaptive-mastery.service';
 import { AdaptiveSkillKey } from '../adaptive-learning.config';
+import type { AdaptivePlanScope } from '../adaptive-plan.types';
 
 export type AdaptiveLearningGoal = 'COMPLETE_COURSE' | 'INTERVIEW_PREP' | 'BUILD_PROJECT';
 
@@ -36,6 +37,13 @@ export interface IAdaptivePlanWeek {
 export interface IAdaptivePlanSnapshot {
   version: number;
   diagnosticVersion: number;
+  goal: AdaptiveLearningGoal;
+  scope: AdaptivePlanScope;
+  coverage: {
+    selectedLessons: number;
+    totalRemainingLessons: number;
+    percentage: number;
+  };
   generatedBy: AdaptivePlanSource;
   modelName?: string;
   fallbackReason?: string;
@@ -101,7 +109,7 @@ const AdaptivePlanLessonSchema = new Schema<IAdaptivePlanLesson>(
 
 const AdaptivePlanWeekSchema = new Schema<IAdaptivePlanWeek>(
   {
-    week: { type: Number, required: true, min: 1, max: 8 },
+    week: { type: Number, required: true, min: 1, max: 24 },
     focusSkillKey: {
       type: String,
       enum: ['RUNTIME_EVENT_LOOP', 'ASYNC_PRIMITIVES', 'RACE_SAFE_PATTERNS', 'JOB_QUEUE_CAPSTONE'],
@@ -120,6 +128,23 @@ const AdaptivePlanSnapshotSchema = new Schema<IAdaptivePlanSnapshot>(
   {
     version: { type: Number, required: true, min: 1 },
     diagnosticVersion: { type: Number, required: true, min: 1 },
+    goal: {
+      type: String,
+      enum: ['COMPLETE_COURSE', 'INTERVIEW_PREP', 'BUILD_PROJECT'],
+      required: true,
+    },
+    scope: { type: String, enum: ['FULL_COURSE', 'FOCUSED'], required: true },
+    coverage: {
+      type: new Schema(
+        {
+          selectedLessons: { type: Number, required: true, min: 0 },
+          totalRemainingLessons: { type: Number, required: true, min: 0 },
+          percentage: { type: Number, required: true, min: 0, max: 100 },
+        },
+        { _id: false },
+      ),
+      required: true,
+    },
     generatedBy: { type: String, enum: ['GEMINI', 'RULE_ENGINE'], required: true },
     modelName: { type: String },
     fallbackReason: { type: String },
